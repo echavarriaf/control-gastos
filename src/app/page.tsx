@@ -3,6 +3,7 @@
 import { LoaderCircle } from "lucide-react";
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -20,8 +21,13 @@ import { VariableMovementsSection } from "@/components/budget/VariableMovementsS
 import { ViewTabs } from "@/components/budget/ViewTabs";
 
 import { useBudgetData } from "@/hooks/useBudgetData";
-import { useBudgetNotifications } from "@/hooks/useBudgetNotifications";
+import type { AlertaPresupuesto } from "@/hooks/useBudgetNotifications";
 import { useBudgetSummary } from "@/hooks/useBudgetSummary";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+
+import {
+  CATEGORIAS_VARIABLES,
+} from "@/lib/budget/constants";
 
 import type {
   CompromisoFijo,
@@ -30,26 +36,49 @@ import type {
 } from "@/lib/budget/types";
 
 import {
+  formatoMoneda,
   obtenerPeriodo,
   obtenerQuincena,
 } from "@/lib/budget/utils";
 
-export default function Home() {
-  const [periodoActual, setPeriodoActual] =
-    useState(() => obtenerPeriodo(new Date()));
+const ALERTA_MINIMA = 90;
 
-  const [mesSeleccionado, setMesSeleccionado] =
-    useState(() => obtenerPeriodo(new Date()));
+export default function Home() {
+  const [
+    periodoActual,
+    setPeriodoActual,
+  ] = useState(() =>
+    obtenerPeriodo(
+      new Date(),
+    ),
+  );
+
+  const [
+    mesSeleccionado,
+    setMesSeleccionado,
+  ] = useState(() =>
+    obtenerPeriodo(
+      new Date(),
+    ),
+  );
 
   const [
     quincenaSeleccionada,
     setQuincenaSeleccionada,
-  ] = useState<Quincena>(() =>
-    obtenerQuincena(new Date()),
+  ] = useState<Quincena>(
+    () =>
+      obtenerQuincena(
+        new Date(),
+      ),
   );
 
-  const [vistaActual, setVistaActual] =
-    useState<Vista>("fijos");
+  const [
+    vistaActual,
+    setVistaActual,
+  ] =
+    useState<Vista>(
+      "fijos",
+    );
 
   const [
     mostrarConfiguracion,
@@ -59,78 +88,282 @@ export default function Home() {
   const [
     compromisoSeleccionado,
     setCompromisoSeleccionado,
-  ] = useState<CompromisoFijo | null>(null);
+  ] =
+    useState<CompromisoFijo | null>(
+      null,
+    );
 
   const periodoActualRef =
-    useRef(periodoActual);
-
-  const presupuesto = useBudgetData();
-
-  const resumen = useBudgetSummary({
-    gastos: presupuesto.gastos,
-    pagos: presupuesto.pagos,
-    pagosFijos: presupuesto.pagosFijos,
-    limites: presupuesto.limites,
-    mesSeleccionado,
-    quincenaSeleccionada,
-    periodoActual,
-  });
-
-  const notificaciones =
-    useBudgetNotifications({
-      resumenCategorias:
-        resumen.resumenCategorias,
-      limites: presupuesto.limites,
-      mesSeleccionado,
+    useRef(
       periodoActual,
+    );
+
+  const presupuesto =
+    useBudgetData();
+
+  const resumen =
+    useBudgetSummary({
+      gastos:
+        presupuesto.gastos,
+
+      pagos:
+        presupuesto.pagos,
+
+      pagosFijos:
+        presupuesto.pagosFijos,
+
+      limites:
+        presupuesto.limites,
+
+      mesSeleccionado,
+
       quincenaSeleccionada,
+
+      periodoActual,
     });
 
+  const push =
+    usePushNotifications();
+
+  /**
+   * Estas alertas se muestran únicamente dentro de la
+   * interfaz. Las notificaciones del sistema son manejadas
+   * por Firebase Cloud Messaging.
+   */
+  const alertasVisuales =
+    useMemo<
+      AlertaPresupuesto[]
+    >(() => {
+      const alertas:
+        AlertaPresupuesto[] =
+        [];
+
+      resumen
+        .resumenCategorias
+        .forEach(
+          (
+            categoria,
+          ) => {
+            const configuracion =
+              CATEGORIAS_VARIABLES[
+                categoria.key
+              ];
+
+            const limite =
+              presupuesto
+                .limites[
+                categoria.key
+              ];
+
+            if (
+              categoria
+                .porcentajeMes >=
+              ALERTA_MINIMA
+            ) {
+              const excedido =
+                categoria
+                  .porcentajeMes >=
+                100;
+
+              alertas.push({
+                id: `${categoria.key}-mensual`,
+
+                categoria:
+                  categoria.key,
+
+                tipo:
+                  "mensual",
+
+                nivel:
+                  excedido
+                    ? "excedido"
+                    : "advertencia",
+
+                porcentaje:
+                  categoria
+                    .porcentajeMes,
+
+                saldo:
+                  categoria
+                    .saldoMes,
+
+                limite:
+                  limite.mensual,
+
+                titulo:
+                  excedido
+                    ? `${configuracion.label}: límite excedido`
+                    : `${configuracion.label}: alerta del 90%`,
+
+                mensaje:
+                  excedido
+                    ? `El saldo de ${formatoMoneda.format(
+                        categoria.saldoMes,
+                      )} superó el límite mensual de ${formatoMoneda.format(
+                        limite.mensual,
+                      )}.`
+                    : `Has utilizado ${categoria.porcentajeMes.toFixed(
+                        0,
+                      )}% del límite mensual. Quedan ${formatoMoneda.format(
+                        Math.max(
+                          limite.mensual -
+                            categoria.saldoMes,
+                          0,
+                        ),
+                      )} disponibles.`,
+              });
+            }
+
+            if (
+              categoria
+                .porcentajeQuincena >=
+              ALERTA_MINIMA
+            ) {
+              const excedido =
+                categoria
+                  .porcentajeQuincena >=
+                100;
+
+              const nombreQuincena =
+                quincenaSeleccionada ===
+                1
+                  ? "primera"
+                  : "segunda";
+
+              alertas.push({
+                id: `${categoria.key}-quincenal`,
+
+                categoria:
+                  categoria.key,
+
+                tipo:
+                  "quincenal",
+
+                nivel:
+                  excedido
+                    ? "excedido"
+                    : "advertencia",
+
+                porcentaje:
+                  categoria
+                    .porcentajeQuincena,
+
+                saldo:
+                  categoria
+                    .saldoQuincena,
+
+                limite:
+                  limite.quincenal,
+
+                titulo:
+                  excedido
+                    ? `${configuracion.label}: límite excedido`
+                    : `${configuracion.label}: alerta del 90%`,
+
+                mensaje:
+                  excedido
+                    ? `El saldo de ${formatoMoneda.format(
+                        categoria.saldoQuincena,
+                      )} superó el límite de la ${nombreQuincena} quincena de ${formatoMoneda.format(
+                        limite.quincenal,
+                      )}.`
+                    : `Has utilizado ${categoria.porcentajeQuincena.toFixed(
+                        0,
+                      )}% del límite de la ${nombreQuincena} quincena. Quedan ${formatoMoneda.format(
+                        Math.max(
+                          limite.quincenal -
+                            categoria.saldoQuincena,
+                          0,
+                        ),
+                      )} disponibles.`,
+              });
+            }
+          },
+        );
+
+      return alertas.sort(
+        (a, b) => {
+          if (
+            a.nivel !==
+            b.nivel
+          ) {
+            return a.nivel ===
+              "excedido"
+              ? -1
+              : 1;
+          }
+
+          return (
+            b.porcentaje -
+            a.porcentaje
+          );
+        },
+      );
+    }, [
+      presupuesto.limites,
+      quincenaSeleccionada,
+      resumen.resumenCategorias,
+    ]);
+
   /*
-   * Si la aplicación permanece abierta cuando
-   * comienza un nuevo mes, cambia automáticamente
-   * al nuevo período.
+   * Si la aplicación permanece abierta cuando empieza
+   * un nuevo mes, cambia automáticamente al período nuevo.
    */
   useEffect(() => {
-    const sincronizarPeriodo = () => {
-      const ahora = new Date();
+    const sincronizarPeriodo =
+      () => {
+        const ahora =
+          new Date();
 
-      const nuevoPeriodo =
-        obtenerPeriodo(ahora);
+        const nuevoPeriodo =
+          obtenerPeriodo(
+            ahora,
+          );
 
-      if (
-        periodoActualRef.current ===
-        nuevoPeriodo
-      ) {
-        return;
-      }
+        if (
+          periodoActualRef
+            .current ===
+          nuevoPeriodo
+        ) {
+          return;
+        }
 
-      periodoActualRef.current =
-        nuevoPeriodo;
+        periodoActualRef.current =
+          nuevoPeriodo;
 
-      setPeriodoActual(nuevoPeriodo);
-      setMesSeleccionado(nuevoPeriodo);
+        setPeriodoActual(
+          nuevoPeriodo,
+        );
 
-      setQuincenaSeleccionada(
-        obtenerQuincena(ahora),
-      );
-    };
+        setMesSeleccionado(
+          nuevoPeriodo,
+        );
+
+        setQuincenaSeleccionada(
+          obtenerQuincena(
+            ahora,
+          ),
+        );
+      };
 
     sincronizarPeriodo();
 
-    const intervalId = window.setInterval(
-      sincronizarPeriodo,
-      60_000,
-    );
+    const intervalId =
+      window.setInterval(
+        sincronizarPeriodo,
+        60_000,
+      );
 
-    const sincronizarAlRegresar = () => {
-      if (
-        document.visibilityState ===
-        "visible"
-      ) {
-        sincronizarPeriodo();
-      }
-    };
+    const sincronizarAlRegresar =
+      () => {
+        if (
+          document
+            .visibilityState ===
+          "visible"
+        ) {
+          sincronizarPeriodo();
+        }
+      };
 
     document.addEventListener(
       "visibilitychange",
@@ -138,7 +371,9 @@ export default function Home() {
     );
 
     return () => {
-      window.clearInterval(intervalId);
+      window.clearInterval(
+        intervalId,
+      );
 
       document.removeEventListener(
         "visibilitychange",
@@ -154,38 +389,64 @@ export default function Home() {
           totalPlanMensual={
             resumen.totalPlanMensual
           }
-          totalFijo={resumen.totalFijo}
+          totalFijo={
+            resumen.totalFijo
+          }
           limiteVariableMensual={
-            resumen.limiteVariableMensual
+            resumen
+              .limiteVariableMensual
           }
           saldoVariableMes={
             resumen.saldoVariableMes
           }
           disponibleVariableMes={
-            resumen.disponibleVariableMes
+            resumen
+              .disponibleVariableMes
           }
           totalPagadoFijoMes={
-            resumen.totalPagadoFijoMes
+            resumen
+              .totalPagadoFijoMes
           }
           totalPendienteFijoMes={
-            resumen.totalPendienteFijoMes
+            resumen
+              .totalPendienteFijoMes
           }
-          permisoNotificaciones={
-            notificaciones
-              .permisoNotificaciones
+          estadoPush={
+            push.estado
           }
-          onSolicitarNotificaciones={
-            notificaciones
-              .solicitarPermiso
+          permisoPush={
+            push.permiso
+          }
+          installationId={
+            push.installationId
+          }
+          requiereInstalacionIOS={
+            push
+              .requiereInstalacionIOS
+          }
+          errorPush={
+            push.error
+          }
+          onActivarPush={
+            push.activarPush
+          }
+          onDesactivarPush={
+            push.desactivarPush
+          }
+          onLimpiarErrorPush={
+            push.limpiarError
           }
           onAbrirConfiguracion={() =>
-            setMostrarConfiguracion(true)
+            setMostrarConfiguracion(
+              true,
+            )
           }
         />
 
         <PeriodSelector
           mesesDisponibles={
-            resumen.mesesDisponibles
+            resumen
+              .mesesDisponibles
           }
           mesSeleccionado={
             mesSeleccionado
@@ -203,18 +464,22 @@ export default function Home() {
 
         <div className="space-y-5 p-4 pb-28 sm:p-6 sm:pb-8">
           <FeedbackBanners
-            error={presupuesto.error}
+            error={
+              presupuesto.error
+            }
             alertas={
-              notificaciones.alertasActivas
+              alertasVisuales
             }
             onCerrarError={
-              presupuesto.limpiarError
+              presupuesto
+                .limpiarError
             }
           />
 
           <CategorySummaryGrid
             resumenCategorias={
-              resumen.resumenCategorias
+              resumen
+                .resumenCategorias
             }
             limites={
               presupuesto.limites
@@ -225,7 +490,9 @@ export default function Home() {
           />
 
           <ViewTabs
-            vistaActual={vistaActual}
+            vistaActual={
+              vistaActual
+            }
             onCambiarVista={
               setVistaActual
             }
@@ -233,10 +500,12 @@ export default function Home() {
 
           {presupuesto.cargando ? (
             <LoadingState />
-          ) : vistaActual === "fijos" ? (
+          ) : vistaActual ===
+            "fijos" ? (
             <FixedPaymentsSection
               resumenFijos={
-                resumen.resumenFijos
+                resumen
+                  .resumenFijos
               }
               quincenaSeleccionada={
                 quincenaSeleccionada
@@ -245,7 +514,8 @@ export default function Home() {
                 resumen.totalFijo
               }
               totalPagadoFijoMes={
-                resumen.totalPagadoFijoMes
+                resumen
+                  .totalPagadoFijoMes
               }
               totalPendienteFijoMes={
                 resumen
@@ -312,7 +582,9 @@ export default function Home() {
       </div>
 
       <BottomNavigation
-        vistaActual={vistaActual}
+        vistaActual={
+          vistaActual
+        }
         onCambiarVista={
           setVistaActual
         }
@@ -329,13 +601,17 @@ export default function Home() {
           quincenaSeleccionada
         }
         guardando={
-          presupuesto.guardandoPagoFijo
+          presupuesto
+            .guardandoPagoFijo
         }
         onCerrar={() =>
-          setCompromisoSeleccionado(null)
+          setCompromisoSeleccionado(
+            null,
+          )
         }
         onRegistrar={
-          presupuesto.registrarPagoFijo
+          presupuesto
+            .registrarPagoFijo
         }
       />
 
@@ -347,13 +623,17 @@ export default function Home() {
           presupuesto.limites
         }
         guardando={
-          presupuesto.guardandoLimites
+          presupuesto
+            .guardandoLimites
         }
         onCerrar={() =>
-          setMostrarConfiguracion(false)
+          setMostrarConfiguracion(
+            false,
+          )
         }
         onGuardar={
-          presupuesto.guardarLimites
+          presupuesto
+            .guardarLimites
         }
       />
     </main>
@@ -373,8 +653,8 @@ function LoadingState() {
       </p>
 
       <p className="mt-1 text-xs font-medium text-slate-500">
-        Consultando gastos, pagos y límites
-        en Firestore.
+        Consultando gastos, pagos y límites en
+        Firestore.
       </p>
     </div>
   );

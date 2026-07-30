@@ -1,0 +1,311 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function textoValido(value, minLength, maxLength) {
+      return value is string
+        && value.size() >= minLength
+        && value.size() <= maxLength;
+    }
+
+    function montoValido(value) {
+      return value is number
+        && value >= 0
+        && value <= 1000000;
+    }
+
+    function fechaValida(value) {
+      return textoValido(value, 10, 50);
+    }
+
+    function timestampONull(value) {
+      return value == null
+        || value is timestamp;
+    }
+
+    function categoriaVariableValida(value) {
+      return value == "comida"
+        || value == "gas";
+    }
+
+    function categoriaPagoValida(value) {
+      return value == "comida"
+        || value == "gas"
+        || value == "general";
+    }
+
+    function metodoPagoFijoValido(value) {
+      return value == "debito_automatico"
+        || value == "transferencia"
+        || value == "tarjeta"
+        || value == "efectivo"
+        || value == "otro";
+    }
+
+    function periodicidadValida(value) {
+      return value == "mensual"
+        || value == "quincenal";
+    }
+
+    function permisoPushValido(value) {
+      return value == "default"
+        || value == "granted"
+        || value == "denied"
+        || value == "no_soportado";
+    }
+
+    function gastoValido(data) {
+      return data.keys().hasOnly([
+          "concepto",
+          "monto",
+          "categoria",
+          "fecha"
+        ])
+        && data.keys().hasAll([
+          "concepto",
+          "monto",
+          "categoria",
+          "fecha"
+        ])
+        && textoValido(data.concepto, 1, 200)
+        && montoValido(data.monto)
+        && categoriaVariableValida(data.categoria)
+        && fechaValida(data.fecha);
+    }
+
+    function pagoTarjetaValido(data) {
+      return data.keys().hasOnly([
+          "concepto",
+          "tarjeta",
+          "monto",
+          "categoria",
+          "fecha"
+        ])
+        && data.keys().hasAll([
+          "concepto",
+          "tarjeta",
+          "monto",
+          "categoria",
+          "fecha"
+        ])
+        && textoValido(data.concepto, 1, 200)
+        && textoValido(data.tarjeta, 1, 200)
+        && montoValido(data.monto)
+        && categoriaPagoValida(data.categoria)
+        && fechaValida(data.fecha);
+    }
+
+    function pagoFijoValido(data) {
+      return data.keys().hasOnly([
+          "compromisoId",
+          "descripcion",
+          "monto",
+          "fecha",
+          "metodo",
+          "periodicidad",
+          "quincena",
+          "periodo",
+          "referencia",
+          "notas",
+          "creadoEn"
+        ])
+        && data.keys().hasAll([
+          "compromisoId",
+          "descripcion",
+          "monto",
+          "fecha",
+          "metodo",
+          "periodicidad",
+          "quincena",
+          "periodo",
+          "referencia",
+          "notas",
+          "creadoEn"
+        ])
+        && textoValido(data.compromisoId, 1, 100)
+        && textoValido(data.descripcion, 1, 250)
+        && montoValido(data.monto)
+        && fechaValida(data.fecha)
+        && metodoPagoFijoValido(data.metodo)
+        && periodicidadValida(data.periodicidad)
+        && (
+          data.quincena == 1
+          || data.quincena == 2
+        )
+        && textoValido(data.periodo, 7, 7)
+        && data.referencia is string
+        && data.referencia.size() <= 250
+        && data.notas is string
+        && data.notas.size() <= 1000
+        && fechaValida(data.creadoEn);
+    }
+
+    function limiteValido(data) {
+      return data is map
+        && data.keys().hasOnly([
+          "mensual",
+          "quincenal"
+        ])
+        && data.keys().hasAll([
+          "mensual",
+          "quincenal"
+        ])
+        && montoValido(data.mensual)
+        && montoValido(data.quincenal);
+    }
+
+    function configuracionValida(data) {
+      return data.keys().hasOnly([
+          "limites",
+          "actualizadoEn"
+        ])
+        && data.keys().hasAll([
+          "limites",
+          "actualizadoEn"
+        ])
+        && data.limites is map
+        && data.limites.keys().hasOnly([
+          "comida",
+          "gas"
+        ])
+        && data.limites.keys().hasAll([
+          "comida",
+          "gas"
+        ])
+        && limiteValido(data.limites.comida)
+        && limiteValido(data.limites.gas)
+        && fechaValida(data.actualizadoEn);
+    }
+
+    function camposClienteDispositivo() {
+      return [
+        "installationId",
+        "activo",
+        "app",
+        "permiso",
+        "dispositivo",
+        "plataforma",
+        "idioma",
+        "zonaHoraria",
+        "userAgent",
+        "actualizadoEn",
+        "registradoEn",
+        "desactivadoEn"
+      ];
+    }
+
+    function dispositivoClienteValido(data) {
+      return data.keys().hasAll([
+          "installationId",
+          "activo",
+          "app",
+          "permiso",
+          "dispositivo",
+          "plataforma",
+          "idioma",
+          "zonaHoraria",
+          "userAgent",
+          "actualizadoEn",
+          "registradoEn",
+          "desactivadoEn"
+        ])
+        && textoValido(data.installationId, 10, 500)
+        && data.activo is bool
+        && data.app == "presupuesto-felo"
+        && permisoPushValido(data.permiso)
+        && textoValido(data.dispositivo, 1, 100)
+        && textoValido(data.plataforma, 1, 200)
+        && textoValido(data.idioma, 1, 50)
+        && textoValido(data.zonaHoraria, 1, 100)
+        && textoValido(data.userAgent, 1, 1000)
+        && data.actualizadoEn is timestamp
+        && timestampONull(data.registradoEn)
+        && timestampONull(data.desactivadoEn);
+    }
+
+    /*
+     * La aplicación actual no utiliza Firebase Authentication.
+     * Estas colecciones siguen accesibles para no romperla,
+     * pero cada escritura debe respetar el esquema esperado.
+     */
+    match /gastos/{gastoId} {
+      allow read: if true;
+
+      allow create, update:
+        if gastoValido(request.resource.data);
+
+      allow delete: if true;
+    }
+
+    match /pagosTarjeta/{pagoId} {
+      allow read: if true;
+
+      allow create, update:
+        if pagoTarjetaValido(request.resource.data);
+
+      allow delete: if true;
+    }
+
+    match /pagosFijos/{pagoFijoId} {
+      allow read: if true;
+
+      allow create, update:
+        if pagoFijoValido(request.resource.data);
+
+      allow delete: if true;
+    }
+
+    match /configuracion/presupuestoFelo {
+      allow read: if true;
+
+      allow create, update:
+        if configuracionValida(request.resource.data);
+
+      allow delete: if false;
+    }
+
+    /*
+     * Los Firebase Installation IDs nunca pueden leerse
+     * desde el navegador.
+     */
+    match /notificationDevices/{deviceId} {
+      allow get, list: if false;
+
+      allow create:
+        if request.resource.data.keys().hasOnly(
+          camposClienteDispositivo()
+        )
+        && dispositivoClienteValido(
+          request.resource.data
+        );
+
+      allow update:
+        if request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(camposClienteDispositivo())
+        && dispositivoClienteValido(
+          request.resource.data
+        )
+        && request.resource.data.installationId
+          == resource.data.installationId;
+
+      allow delete: if false;
+    }
+
+    /*
+     * Solo Firebase Admin puede acceder a los estados
+     * internos de deduplicación.
+     */
+    match /notificationAlertStates/{alertId} {
+      allow read, write: if false;
+    }
+
+    /*
+     * Bloquea cualquier colección no declarada.
+     */
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
