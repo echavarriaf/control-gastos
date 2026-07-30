@@ -9,7 +9,7 @@ const SERVICE_WORKER_URL =
   "/firebase-messaging-sw.js";
 
 const SERVICE_WORKER_SCOPE =
-  "/firebase-cloud-messaging-push-scope/";
+  "/";
 
 const vapidKey =
   process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
@@ -236,6 +236,7 @@ export async function registrarServiceWorkerPush(): Promise<ServiceWorkerRegistr
         {
           scope: SERVICE_WORKER_SCOPE,
           updateViaCache: "none",
+          type:"classic",
         },
       );
 
