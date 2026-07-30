@@ -35,8 +35,8 @@ messaging.onBackgroundMessage((payload) => {
 
   return self.registration.showNotification(title, {
     body,
-    icon: data.icon || "/icons/icon-192.png",
-    badge: data.badge || "/icons/icon-192.png",
+    icon: data.icon || "/icons/notification-icon-v2.png",
+    badge: data.badge || "/icons/notification-icon-v2.png",
     tag: data.tag || "presupuesto-felo",
     data: {
       ...data,
