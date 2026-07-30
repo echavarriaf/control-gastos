@@ -45,7 +45,7 @@ export function BudgetHeader({
         : "Activar notificaciones";
 
   return (
-    <header className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-5 text-white sm:p-7">
+    <header className="relative overflow-hidden bg-linear-to-br from-slate-950 via-indigo-950 to-slate-900 p-5 text-white sm:p-7">
       <div
         aria-hidden="true"
         className="absolute -right-12 -top-14 h-44 w-44 rounded-full bg-indigo-500/20 blur-3xl"
