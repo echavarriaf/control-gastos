@@ -1,6 +1,5 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
 import {
   useEffect,
   useMemo,
@@ -8,12 +7,17 @@ import {
   useState,
 } from "react";
 
+import LoadingState from "@/components/LoadingState";
+
 import { BottomNavigation } from "@/components/budget/BottomNavigation";
 import { BudgetHeader } from "@/components/budget/BudgetHeader";
 import { BudgetSettingsModal } from "@/components/budget/BudgetSettingsModal";
 import { CategorySummaryGrid } from "@/components/budget/CategorySummaryGrid";
 import { FeedbackBanners } from "@/components/budget/FeedbackBanners";
 import { FixedPaymentModal } from "@/components/budget/FixedPaymentModal";
+import { IncomeSettingsModal } from "@/components/budget/IncomeSettingsModal";
+import IncomeReceiptModal from "@/components/budget/IncomeReceiptModal";
+import { IncomeCycleSummary } from "@/components/budget/IncomeCycleSummary";
 import { FixedPaymentsSection } from "@/components/budget/FixedPaymentsSection";
 import { PeriodSelector } from "@/components/budget/PeriodSelector";
 import { VariableMovementForm } from "@/components/budget/VariableMovementForm";
@@ -21,27 +25,24 @@ import { VariableMovementsSection } from "@/components/budget/VariableMovementsS
 import { ViewTabs } from "@/components/budget/ViewTabs";
 
 import { useBudgetData } from "@/hooks/useBudgetData";
-import type { AlertaPresupuesto } from "@/hooks/useBudgetNotifications";
 import { useBudgetSummary } from "@/hooks/useBudgetSummary";
+import { useBudgetVisualAlerts } from "@/hooks/useBudgetVisualAlerts";
+import { useIncomeData } from "@/hooks/useIncomeData";
+import { useIncomeTransactions } from "@/hooks/useIncomeTransactions";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
-import {
-  CATEGORIAS_VARIABLES,
-} from "@/lib/budget/constants";
-
 import type {
+  CicloPago,
   CompromisoFijo,
+  Ingreso,
   Quincena,
   Vista,
 } from "@/lib/budget/types";
 
 import {
-  formatoMoneda,
   obtenerPeriodo,
   obtenerQuincena,
 } from "@/lib/budget/utils";
-
-const ALERTA_MINIMA = 90;
 
 export default function Home() {
   const [
@@ -86,6 +87,19 @@ export default function Home() {
   ] = useState(false);
 
   const [
+    mostrarConfiguracionIngreso,
+    setMostrarConfiguracionIngreso,
+  ] = useState(false);
+
+  const [
+    cicloIngresoSeleccionado,
+    setCicloIngresoSeleccionado,
+  ] =
+    useState<CicloPago | null>(
+      null,
+    );
+
+  const [
     compromisoSeleccionado,
     setCompromisoSeleccionado,
   ] =
@@ -100,6 +114,65 @@ export default function Home() {
 
   const presupuesto =
     useBudgetData();
+
+  const ingresos =
+    useIncomeData();
+
+  const movimientosIngresos =
+    useIncomeTransactions();
+
+  const ingresoCicloActual =
+    useMemo<Ingreso | null>(
+      () => {
+        if (
+          !ingresos.cicloActual
+        ) {
+          return null;
+        }
+
+        return (
+          movimientosIngresos
+            .ingresosPorCiclo
+            .get(
+              ingresos
+                .cicloActual
+                .id,
+            ) ??
+          null
+        );
+      },
+      [
+        ingresos.cicloActual,
+        movimientosIngresos
+          .ingresosPorCiclo,
+      ],
+    );
+
+  const ingresoCicloSeleccionado =
+    useMemo<Ingreso | null>(
+      () => {
+        if (
+          !cicloIngresoSeleccionado
+        ) {
+          return null;
+        }
+
+        return (
+          movimientosIngresos
+            .ingresosPorCiclo
+            .get(
+              cicloIngresoSeleccionado
+                .id,
+            ) ??
+          null
+        );
+      },
+      [
+        cicloIngresoSeleccionado,
+        movimientosIngresos
+          .ingresosPorCiclo,
+      ],
+    );
 
   const resumen =
     useBudgetSummary({
@@ -125,185 +198,16 @@ export default function Home() {
   const push =
     usePushNotifications();
 
-  /**
-   * Estas alertas se muestran únicamente dentro de la
-   * interfaz. Las notificaciones del sistema son manejadas
-   * por Firebase Cloud Messaging.
-   */
   const alertasVisuales =
-    useMemo<
-      AlertaPresupuesto[]
-    >(() => {
-      const alertas:
-        AlertaPresupuesto[] =
-        [];
+    useBudgetVisualAlerts({
+      resumenCategorias:
+        resumen.resumenCategorias,
 
-      resumen
-        .resumenCategorias
-        .forEach(
-          (
-            categoria,
-          ) => {
-            const configuracion =
-              CATEGORIAS_VARIABLES[
-                categoria.key
-              ];
+      limites:
+        presupuesto.limites,
 
-            const limite =
-              presupuesto
-                .limites[
-                categoria.key
-              ];
-
-            if (
-              categoria
-                .porcentajeMes >=
-              ALERTA_MINIMA
-            ) {
-              const excedido =
-                categoria
-                  .porcentajeMes >=
-                100;
-
-              alertas.push({
-                id: `${categoria.key}-mensual`,
-
-                categoria:
-                  categoria.key,
-
-                tipo:
-                  "mensual",
-
-                nivel:
-                  excedido
-                    ? "excedido"
-                    : "advertencia",
-
-                porcentaje:
-                  categoria
-                    .porcentajeMes,
-
-                saldo:
-                  categoria
-                    .saldoMes,
-
-                limite:
-                  limite.mensual,
-
-                titulo:
-                  excedido
-                    ? `${configuracion.label}: límite excedido`
-                    : `${configuracion.label}: alerta del 90%`,
-
-                mensaje:
-                  excedido
-                    ? `El saldo de ${formatoMoneda.format(
-                        categoria.saldoMes,
-                      )} superó el límite mensual de ${formatoMoneda.format(
-                        limite.mensual,
-                      )}.`
-                    : `Has utilizado ${categoria.porcentajeMes.toFixed(
-                        0,
-                      )}% del límite mensual. Quedan ${formatoMoneda.format(
-                        Math.max(
-                          limite.mensual -
-                            categoria.saldoMes,
-                          0,
-                        ),
-                      )} disponibles.`,
-              });
-            }
-
-            if (
-              categoria
-                .porcentajeQuincena >=
-              ALERTA_MINIMA
-            ) {
-              const excedido =
-                categoria
-                  .porcentajeQuincena >=
-                100;
-
-              const nombreQuincena =
-                quincenaSeleccionada ===
-                1
-                  ? "primera"
-                  : "segunda";
-
-              alertas.push({
-                id: `${categoria.key}-quincenal`,
-
-                categoria:
-                  categoria.key,
-
-                tipo:
-                  "quincenal",
-
-                nivel:
-                  excedido
-                    ? "excedido"
-                    : "advertencia",
-
-                porcentaje:
-                  categoria
-                    .porcentajeQuincena,
-
-                saldo:
-                  categoria
-                    .saldoQuincena,
-
-                limite:
-                  limite.quincenal,
-
-                titulo:
-                  excedido
-                    ? `${configuracion.label}: límite excedido`
-                    : `${configuracion.label}: alerta del 90%`,
-
-                mensaje:
-                  excedido
-                    ? `El saldo de ${formatoMoneda.format(
-                        categoria.saldoQuincena,
-                      )} superó el límite de la ${nombreQuincena} quincena de ${formatoMoneda.format(
-                        limite.quincenal,
-                      )}.`
-                    : `Has utilizado ${categoria.porcentajeQuincena.toFixed(
-                        0,
-                      )}% del límite de la ${nombreQuincena} quincena. Quedan ${formatoMoneda.format(
-                        Math.max(
-                          limite.quincenal -
-                            categoria.saldoQuincena,
-                          0,
-                        ),
-                      )} disponibles.`,
-              });
-            }
-          },
-        );
-
-      return alertas.sort(
-        (a, b) => {
-          if (
-            a.nivel !==
-            b.nivel
-          ) {
-            return a.nivel ===
-              "excedido"
-              ? -1
-              : 1;
-          }
-
-          return (
-            b.porcentaje -
-            a.porcentaje
-          );
-        },
-      );
-    }, [
-      presupuesto.limites,
       quincenaSeleccionada,
-      resumen.resumenCategorias,
-    ]);
+    });
 
   /*
    * Si la aplicación permanece abierta cuando empieza
@@ -465,14 +369,69 @@ export default function Home() {
         <div className="space-y-5 p-4 pb-28 sm:p-6 sm:pb-8">
           <FeedbackBanners
             error={
-              presupuesto.error
+              presupuesto.error ??
+              ingresos.error ??
+              movimientosIngresos.error
             }
             alertas={
               alertasVisuales
             }
-            onCerrarError={
+            onCerrarError={() => {
               presupuesto
-                .limpiarError
+                .limpiarError();
+
+              ingresos
+                .limpiarError();
+
+              movimientosIngresos
+                .limpiarError();
+            }}
+          />
+
+          <IncomeCycleSummary
+            montoEstimado={
+              ingresos
+                .configuracion
+                .montoEstimado
+            }
+            cargando={
+              ingresos.cargando
+            }
+            cicloActual={
+              ingresos.cicloActual
+            }
+            proximoCiclo={
+              ingresos.proximoCiclo
+            }
+            pagosMes={
+              ingresos
+                .ciclosMesActual
+                .length
+            }
+            ingresoActual={
+              ingresoCicloActual
+            }
+            cargandoIngreso={
+              movimientosIngresos
+                .cargando
+            }
+            guardandoIngreso={
+              movimientosIngresos
+                .guardando
+            }
+            onRegistrarDeposito={() => {
+              if (
+                ingresos.cicloActual
+              ) {
+                setCicloIngresoSeleccionado(
+                  ingresos.cicloActual,
+                );
+              }
+            }}
+            onConfigurar={() =>
+              setMostrarConfiguracionIngreso(
+                true,
+              )
             }
           />
 
@@ -636,26 +595,63 @@ export default function Home() {
             .guardarLimites
         }
       />
+
+      <IncomeSettingsModal
+        abierta={
+          mostrarConfiguracionIngreso
+        }
+        configuracion={
+          ingresos.configuracion
+        }
+        guardando={
+          ingresos
+            .guardandoConfiguracion
+        }
+        onCerrar={() =>
+          setMostrarConfiguracionIngreso(
+            false,
+          )
+        }
+        onGuardar={
+          ingresos
+            .guardarConfiguracion
+        }
+      />
+
+      <IncomeReceiptModal
+        abierto={
+          cicloIngresoSeleccionado !==
+          null
+        }
+        ciclo={
+          cicloIngresoSeleccionado
+        }
+        configuracion={
+          ingresos.configuracion
+        }
+        ingresoExistente={
+          ingresoCicloSeleccionado
+        }
+        guardando={
+          movimientosIngresos
+            .guardando
+        }
+        error={
+          movimientosIngresos.error
+        }
+        onCerrar={() => {
+          setCicloIngresoSeleccionado(
+            null,
+          );
+
+          movimientosIngresos
+            .limpiarError();
+        }}
+        onGuardar={
+          movimientosIngresos
+            .registrarIngresoRecibido
+        }
+      />
     </main>
-  );
-}
-
-function LoadingState() {
-  return (
-    <div
-      role="status"
-      className="flex min-h-56 flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm"
-    >
-      <LoaderCircle className="h-7 w-7 animate-spin text-indigo-600" />
-
-      <p className="mt-3 text-sm font-black text-slate-800">
-        Cargando presupuesto...
-      </p>
-
-      <p className="mt-1 text-xs font-medium text-slate-500">
-        Consultando gastos, pagos y límites en
-        Firestore.
-      </p>
-    </div>
   );
 }
