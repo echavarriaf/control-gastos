@@ -9,7 +9,9 @@ import {
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
   setDoc,
+  Timestamp,
 } from "firebase/firestore";
 
 import { auth, db } from "@/lib/firebase";
@@ -48,6 +50,28 @@ interface RegistroOrdenable {
   id: string;
   fecha: string;
   creadoEn: string;
+}
+
+/**
+ * Convierte el Timestamp de Firestore a ISO para mantener
+ * el resto de la aplicación trabajando con strings.
+ *
+ * El fallback cubre el snapshot local inicial mientras
+ * Firestore confirma el serverTimestamp().
+ */
+function normalizarCreadoEn(
+  value: unknown,
+  fallback: string,
+): string {
+  if (value instanceof Timestamp) {
+    return value.toDate().toISOString();
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return fallback;
 }
 
 /**
@@ -192,10 +216,10 @@ export function useBudgetData() {
               monto: normalizarMonto(data.monto, 0),
               categoria,
               fecha,
-              creadoEn:
-                typeof data.creadoEn === "string"
-                  ? data.creadoEn
-                  : fecha,
+              creadoEn: normalizarCreadoEn(
+                data.creadoEn,
+                fecha,
+              ),
             } satisfies GastoVariable,
           ];
         });
@@ -238,10 +262,10 @@ export function useBudgetData() {
             monto: normalizarMonto(data.monto, 0),
             categoria: normalizarCategoriaPago(data.categoria),
             fecha,
-            creadoEn:
-              typeof data.creadoEn === "string"
-                ? data.creadoEn
-                : fecha,
+            creadoEn: normalizarCreadoEn(
+              data.creadoEn,
+              fecha,
+            ),
           } satisfies PagoTarjeta;
         });
 
@@ -333,15 +357,13 @@ export function useBudgetData() {
     setError(null);
 
     try {
-      const creadoEn = new Date().toISOString();
-
       if (movimiento.tipo === "gasto") {
         await addDoc(collection(db, "gastos"), {
           concepto: movimiento.concepto.trim(),
           monto: movimiento.monto,
           categoria: movimiento.categoria,
           fecha: convertirFechaInputAISO(movimiento.fecha),
-          creadoEn,
+          creadoEn: serverTimestamp(),
         });
       } else {
         await addDoc(collection(db, "pagosTarjeta"), {
@@ -350,7 +372,7 @@ export function useBudgetData() {
           monto: movimiento.monto,
           categoria: movimiento.categoria,
           fecha: convertirFechaInputAISO(movimiento.fecha),
-          creadoEn,
+          creadoEn: serverTimestamp(),
         });
       }
 
@@ -395,7 +417,7 @@ export function useBudgetData() {
         periodo: pago.fecha.slice(0, 7),
         referencia: pago.referencia.trim(),
         notas: pago.notas.trim(),
-        creadoEn: new Date().toISOString(),
+        creadoEn: serverTimestamp(),
       });
 
       return true;
