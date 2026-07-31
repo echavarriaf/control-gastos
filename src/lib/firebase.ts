@@ -6,6 +6,10 @@ import {
   type FirebaseOptions,
 } from "firebase/app";
 import {
+  getAuth,
+  type Auth,
+} from "firebase/auth";
+import {
   getFirestore,
   initializeFirestore,
   type Firestore,
@@ -100,6 +104,18 @@ function crearFirestore(): Firestore {
   });
 }
 
+/**
+ * Firebase Authentication.
+ *
+ * Se utilizará para iniciar sesión con Google y proteger
+ * el acceso a Firestore.
+ */
+export const auth: Auth =
+  getAuth(app);
+
+/**
+ * Firestore utilizado por la aplicación.
+ */
 export const db: Firestore =
   globalThis.__presupuestoFeloFirestore ??
   crearFirestore();

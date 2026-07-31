@@ -7,11 +7,26 @@ import {
   Settings,
   X,
 } from "lucide-react";
-import { useState } from "react";
 
-import { PushNotificationButton } from "@/components/budget/PushNotificationButton";
-import type { EstadoPush } from "@/hooks/usePushNotifications";
-import { formatoMoneda } from "@/lib/budget/utils";
+import {
+  useState,
+} from "react";
+
+import {
+  AuthUserMenu,
+} from "@/components/auth/AuthUserMenu";
+
+import {
+  PushNotificationButton,
+} from "@/components/budget/PushNotificationButton";
+
+import type {
+  EstadoPush,
+} from "@/hooks/usePushNotifications";
+
+import {
+  formatoMoneda,
+} from "@/lib/budget/utils";
 
 interface BudgetHeaderProps {
   totalPlanMensual: number;
@@ -63,12 +78,15 @@ export function BudgetHeader({
   const [
     mostrarPanelPush,
     setMostrarPanelPush,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const pushActivo =
     estadoPush === "activo" &&
     permisoPush === "granted" &&
-    Boolean(installationId);
+    Boolean(
+      installationId,
+    );
 
   const pushProcesando =
     estadoPush === "comprobando" ||
@@ -87,15 +105,15 @@ export function BudgetHeader({
           : "Configurar notificaciones push";
 
   return (
-    <header className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-5 text-white sm:p-7">
+    <header className="relative overflow-visible bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-5 text-white sm:p-7">
       <div
         aria-hidden="true"
-        className="absolute -right-12 -top-14 h-44 w-44 rounded-full bg-indigo-500/20 blur-3xl"
+        className="pointer-events-none absolute -right-12 -top-14 h-44 w-44 rounded-full bg-indigo-500/20 blur-3xl"
       />
 
       <div
         aria-hidden="true"
-        className="absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-400/10 blur-3xl"
+        className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-400/10 blur-3xl"
       />
 
       <div className="relative flex items-start justify-between gap-3">
@@ -127,13 +145,20 @@ export function BudgetHeader({
             type="button"
             onClick={() => {
               setMostrarPanelPush(
-                (actual) => !actual,
+                (actual) =>
+                  !actual,
               );
             }}
-            aria-label={tituloPush}
-            aria-expanded={mostrarPanelPush}
+            aria-label={
+              tituloPush
+            }
+            aria-expanded={
+              mostrarPanelPush
+            }
             aria-controls="panel-notificaciones-push"
-            title={tituloPush}
+            title={
+              tituloPush
+            }
             className={`rounded-2xl border p-3 transition active:scale-95 ${
               pushActivo
                 ? "border-emerald-300/30 bg-emerald-400/10"
@@ -155,59 +180,83 @@ export function BudgetHeader({
 
           <button
             type="button"
-            onClick={onAbrirConfiguracion}
+            onClick={
+              onAbrirConfiguracion
+            }
             aria-label="Configurar límites"
             title="Configurar límites"
             className="rounded-2xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10 active:scale-95"
           >
             <Settings className="h-4 w-4 text-indigo-200" />
           </button>
+
+          <AuthUserMenu />
         </div>
       </div>
 
-      {mostrarPanelPush && (
+      {mostrarPanelPush ? (
         <div
           id="panel-notificaciones-push"
-          className="relative mt-4 rounded-3xl border border-white/10 bg-slate-50 p-3 text-slate-900 shadow-2xl"
+          className="relative z-20 mt-4 rounded-3xl border border-white/10 bg-slate-50 p-3 text-slate-900 shadow-2xl"
         >
           <PushNotificationButton
-            estado={estadoPush}
-            permiso={permisoPush}
-            installationId={installationId}
+            estado={
+              estadoPush
+            }
+            permiso={
+              permisoPush
+            }
+            installationId={
+              installationId
+            }
             requiereInstalacionIOS={
               requiereInstalacionIOS
             }
-            error={errorPush}
-            onActivar={onActivarPush}
-            onDesactivar={onDesactivarPush}
+            error={
+              errorPush
+            }
+            onActivar={
+              onActivarPush
+            }
+            onDesactivar={
+              onDesactivarPush
+            }
             onLimpiarError={
               onLimpiarErrorPush
             }
           />
         </div>
-      )}
+      ) : null}
 
       <div className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Metric
           label="Saldo variable"
-          value={saldoVariableMes}
+          value={
+            saldoVariableMes
+          }
         />
 
         <Metric
           label="Disponible"
-          value={disponibleVariableMes}
+          value={
+            disponibleVariableMes
+          }
           valueClassName="text-emerald-300"
         />
 
         <Metric
           label="Fijos pagados"
-          value={totalPagadoFijoMes}
+          value={
+            totalPagadoFijoMes
+          }
           valueClassName="text-cyan-200"
         />
 
         <Metric
           label="Fijos pendientes"
-          value={totalPendienteFijoMes}
+          value={
+            totalPendienteFijoMes
+          }
           valueClassName="text-amber-200"
         />
       </div>
@@ -235,7 +284,9 @@ function Metric({
       <p
         className={`mt-1 text-lg font-black ${valueClassName}`}
       >
-        {formatoMoneda.format(value)}
+        {formatoMoneda.format(
+          value,
+        )}
       </p>
     </div>
   );
