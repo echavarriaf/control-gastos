@@ -62,7 +62,15 @@ interface ResultadoCiclosIngreso {
   ciclos: CicloPago[];
   cicloActual: CicloPago | null;
   proximoCiclo: CicloPago | null;
-  ciclosMesActual: CicloPago[];
+
+  periodoPresupuestarioActual: string;
+  quincenaPresupuestariaActual:
+    | 1
+    | 2
+    | null;
+
+  ciclosPeriodoPresupuestarioActual:
+    CicloPago[];
 }
 
 /**
@@ -204,10 +212,23 @@ export function useIncomeData() {
           ) ??
           null;
 
-        const periodoActual =
+        const periodoPresupuestarioActual =
+          cicloActual
+            ?.periodoPresupuestario ??
           fechaReferencia.slice(
             0,
             7,
+          );
+
+        const quincenaPresupuestariaActual =
+          cicloActual
+            ?.quincenaPresupuestaria ??
+          null;
+
+        const ciclosPeriodoPresupuestarioActual =
+          obtenerCiclosDelMes(
+            ciclos,
+            periodoPresupuestarioActual,
           );
 
         return {
@@ -217,11 +238,11 @@ export function useIncomeData() {
 
           proximoCiclo,
 
-          ciclosMesActual:
-            obtenerCiclosDelMes(
-              ciclos,
-              periodoActual,
-            ),
+          periodoPresupuestarioActual,
+
+          quincenaPresupuestariaActual,
+
+          ciclosPeriodoPresupuestarioActual,
         };
       },
       [
@@ -301,8 +322,26 @@ export function useIncomeData() {
     proximoCiclo:
       resultadoCiclos.proximoCiclo,
 
+    periodoPresupuestarioActual:
+      resultadoCiclos
+        .periodoPresupuestarioActual,
+
+    quincenaPresupuestariaActual:
+      resultadoCiclos
+        .quincenaPresupuestariaActual,
+
+    ciclosPeriodoPresupuestarioActual:
+      resultadoCiclos
+        .ciclosPeriodoPresupuestarioActual,
+
+    /**
+     * Alias temporal para no romper los componentes actuales.
+     * Ahora representa los dos ciclos del periodo
+     * presupuestario, no los depósitos del mes calendario.
+     */
     ciclosMesActual:
-      resultadoCiclos.ciclosMesActual,
+      resultadoCiclos
+        .ciclosPeriodoPresupuestarioActual,
 
     cargando:
       cargandoConfiguracion,

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/__/auth/:path*",
+      "destination": "https://control-gastos-f89e4.firebaseapp.com/__/auth/:path*"
+    }
+  ]
+}

@@ -15,88 +15,177 @@ import {
   obtenerQuincena,
 } from "@/lib/budget/utils";
 
+interface UseBudgetPeriodArgs {
+  /**
+   * Periodo financiado por el ciclo de ingreso actual.
+   * Formato: YYYY-MM.
+   */
+  periodoPresupuestarioActual?:
+    string;
+
+  /**
+   * Quincena financiada por el ciclo de ingreso actual.
+   */
+  quincenaPresupuestariaActual?:
+    Quincena | null;
+
+  /**
+   * Evita sincronizar con valores temporales mientras
+   * se carga la configuración del ingreso.
+   */
+  cargando?: boolean;
+}
+
+interface PeriodoPresupuestario {
+  periodo: string;
+  quincena: Quincena;
+}
+
+function obtenerPeriodoCalendarioActual():
+  PeriodoPresupuestario {
+  const ahora =
+    new Date();
+
+  return {
+    periodo:
+      obtenerPeriodo(
+        ahora,
+      ),
+
+    quincena:
+      obtenerQuincena(
+        ahora,
+      ),
+  };
+}
+
 /**
- * Administra el período visible del presupuesto.
+ * Administra el periodo visible del presupuesto.
  *
- * También detecta cuando comienza un mes nuevo mientras
- * la aplicación permanece abierta o vuelve del segundo plano.
+ * Cuando recibe el ciclo de ingreso actual, el periodo y la
+ * quincena se determinan por el dinero que los financia.
+ *
+ * Mantiene un fallback basado en el calendario para conservar
+ * compatibilidad mientras los componentes terminan de migrarse.
  */
-export function useBudgetPeriod() {
+export function useBudgetPeriod({
+  periodoPresupuestarioActual,
+  quincenaPresupuestariaActual,
+  cargando = false,
+}: UseBudgetPeriodArgs = {}) {
+  const periodoInicial =
+    periodoPresupuestarioActual &&
+    quincenaPresupuestariaActual
+      ? {
+          periodo:
+            periodoPresupuestarioActual,
+
+          quincena:
+            quincenaPresupuestariaActual,
+        }
+      : obtenerPeriodoCalendarioActual();
+
   const [
     periodoActual,
     setPeriodoActual,
-  ] = useState(() =>
-    obtenerPeriodo(
-      new Date(),
-    ),
-  );
+  ] =
+    useState(
+      periodoInicial.periodo,
+    );
 
   const [
     mesSeleccionado,
     setMesSeleccionado,
-  ] = useState(() =>
-    obtenerPeriodo(
-      new Date(),
-    ),
-  );
+  ] =
+    useState(
+      periodoInicial.periodo,
+    );
 
   const [
     quincenaSeleccionada,
     setQuincenaSeleccionada,
-  ] = useState<Quincena>(
-    () =>
-      obtenerQuincena(
-        new Date(),
-      ),
-  );
+  ] =
+    useState<Quincena>(
+      periodoInicial.quincena,
+    );
 
   const periodoActualRef =
     useRef(
-      periodoActual,
+      periodoInicial.periodo,
+    );
+
+  const quincenaActualRef =
+    useRef<Quincena>(
+      periodoInicial.quincena,
     );
 
   useEffect(() => {
-    const sincronizarPeriodo =
+    const sincronizarPeriodo = (
+      siguiente:
+        PeriodoPresupuestario,
+    ) => {
+      const cambioPeriodo =
+        periodoActualRef.current !==
+        siguiente.periodo;
+
+      const cambioQuincena =
+        quincenaActualRef.current !==
+        siguiente.quincena;
+
+      if (
+        !cambioPeriodo &&
+        !cambioQuincena
+      ) {
+        return;
+      }
+
+      periodoActualRef.current =
+        siguiente.periodo;
+
+      quincenaActualRef.current =
+        siguiente.quincena;
+
+      setPeriodoActual(
+        siguiente.periodo,
+      );
+
+      setMesSeleccionado(
+        siguiente.periodo,
+      );
+
+      setQuincenaSeleccionada(
+        siguiente.quincena,
+      );
+    };
+
+    if (
+      !cargando &&
+      periodoPresupuestarioActual &&
+      quincenaPresupuestariaActual
+    ) {
+      sincronizarPeriodo({
+        periodo:
+          periodoPresupuestarioActual,
+
+        quincena:
+          quincenaPresupuestariaActual,
+      });
+
+      return;
+    }
+
+    const sincronizarCalendario =
       () => {
-        const ahora =
-          new Date();
-
-        const nuevoPeriodo =
-          obtenerPeriodo(
-            ahora,
-          );
-
-        if (
-          periodoActualRef
-            .current ===
-          nuevoPeriodo
-        ) {
-          return;
-        }
-
-        periodoActualRef.current =
-          nuevoPeriodo;
-
-        setPeriodoActual(
-          nuevoPeriodo,
-        );
-
-        setMesSeleccionado(
-          nuevoPeriodo,
-        );
-
-        setQuincenaSeleccionada(
-          obtenerQuincena(
-            ahora,
-          ),
+        sincronizarPeriodo(
+          obtenerPeriodoCalendarioActual(),
         );
       };
 
-    sincronizarPeriodo();
+    sincronizarCalendario();
 
     const intervalId =
       window.setInterval(
-        sincronizarPeriodo,
+        sincronizarCalendario,
         60_000,
       );
 
@@ -107,7 +196,7 @@ export function useBudgetPeriod() {
             .visibilityState ===
           "visible"
         ) {
-          sincronizarPeriodo();
+          sincronizarCalendario();
         }
       };
 
@@ -126,7 +215,11 @@ export function useBudgetPeriod() {
         sincronizarAlRegresar,
       );
     };
-  }, []);
+  }, [
+    cargando,
+    periodoPresupuestarioActual,
+    quincenaPresupuestariaActual,
+  ]);
 
   return {
     periodoActual,

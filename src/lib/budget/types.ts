@@ -185,13 +185,34 @@ export interface CicloPago {
   finCobertura: string;
 
   /**
-   * Solo se usa para agrupar y mostrar información.
-   * No determina el ciclo de pago.
+   * Mes calendario en el que ocurrió el depósito.
+   *
+   * Puede contener dos o tres pagos y no determina
+   * qué presupuesto financia el ingreso.
    */
   periodoCalendario: string;
 
   /**
-   * Puede ser 1, 2 o 3 dentro de un mes.
+   * Mes presupuestario financiado por este ciclo.
+   *
+   * Ejemplo:
+   * depósito del 30 de julio -> presupuesto de agosto.
+   */
+  periodoPresupuestario: string;
+
+  /**
+   * Posición del ciclo dentro del periodo presupuestario.
+   *
+   * Cada periodo presupuestario tiene exactamente
+   * una primera y una segunda quincena.
+   */
+  quincenaPresupuestaria:
+    | 1
+    | 2;
+
+  /**
+   * Puede ser 1, 2 o 3 dentro del mes calendario
+   * en que ocurrió el depósito.
    */
   numeroPagoMes: number;
 

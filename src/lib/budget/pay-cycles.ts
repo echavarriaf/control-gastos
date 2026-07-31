@@ -10,6 +10,14 @@ const MILISEGUNDOS_POR_DIA =
 const INTERVALO_PREDETERMINADO =
   14;
 
+const QUINCENAS_POR_PERIODO =
+  2;
+
+export interface AsignacionPresupuestaria {
+  periodoPresupuestario: string;
+  quincenaPresupuestaria: 1 | 2;
+}
+
 interface GenerarCiclosPagoArgs {
   configuracion:
     Pick<
@@ -277,6 +285,181 @@ function obtenerInicioAnio(
   );
 }
 
+function convertirPeriodoAFechaUTC(
+  periodo: string,
+): Date {
+  const coincidencia =
+    /^(\d{4})-(\d{2})$/.exec(
+      periodo,
+    );
+
+  if (!coincidencia) {
+    throw new Error(
+      `El periodo "${periodo}" debe usar el formato YYYY-MM.`,
+    );
+  }
+
+  const [, anioTexto, mesTexto] =
+    coincidencia;
+
+  const anio =
+    Number(anioTexto);
+
+  const mes =
+    Number(mesTexto);
+
+  if (
+    mes < 1 ||
+    mes > 12
+  ) {
+    throw new Error(
+      `El periodo "${periodo}" no contiene un mes válido.`,
+    );
+  }
+
+  return new Date(
+    Date.UTC(
+      anio,
+      mes - 1,
+      1,
+    ),
+  );
+}
+
+function convertirFechaAPeriodo(
+  valor: string | Date,
+): string {
+  return convertirFechaAISO(
+    valor,
+  ).slice(0, 7);
+}
+
+export function agregarMesesAPeriodo(
+  periodo: string,
+  meses: number,
+): string {
+  if (!Number.isInteger(meses)) {
+    throw new Error(
+      "La cantidad de meses debe ser un número entero.",
+    );
+  }
+
+  const fecha =
+    convertirPeriodoAFechaUTC(
+      periodo,
+    );
+
+  return convertirFechaAPeriodo(
+    new Date(
+      Date.UTC(
+        fecha.getUTCFullYear(),
+        fecha.getUTCMonth() + meses,
+        1,
+      ),
+    ),
+  );
+}
+
+function obtenerDesplazamientoCiclo(
+  fechaPago: string | Date,
+  fechaAncla: string | Date,
+  intervaloDias: number,
+): number {
+  const diferencia =
+    diferenciaDiasUTC(
+      fechaAncla,
+      fechaPago,
+    );
+
+  if (
+    diferencia % intervaloDias !==
+    0
+  ) {
+    throw new Error(
+      "La fecha de pago no está alineada con la fecha ancla.",
+    );
+  }
+
+  return diferencia / intervaloDias;
+}
+
+/**
+ * Asigna cada dos ciclos reales de pago a un mismo periodo
+ * presupuestario.
+ *
+ * La fecha ancla se considera la primera quincena del periodo
+ * cubierto por ese ingreso. Para la configuración actual:
+ *
+ * - 2026-07-30 -> agosto, primera quincena;
+ * - 2026-08-13 -> agosto, segunda quincena;
+ * - 2026-08-27 -> septiembre, primera quincena.
+ *
+ * Esto evita que el tercer depósito de un mes se trate como una
+ * tercera quincena del mismo presupuesto.
+ */
+export function obtenerAsignacionPresupuestaria(
+  fechaPago: string | Date,
+  fechaAncla: string | Date,
+  intervaloDias =
+    INTERVALO_PREDETERMINADO,
+): AsignacionPresupuestaria {
+  const intervalo =
+    validarIntervalo(
+      intervaloDias,
+    );
+
+  const ancla =
+    convertirAFechaUTC(
+      fechaAncla,
+    );
+
+  const finCoberturaAncla =
+    agregarDiasUTC(
+      ancla,
+      intervalo - 1,
+    );
+
+  const periodoAncla =
+    convertirFechaAPeriodo(
+      finCoberturaAncla,
+    );
+
+  const desplazamiento =
+    obtenerDesplazamientoCiclo(
+      fechaPago,
+      ancla,
+      intervalo,
+    );
+
+  const desplazamientoPeriodo =
+    Math.floor(
+      desplazamiento /
+        QUINCENAS_POR_PERIODO,
+    );
+
+  const posicionNormalizada =
+    (
+      (
+        desplazamiento %
+        QUINCENAS_POR_PERIODO
+      ) +
+      QUINCENAS_POR_PERIODO
+    ) % QUINCENAS_POR_PERIODO;
+
+  return {
+    periodoPresupuestario:
+      agregarMesesAPeriodo(
+        periodoAncla,
+        desplazamientoPeriodo,
+      ),
+
+    quincenaPresupuestaria:
+      (
+        posicionNormalizada + 1
+      ) as 1 | 2,
+  };
+}
+
 function obtenerNumeroPagoDesde(
   fechaPago: string | Date,
   inicioPeriodo: Date,
@@ -442,6 +625,15 @@ export function generarCiclosPago({
       const periodoCalendario =
         fechaPagoISO.slice(0, 7);
 
+      const {
+        periodoPresupuestario,
+        quincenaPresupuestaria,
+      } = obtenerAsignacionPresupuestaria(
+        fechaPago,
+        fechaAncla,
+        intervaloDias,
+      );
+
       return {
         id:
           `${configuracion.id}__${fechaPagoISO}`,
@@ -469,6 +661,9 @@ export function generarCiclosPago({
           ),
 
         periodoCalendario,
+
+        periodoPresupuestario,
+        quincenaPresupuestaria,
 
         numeroPagoMes:
           obtenerNumeroPagoMes(
@@ -521,10 +716,31 @@ export function buscarCicloParaFecha({
 }
 
 /**
- * Devuelve los ciclos cuyo pago cae dentro del mes.
- * Puede devolver dos o tres ciclos.
+ * Devuelve los dos ciclos que financian un periodo
+ * presupuestario.
  */
 export function obtenerCiclosDelMes(
+  ciclos: CicloPago[],
+  periodo: string,
+): CicloPago[] {
+  return ciclos
+    .filter(
+      (ciclo) =>
+        ciclo.periodoPresupuestario ===
+        periodo,
+    )
+    .sort(
+      (a, b) =>
+        a.quincenaPresupuestaria -
+        b.quincenaPresupuestaria,
+    );
+}
+
+/**
+ * Devuelve los depósitos cuya fecha real cae dentro del mes
+ * calendario. Puede devolver dos o tres ciclos.
+ */
+export function obtenerCiclosDelMesCalendario(
   ciclos: CicloPago[],
   periodo: string,
 ): CicloPago[] {
