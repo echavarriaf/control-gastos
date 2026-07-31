@@ -8,10 +8,17 @@ import {
   type App,
   type ServiceAccount,
 } from "firebase-admin/app";
+
+import {
+  getAuth,
+  type Auth,
+} from "firebase-admin/auth";
+
 import {
   getFirestore,
   type Firestore,
 } from "firebase-admin/firestore";
+
 import {
   getMessaging,
   type Messaging,
@@ -21,9 +28,9 @@ const ADMIN_APP_NAME =
   "presupuesto-felo-admin";
 
 let cachedApp: App | null = null;
+let cachedAuth: Auth | null = null;
 let cachedDb: Firestore | null = null;
-let cachedMessaging: Messaging | null =
-  null;
+let cachedMessaging: Messaging | null = null;
 
 /**
  * Obtiene o inicializa Firebase Admin.
@@ -84,6 +91,23 @@ export function getFirebaseAdminApp(): App {
   );
 
   return cachedApp;
+}
+
+/**
+ * Firebase Authentication con permisos administrativos.
+ *
+ * Se utiliza en el servidor para verificar los ID tokens
+ * enviados por usuarios autenticados.
+ */
+export function getAdminAuth(): Auth {
+  if (!cachedAuth) {
+    cachedAuth =
+      getAuth(
+        getFirebaseAdminApp(),
+      );
+  }
+
+  return cachedAuth;
 }
 
 /**

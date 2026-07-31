@@ -298,6 +298,7 @@ export interface GastoVariable {
   monto: number;
   categoria: CategoriaVariable;
   fecha: string;
+  creadoEn: string;
 
   metodoPago?:
     MetodoPagoMovimiento;
@@ -327,6 +328,7 @@ export interface PagoTarjeta {
   monto: number;
   categoria: CategoriaPago;
   fecha: string;
+  creadoEn: string;
 
   tarjetaId?:
     string | null;
