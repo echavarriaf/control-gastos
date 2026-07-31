@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -27,6 +25,7 @@ import { ViewTabs } from "@/components/budget/ViewTabs";
 import { useBudgetData } from "@/hooks/useBudgetData";
 import { useBudgetSummary } from "@/hooks/useBudgetSummary";
 import { useBudgetVisualAlerts } from "@/hooks/useBudgetVisualAlerts";
+import { useBudgetPeriod } from "@/hooks/useBudgetPeriod";
 import { useIncomeData } from "@/hooks/useIncomeData";
 import { useIncomeTransactions } from "@/hooks/useIncomeTransactions";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -35,43 +34,18 @@ import type {
   CicloPago,
   CompromisoFijo,
   Ingreso,
-  Quincena,
   Vista,
 } from "@/lib/budget/types";
 
-import {
-  obtenerPeriodo,
-  obtenerQuincena,
-} from "@/lib/budget/utils";
 
 export default function Home() {
-  const [
+  const {
     periodoActual,
-    setPeriodoActual,
-  ] = useState(() =>
-    obtenerPeriodo(
-      new Date(),
-    ),
-  );
-
-  const [
     mesSeleccionado,
-    setMesSeleccionado,
-  ] = useState(() =>
-    obtenerPeriodo(
-      new Date(),
-    ),
-  );
-
-  const [
     quincenaSeleccionada,
+    setMesSeleccionado,
     setQuincenaSeleccionada,
-  ] = useState<Quincena>(
-    () =>
-      obtenerQuincena(
-        new Date(),
-      ),
-  );
+  } = useBudgetPeriod();
 
   const [
     vistaActual,
@@ -105,11 +79,6 @@ export default function Home() {
   ] =
     useState<CompromisoFijo | null>(
       null,
-    );
-
-  const periodoActualRef =
-    useRef(
-      periodoActual,
     );
 
   const presupuesto =
@@ -208,83 +177,6 @@ export default function Home() {
 
       quincenaSeleccionada,
     });
-
-  /*
-   * Si la aplicación permanece abierta cuando empieza
-   * un nuevo mes, cambia automáticamente al período nuevo.
-   */
-  useEffect(() => {
-    const sincronizarPeriodo =
-      () => {
-        const ahora =
-          new Date();
-
-        const nuevoPeriodo =
-          obtenerPeriodo(
-            ahora,
-          );
-
-        if (
-          periodoActualRef
-            .current ===
-          nuevoPeriodo
-        ) {
-          return;
-        }
-
-        periodoActualRef.current =
-          nuevoPeriodo;
-
-        setPeriodoActual(
-          nuevoPeriodo,
-        );
-
-        setMesSeleccionado(
-          nuevoPeriodo,
-        );
-
-        setQuincenaSeleccionada(
-          obtenerQuincena(
-            ahora,
-          ),
-        );
-      };
-
-    sincronizarPeriodo();
-
-    const intervalId =
-      window.setInterval(
-        sincronizarPeriodo,
-        60_000,
-      );
-
-    const sincronizarAlRegresar =
-      () => {
-        if (
-          document
-            .visibilityState ===
-          "visible"
-        ) {
-          sincronizarPeriodo();
-        }
-      };
-
-    document.addEventListener(
-      "visibilitychange",
-      sincronizarAlRegresar,
-    );
-
-    return () => {
-      window.clearInterval(
-        intervalId,
-      );
-
-      document.removeEventListener(
-        "visibilitychange",
-        sincronizarAlRegresar,
-      );
-    };
-  }, []);
 
   return (
     <main className="min-h-screen bg-slate-950 px-0 py-0 text-slate-900 antialiased sm:px-5 sm:py-5">
