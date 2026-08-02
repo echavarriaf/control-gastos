@@ -33,8 +33,14 @@ import {
   montoSeguro,
 } from "@/lib/budget/utils";
 
+type OpcionMontoPago =
+  | "total"
+  | "mitad"
+  | "otro";
+
 interface FixedPaymentModalProps {
   compromiso: CompromisoFijo | null;
+  montoPendiente?: number;
   mesSeleccionado: string;
   quincenaSeleccionada: Quincena;
   guardando: boolean;
@@ -46,15 +52,18 @@ interface FixedPaymentModalProps {
 
 export function FixedPaymentModal({
   compromiso,
+  montoPendiente,
   mesSeleccionado,
   quincenaSeleccionada,
   guardando,
   onCerrar,
   onRegistrar,
 }: FixedPaymentModalProps) {
+  const [opcionMonto, setOpcionMonto] =
+    useState<OpcionMontoPago>("total");
+
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState("");
-
   const [metodo, setMetodo] =
     useState<MetodoPagoFijo>("transferencia");
 
@@ -76,8 +85,16 @@ export function FixedPaymentModal({
       return;
     }
 
+    const totalPendiente =
+      typeof montoPendiente === "number" &&
+        Number.isFinite(montoPendiente)
+        ? Math.max(montoPendiente, 0)
+        : compromiso.monto;
+
+    setOpcionMonto("total");
+
     setMonto(
-      compromiso.monto.toFixed(2),
+      totalPendiente.toFixed(2),
     );
 
     setFecha(
@@ -94,6 +111,7 @@ export function FixedPaymentModal({
     setErrorLocal(null);
   }, [
     compromiso,
+    montoPendiente,
     mesSeleccionado,
     quincenaSeleccionada,
   ]);
@@ -134,6 +152,40 @@ export function FixedPaymentModal({
   if (!compromiso) {
     return null;
   }
+
+  const totalPendiente =
+    typeof montoPendiente === "number" &&
+      Number.isFinite(montoPendiente)
+      ? Math.max(montoPendiente, 0)
+      : compromiso.monto;
+
+  const mitadPendiente =
+    Math.round(
+      (totalPendiente / 2) * 100,
+    ) / 100;
+
+  const seleccionarMonto = (
+    opcion: OpcionMontoPago,
+  ) => {
+    setOpcionMonto(opcion);
+    setErrorLocal(null);
+
+    if (opcion === "total") {
+      setMonto(
+        totalPendiente.toFixed(2),
+      );
+      return;
+    }
+
+    if (opcion === "mitad") {
+      setMonto(
+        mitadPendiente.toFixed(2),
+      );
+      return;
+    }
+
+    setMonto("");
+  };
 
   const enviarFormulario = async (
     event: FormEvent<HTMLFormElement>,
@@ -186,7 +238,7 @@ export function FixedPaymentModal({
       onMouseDown={(event) => {
         if (
           event.target ===
-            event.currentTarget &&
+          event.currentTarget &&
           !guardando
         ) {
           onCerrar();
@@ -237,28 +289,88 @@ export function FixedPaymentModal({
           onSubmit={enviarFormulario}
           className="space-y-5 p-5"
         >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              id="pago-fijo-monto"
-              label="Monto pagado"
-              icon={Wallet}
-            >
-              <input
-                id="pago-fijo-monto"
-                type="number"
-                inputMode="decimal"
-                min="0.01"
-                step="0.01"
-                value={monto}
-                onChange={(event) =>
-                  setMonto(
-                    event.target.value,
-                  )
-                }
+          <fieldset>
+            <legend className="mb-2 flex items-center gap-1.5 text-xs font-black text-slate-700">
+              <Wallet className="h-3.5 w-3.5 text-slate-400" />
+              Monto a pagar
+            </legend>
+
+            <div className="grid gap-2 sm:grid-cols-3">
+              <AmountOption
+                id="pago-fijo-monto-total"
+                name="pago-fijo-opcion-monto"
+                label="Total"
+                amount={totalPendiente}
+                checked={opcionMonto === "total"}
                 disabled={guardando}
-                className={inputClassName}
+                onChange={() =>
+                  seleccionarMonto("total")
+                }
               />
-            </Field>
+
+              <AmountOption
+                id="pago-fijo-monto-mitad"
+                name="pago-fijo-opcion-monto"
+                label="Mitad"
+                amount={mitadPendiente}
+                checked={opcionMonto === "mitad"}
+                disabled={guardando}
+                onChange={() =>
+                  seleccionarMonto("mitad")
+                }
+              />
+
+              <AmountOption
+                id="pago-fijo-monto-otro"
+                name="pago-fijo-opcion-monto"
+                label="Otro"
+                checked={opcionMonto === "otro"}
+                disabled={guardando}
+                onChange={() =>
+                  seleccionarMonto("otro")
+                }
+              />
+            </div>
+          </fieldset>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {opcionMonto === "otro" ? (
+              <Field
+                id="pago-fijo-monto"
+                label="Otro monto"
+                icon={Wallet}
+              >
+                <input
+                  id="pago-fijo-monto"
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  step="0.01"
+                  value={monto}
+                  onChange={(event) =>
+                    setMonto(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Escribe el monto"
+                  autoFocus
+                  disabled={guardando}
+                  className={inputClassName}
+                />
+              </Field>
+            ) : (
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-indigo-500">
+                  Monto seleccionado
+                </p>
+
+                <p className="mt-1 text-lg font-black text-indigo-950">
+                  {formatoMoneda.format(
+                    montoSeguro(monto) ?? 0,
+                  )}
+                </p>
+              </div>
+            )}
 
             <Field
               id="pago-fijo-fecha"
@@ -437,6 +549,65 @@ export function FixedPaymentModal({
         </form>
       </section>
     </div>
+  );
+}
+
+interface AmountOptionProps {
+  id: string;
+  name: string;
+  label: string;
+  amount?: number;
+  checked: boolean;
+  disabled: boolean;
+  onChange: () => void;
+}
+
+function AmountOption({
+  id,
+  name,
+  label,
+  amount,
+  checked,
+  disabled,
+  onChange,
+}: AmountOptionProps) {
+  return (
+    <label
+      htmlFor={id}
+      className={`flex min-h-20 cursor-pointer items-center gap-3 rounded-2xl border px-3 py-3 transition ${checked
+          ? "border-indigo-500 bg-indigo-50 ring-4 ring-indigo-100"
+          : "border-slate-200 bg-slate-50 hover:border-indigo-200 hover:bg-white"
+        } ${disabled
+          ? "cursor-not-allowed opacity-60"
+          : ""
+        }`}
+    >
+      <input
+        id={id}
+        name={name}
+        type="radio"
+        checked={checked}
+        onChange={onChange}
+        disabled={disabled}
+        className="h-4 w-4 shrink-0 accent-indigo-600"
+      />
+
+      <span className="min-w-0">
+        <span className="block text-xs font-black text-slate-800">
+          {label}
+        </span>
+
+        {typeof amount === "number" ? (
+          <span className="mt-0.5 block text-[11px] font-bold text-slate-500">
+            {formatoMoneda.format(amount)}
+          </span>
+        ) : (
+          <span className="mt-0.5 block text-[11px] font-semibold text-slate-400">
+            Escribir cantidad
+          </span>
+        )}
+      </span>
+    </label>
   );
 }
 
