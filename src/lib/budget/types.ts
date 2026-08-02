@@ -367,26 +367,72 @@ export interface PagoTarjeta {
     string;
 }
 
+/**
+ * Gasto fijo configurable.
+ *
+ * `quincenaPresupuestaria` indica cuál de los dos ciclos
+ * presupuestarios debe reservar el dinero para este gasto.
+ *
+ * Un compromiso inactivo conserva su historial, pero deja
+ * de aparecer entre los pagos pendientes.
+ */
 export interface CompromisoFijo {
   id: string;
   descripcion: string;
   monto: number;
 
-  diaVencimiento?:
-    number;
+  diaVencimiento: number;
 
-  prioridad?:
+  quincenaPresupuestaria:
+    Quincena;
+
+  prioridad:
     PrioridadPago;
 
-  metodoPagoPreferido?:
+  metodoPagoPreferido:
     MetodoPagoFijo;
 
-  tarjetaId?:
+  tarjetaId:
     string | null;
 
-  activo?:
-    boolean;
+  activo: boolean;
+
+  creadoEn?: string;
+  actualizadoEn?: string;
 }
+
+/**
+ * Datos necesarios para crear un gasto fijo.
+ *
+ * El identificador y las marcas de tiempo son asignados
+ * por Firestore.
+ */
+export interface NuevoCompromisoFijo {
+  descripcion: string;
+  monto: number;
+
+  diaVencimiento: number;
+
+  quincenaPresupuestaria:
+    Quincena;
+
+  prioridad:
+    PrioridadPago;
+
+  metodoPagoPreferido:
+    MetodoPagoFijo;
+
+  tarjetaId:
+    string | null;
+
+  activo: boolean;
+}
+
+/**
+ * Cambios permitidos al editar o desactivar un gasto fijo.
+ */
+export type ActualizacionCompromisoFijo =
+  Partial<NuevoCompromisoFijo>;
 
 export interface PagoFijo {
   id: string;

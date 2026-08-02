@@ -1,6 +1,7 @@
 "use client";
 
 import { BudgetSettingsModal } from "@/components/budget/BudgetSettingsModal";
+import { FixedCommitmentsModal } from "@/components/budget/FixedCommitmentsModal";
 import { FixedPaymentModal } from "@/components/budget/FixedPaymentModal";
 import IncomeReceiptModal from "@/components/budget/IncomeReceiptModal";
 import { IncomeSettingsModal } from "@/components/budget/IncomeSettingsModal";
@@ -17,6 +18,7 @@ export function BudgetModals({
   const {
     actions,
     budget,
+    fixedCommitments,
     income,
     incomeTransactions,
     period,
@@ -65,6 +67,44 @@ export function BudgetModals({
         }
         onRegistrar={
           budget.registrarPagoFijo
+        }
+      />
+
+      <FixedCommitmentsModal
+        abierto={
+          ui.fixedCommitmentsOpen
+        }
+        compromisos={
+          fixedCommitments
+            .compromisos
+        }
+        cargando={
+          fixedCommitments
+            .cargando
+        }
+        guardando={
+          fixedCommitments
+            .guardando
+        }
+        actualizandoId={
+          fixedCommitments
+            .actualizandoId
+        }
+        onCerrar={
+          actions
+            .closeFixedCommitments
+        }
+        onCrear={
+          fixedCommitments
+            .crearCompromiso
+        }
+        onActualizar={
+          fixedCommitments
+            .actualizarCompromiso
+        }
+        onCambiarEstado={
+          fixedCommitments
+            .cambiarEstado
         }
       />
 

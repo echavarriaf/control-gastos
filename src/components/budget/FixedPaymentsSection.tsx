@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  Settings2,
 } from "lucide-react";
 
 import { FixedPaymentCard } from "./FixedPaymentCard";
@@ -32,6 +33,8 @@ interface FixedPaymentsSectionProps {
 
   eliminandoPagoFijoId: string | null;
 
+  onConfigurar: () => void;
+
   onRegistrarPago: (
     compromiso: CompromisoFijo,
   ) => void;
@@ -50,6 +53,7 @@ export function FixedPaymentsSection({
   totalPagadoFijoQuincena,
   porcentajeFijoPagado,
   eliminandoPagoFijoId,
+  onConfigurar,
   onRegistrarPago,
   onEliminarPago,
 }: FixedPaymentsSectionProps) {
@@ -97,14 +101,29 @@ export function FixedPaymentsSection({
             </p>
           </div>
 
-          <div className="rounded-2xl bg-indigo-50 px-4 py-3 text-right">
-            <p className="text-[9px] font-black uppercase tracking-wider text-indigo-500">
-              Total mensual
-            </p>
+          <div className="flex items-stretch gap-2 sm:items-start">
+            <button
+              type="button"
+              onClick={onConfigurar}
+              aria-label="Configurar gastos fijos"
+              title="Configurar gastos fijos"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 text-xs font-black text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:scale-95"
+            >
+              <Settings2 className="h-4 w-4" />
+              <span className="hidden sm:inline">
+                Configurar
+              </span>
+            </button>
 
-            <p className="mt-1 text-xl font-black text-indigo-900">
-              {formatoMoneda.format(totalFijo)}
-            </p>
+            <div className="flex-1 rounded-2xl bg-indigo-50 px-4 py-3 text-right sm:flex-none">
+              <p className="text-[9px] font-black uppercase tracking-wider text-indigo-500">
+                Total mensual
+              </p>
+
+              <p className="mt-1 text-xl font-black text-indigo-900">
+                {formatoMoneda.format(totalFijo)}
+              </p>
+            </div>
           </div>
         </div>
 

@@ -4,9 +4,9 @@ import { useMemo } from "react";
 
 import {
   CATEGORIA_KEYS,
-  COMPROMISOS_FIJOS,
 } from "@/lib/budget/constants";
 import type {
+  CompromisoFijo,
   GastoVariable,
   LimitesVariables,
   Movimiento,
@@ -26,6 +26,7 @@ interface UseBudgetSummaryArgs {
   gastos: GastoVariable[];
   pagos: PagoTarjeta[];
   pagosFijos: PagoFijo[];
+  compromisosFijos: CompromisoFijo[];
   limites: LimitesVariables;
   mesSeleccionado: string;
   quincenaSeleccionada: Quincena;
@@ -36,6 +37,7 @@ export function useBudgetSummary({
   gastos,
   pagos,
   pagosFijos,
+  compromisosFijos,
   limites,
   mesSeleccionado,
   quincenaSeleccionada,
@@ -52,6 +54,14 @@ export function useBudgetSummary({
       (pago) => obtenerPeriodoDesdeISO(pago.fecha) === mesSeleccionado,
     );
 
+    const idsCompromisosActivos = new Set(
+      compromisosFijos.map((compromiso) => compromiso.id),
+    );
+
+    const pagosFijosActivosMes = pagosFijosMes.filter((pago) =>
+      idsCompromisosActivos.has(pago.compromisoId),
+    );
+
     const gastosQuincena = gastosMes.filter(
       (gasto) =>
         obtenerQuincenaDesdeISO(gasto.fecha) === quincenaSeleccionada,
@@ -59,12 +69,12 @@ export function useBudgetSummary({
     const pagosQuincena = pagosMes.filter(
       (pago) => obtenerQuincenaDesdeISO(pago.fecha) === quincenaSeleccionada,
     );
-    const pagosFijosQuincena = pagosFijosMes.filter(
+    const pagosFijosQuincena = pagosFijosActivosMes.filter(
       (pago) =>
         obtenerQuincenaDesdeISO(pago.fecha) === quincenaSeleccionada,
     );
 
-    const totalFijo = COMPROMISOS_FIJOS.reduce(
+    const totalFijo = compromisosFijos.reduce(
       (total, gasto) => total + gasto.monto,
       0,
     );
@@ -113,7 +123,7 @@ export function useBudgetSummary({
       0,
     );
 
-    const totalPagadoFijoMes = pagosFijosMes.reduce(
+    const totalPagadoFijoMes = pagosFijosActivosMes.reduce(
       (total, pago) => total + pago.monto,
       0,
     );
@@ -164,8 +174,8 @@ export function useBudgetSummary({
       };
     });
 
-    const resumenFijos: ResumenFijo[] = COMPROMISOS_FIJOS.map((compromiso) => {
-      const registrosMes = pagosFijosMes.filter(
+    const resumenFijos: ResumenFijo[] = compromisosFijos.map((compromiso) => {
+      const registrosMes = pagosFijosActivosMes.filter(
         (pago) => pago.compromisoId === compromiso.id,
       );
       const registrosQuincena = pagosFijosQuincena.filter(
@@ -247,6 +257,7 @@ export function useBudgetSummary({
     gastos,
     pagos,
     pagosFijos,
+    compromisosFijos,
     limites,
     mesSeleccionado,
     quincenaSeleccionada,

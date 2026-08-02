@@ -9,6 +9,7 @@ import { useBudgetData } from "@/hooks/useBudgetData";
 import { useBudgetPeriod } from "@/hooks/useBudgetPeriod";
 import { useBudgetSummary } from "@/hooks/useBudgetSummary";
 import { useBudgetVisualAlerts } from "@/hooks/useBudgetVisualAlerts";
+import { useFixedCommitments } from "@/hooks/useFixedCommitments";
 import { useIncomeData } from "@/hooks/useIncomeData";
 import { useIncomeTransactions } from "@/hooks/useIncomeTransactions";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -21,29 +22,17 @@ import type {
 } from "@/lib/budget/types";
 
 export function useBudgetDashboard() {
+  const period =
+    useBudgetPeriod();
+
   const budget =
     useBudgetData();
 
+  const fixedCommitments =
+    useFixedCommitments();
+
   const income =
     useIncomeData();
-
-  /**
-   * El periodo visible ahora depende del ciclo de ingreso
-   * que financia los pagos, no solamente del calendario.
-   */
-  const period =
-    useBudgetPeriod({
-      periodoPresupuestarioActual:
-        income
-          .periodoPresupuestarioActual,
-
-      quincenaPresupuestariaActual:
-        income
-          .quincenaPresupuestariaActual,
-
-      cargando:
-        income.cargando,
-    });
 
   const incomeTransactions =
     useIncomeTransactions();
@@ -68,6 +57,12 @@ export function useBudgetDashboard() {
   const [
     incomeSettingsOpen,
     setIncomeSettingsOpen,
+  ] =
+    useState(false);
+
+  const [
+    fixedCommitmentsOpen,
+    setFixedCommitmentsOpen,
   ] =
     useState(false);
 
@@ -98,6 +93,10 @@ export function useBudgetDashboard() {
       pagosFijos:
         budget.pagosFijos,
 
+      compromisosFijos:
+        fixedCommitments
+          .compromisosActivos,
+
       limites:
         budget.limites,
 
@@ -115,8 +114,7 @@ export function useBudgetDashboard() {
   const visualAlerts =
     useBudgetVisualAlerts({
       resumenCategorias:
-        summary
-          .resumenCategorias,
+        summary.resumenCategorias,
 
       limites:
         budget.limites,
@@ -128,77 +126,86 @@ export function useBudgetDashboard() {
 
   const currentCycleIncome:
     Ingreso | null =
-    income.cicloActual
-      ? incomeTransactions
-          .ingresosPorCiclo
-          .get(
-            income
-              .cicloActual
-              .id,
-          ) ??
-        null
-      : null;
+      income.cicloActual
+        ? incomeTransactions
+            .ingresosPorCiclo
+            .get(
+              income.cicloActual.id,
+            ) ?? null
+        : null;
 
   const selectedCycleIncome:
     Ingreso | null =
-    selectedIncomeCycle
-      ? incomeTransactions
-          .ingresosPorCiclo
-          .get(
-            selectedIncomeCycle.id,
-          ) ??
-        null
-      : null;
+      selectedIncomeCycle
+        ? incomeTransactions
+            .ingresosPorCiclo
+            .get(
+              selectedIncomeCycle.id,
+            ) ?? null
+        : null;
 
   const feedbackError =
     budget.error ??
+    fixedCommitments.error ??
     income.error ??
     incomeTransactions.error;
 
   const clearErrors =
-    useCallback(() => {
-      budget
-        .limpiarError();
+    useCallback(
+      () => {
+        budget.limpiarError();
 
-      income
-        .limpiarError();
+        fixedCommitments
+          .limpiarError();
 
-      incomeTransactions
-        .limpiarError();
-    }, [
-      budget,
-      income,
-      incomeTransactions,
-    ]);
+        income.limpiarError();
+
+        incomeTransactions
+          .limpiarError();
+      },
+      [
+        budget,
+        fixedCommitments,
+        income,
+        incomeTransactions,
+      ],
+    );
 
   const openCurrentIncomeReceipt =
-    useCallback(() => {
-      if (
-        income.cicloActual
-      ) {
-        setSelectedIncomeCycle(
-          income.cicloActual,
-        );
-      }
-    }, [
-      income.cicloActual,
-    ]);
+    useCallback(
+      () => {
+        if (
+          income.cicloActual
+        ) {
+          setSelectedIncomeCycle(
+            income.cicloActual,
+          );
+        }
+      },
+      [
+        income.cicloActual,
+      ],
+    );
 
   const closeIncomeReceipt =
-    useCallback(() => {
-      setSelectedIncomeCycle(
-        null,
-      );
+    useCallback(
+      () => {
+        setSelectedIncomeCycle(
+          null,
+        );
 
-      incomeTransactions
-        .limpiarError();
-    }, [
-      incomeTransactions,
-    ]);
+        incomeTransactions
+          .limpiarError();
+      },
+      [
+        incomeTransactions,
+      ],
+    );
 
   return {
     period,
     budget,
+    fixedCommitments,
     summary,
     income,
     incomeTransactions,
@@ -212,6 +219,7 @@ export function useBudgetDashboard() {
       view,
       budgetSettingsOpen,
       incomeSettingsOpen,
+      fixedCommitmentsOpen,
       selectedFixedCommitment,
       selectedIncomeCycle,
     },
@@ -241,6 +249,18 @@ export function useBudgetDashboard() {
       closeIncomeSettings:
         () =>
           setIncomeSettingsOpen(
+            false,
+          ),
+
+      openFixedCommitments:
+        () =>
+          setFixedCommitmentsOpen(
+            true,
+          ),
+
+      closeFixedCommitments:
+        () =>
+          setFixedCommitmentsOpen(
             false,
           ),
 
