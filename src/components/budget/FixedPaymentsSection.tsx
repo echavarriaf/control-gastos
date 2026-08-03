@@ -1,14 +1,28 @@
 "use client";
 
+/*
+ * Nombre: Sección de pagos fijos
+ * Ruta: src/components/budget/FixedPaymentsSection.tsx
+ * Autor: Felix Echavarria
+ * Fecha: 2026-08-02
+ *
+ * Descripción:
+ * Presenta el resumen mensual de compromisos fijos, su progreso
+ * de pago y las tarjetas individuales de cada compromiso. Permite
+ * abrir la configuración de gastos fijos, registrar pagos y
+ * eliminar registros de pagos existentes.
+ */
+
 import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
-  CreditCard,
   Settings2,
 } from "lucide-react";
 
-import { FixedPaymentCard } from "./FixedPaymentCard";
+import {
+  FixedPaymentCard,
+} from "./FixedPaymentCard";
 
 import type {
   CompromisoFijo,
@@ -23,34 +37,76 @@ import {
 } from "@/lib/budget/utils";
 
 interface FixedPaymentsSectionProps {
-  resumenFijos: ResumenFijo[];
-  quincenaSeleccionada: Quincena;
+  resumenFijos:
+    ResumenFijo[];
 
-  totalFijo: number;
-  totalPagadoFijoMes: number;
-  totalPendienteFijoMes: number;
-  totalPagadoFijoQuincena: number;
-  porcentajeFijoPagado: number;
+  quincenaSeleccionada:
+    Quincena;
 
-  eliminandoPagoFijoId: string | null;
+  totalFijo:
+    number;
 
-  /**
-   * TARJETAS - 1. Abre el administrador de
-   * tarjetas desde la sección de gastos fijos.
-   */
-  onConfigurarTarjetas: () => void;
+  totalPagadoFijoMes:
+    number;
 
-  onConfigurar: () => void;
+  totalPendienteFijoMes:
+    number;
+
+  totalPagadoFijoQuincena:
+    number;
+
+  porcentajeFijoPagado:
+    number;
+
+  eliminandoPagoFijoId:
+    string | null;
+
+  onConfigurar:
+    () => void;
 
   onRegistrarPago: (
-    compromiso: CompromisoFijo,
+    compromiso:
+      CompromisoFijo,
   ) => void;
 
   onEliminarPago: (
-    pago: PagoFijo,
-  ) => void | Promise<void>;
+    pago:
+      PagoFijo,
+  ) =>
+    | void
+    | Promise<void>;
 }
 
+interface SummaryMetricProps {
+  icon:
+    typeof CheckCircle2;
+
+  label:
+    string;
+
+  value:
+    number;
+
+  helper:
+    string;
+
+  wrapperClassName:
+    string;
+
+  iconClassName:
+    string;
+
+  valueClassName:
+    string;
+}
+
+/**
+ * Renderiza el resumen y la lista de compromisos fijos.
+ *
+ * Cuenta los compromisos por estado, presenta las métricas del mes
+ * y delega el registro o eliminación de pagos a las acciones que
+ * recibe desde el controlador principal del presupuesto.
+ */
 export function FixedPaymentsSection({
   resumenFijos,
   quincenaSeleccionada,
@@ -60,7 +116,6 @@ export function FixedPaymentsSection({
   totalPagadoFijoQuincena,
   porcentajeFijoPagado,
   eliminandoPagoFijoId,
-  onConfigurarTarjetas,
   onConfigurar,
   onRegistrarPago,
   onEliminarPago,
@@ -68,19 +123,22 @@ export function FixedPaymentsSection({
   const compromisosPagados =
     resumenFijos.filter(
       (resumen) =>
-        resumen.estado === "pagado",
+        resumen.estado ===
+        "pagado",
     ).length;
 
   const compromisosParciales =
     resumenFijos.filter(
       (resumen) =>
-        resumen.estado === "parcial",
+        resumen.estado ===
+        "parcial",
     ).length;
 
   const compromisosPendientes =
     resumenFijos.filter(
       (resumen) =>
-        resumen.estado === "pendiente",
+        resumen.estado ===
+        "pendiente",
     ).length;
 
   return (
@@ -110,38 +168,17 @@ export function FixedPaymentsSection({
           </div>
 
           <div className="flex flex-wrap items-stretch gap-2 sm:items-start">
-            {/**
-             * TARJETAS - 2. Añade un acceso visible
-             * sin esperar a la futura vista Tarjetas.
-             */}
             <button
               type="button"
               onClick={
-                onConfigurarTarjetas
+                onConfigurar
               }
-              aria-label="Administrar tarjetas"
-              title="Administrar tarjetas"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-3.5 text-xs font-black text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100 active:scale-95"
-            >
-              <CreditCard className="h-4 w-4" />
-
-              <span className="hidden sm:inline">
-                Tarjetas
-              </span>
-            </button>
-
-            {/**
-             * TARJETAS - 3. Conserva separado el
-             * acceso a la configuración de gastos fijos.
-             */}
-            <button
-              type="button"
-              onClick={onConfigurar}
               aria-label="Configurar gastos fijos"
               title="Configurar gastos fijos"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 text-xs font-black text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:scale-95"
             >
               <Settings2 className="h-4 w-4" />
+
               <span className="hidden sm:inline">
                 Configurar
               </span>
@@ -153,7 +190,9 @@ export function FixedPaymentsSection({
               </p>
 
               <p className="mt-1 text-xl font-black text-indigo-900">
-                {formatoMoneda.format(totalFijo)}
+                {formatoMoneda.format(
+                  totalFijo,
+                )}
               </p>
             </div>
           </div>
@@ -161,9 +200,13 @@ export function FixedPaymentsSection({
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <SummaryMetric
-            icon={CheckCircle2}
+            icon={
+              CheckCircle2
+            }
             label="Pagado este mes"
-            value={totalPagadoFijoMes}
+            value={
+              totalPagadoFijoMes
+            }
             helper={`${compromisosPagados} completos`}
             wrapperClassName="bg-emerald-50"
             iconClassName="bg-emerald-100 text-emerald-700"
@@ -171,9 +214,13 @@ export function FixedPaymentsSection({
           />
 
           <SummaryMetric
-            icon={Clock3}
+            icon={
+              Clock3
+            }
             label="Pendiente"
-            value={totalPendienteFijoMes}
+            value={
+              totalPendienteFijoMes
+            }
             helper={`${compromisosPendientes} pendientes · ${compromisosParciales} parciales`}
             wrapperClassName="bg-amber-50"
             iconClassName="bg-amber-100 text-amber-700"
@@ -181,9 +228,13 @@ export function FixedPaymentsSection({
           />
 
           <SummaryMetric
-            icon={CircleDollarSign}
+            icon={
+              CircleDollarSign
+            }
             label={`Pagado Q${quincenaSeleccionada}`}
-            value={totalPagadoFijoQuincena}
+            value={
+              totalPagadoFijoQuincena
+            }
             helper={`Quincena ${quincenaSeleccionada}`}
             wrapperClassName="bg-indigo-50"
             iconClassName="bg-indigo-100 text-indigo-700"
@@ -193,10 +244,15 @@ export function FixedPaymentsSection({
 
         <div className="mt-5">
           <div className="mb-2 flex items-center justify-between gap-3 text-[10px] font-black text-slate-500">
-            <span>Progreso mensual</span>
+            <span>
+              Progreso mensual
+            </span>
 
             <span>
-              {porcentajeFijoPagado.toFixed(0)}%
+              {porcentajeFijoPagado.toFixed(
+                0,
+              )}
+              %
             </span>
           </div>
 
@@ -204,9 +260,10 @@ export function FixedPaymentsSection({
             <div
               className="h-full rounded-full bg-emerald-500 transition-all duration-500"
               style={{
-                width: `${anchoBarra(
-                  porcentajeFijoPagado,
-                )}%`,
+                width:
+                  `${anchoBarra(
+                    porcentajeFijoPagado,
+                  )}%`,
               }}
             />
           </div>
@@ -214,35 +271,44 @@ export function FixedPaymentsSection({
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        {resumenFijos.map((resumen) => (
-          <FixedPaymentCard
-            key={resumen.compromiso.id}
-            resumen={resumen}
-            quincenaSeleccionada={
-              quincenaSeleccionada
-            }
-            eliminandoPagoFijoId={
-              eliminandoPagoFijoId
-            }
-            onRegistrar={onRegistrarPago}
-            onEliminar={onEliminarPago}
-          />
-        ))}
+        {resumenFijos.map(
+          (resumen) => (
+            <FixedPaymentCard
+              key={
+                resumen
+                  .compromiso
+                  .id
+              }
+              resumen={
+                resumen
+              }
+              quincenaSeleccionada={
+                quincenaSeleccionada
+              }
+              eliminandoPagoFijoId={
+                eliminandoPagoFijoId
+              }
+              onRegistrar={
+                onRegistrarPago
+              }
+              onEliminar={
+                onEliminarPago
+              }
+            />
+          ),
+        )}
       </div>
     </section>
   );
 }
 
-interface SummaryMetricProps {
-  icon: typeof CheckCircle2;
-  label: string;
-  value: number;
-  helper: string;
-  wrapperClassName: string;
-  iconClassName: string;
-  valueClassName: string;
-}
-
+/**
+ * Renderiza una métrica visual del resumen de gastos fijos.
+ *
+ * Recibe el monto, texto auxiliar e icono y aplica las clases
+ * proporcionadas para reutilizar la misma estructura con distintos
+ * estados financieros.
+ */
 function SummaryMetric({
   icon: Icono,
   label,
@@ -271,7 +337,9 @@ function SummaryMetric({
       <p
         className={`mt-3 text-lg font-black ${valueClassName}`}
       >
-        {formatoMoneda.format(value)}
+        {formatoMoneda.format(
+          value,
+        )}
       </p>
 
       <p className="mt-1 text-[10px] font-semibold text-slate-500">

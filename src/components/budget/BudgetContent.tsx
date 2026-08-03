@@ -1,6 +1,19 @@
 "use client";
 
+/*
+ * Nombre: Contenido principal del presupuesto
+ * Ruta: src/components/budget/BudgetContent.tsx
+ * Autor: Felix Echavarria
+ * Fecha: 2026-08-02
+ *
+ * Descripción:
+ * Decide qué vista del presupuesto debe mostrarse y conecta
+ * los datos y acciones del dashboard con los formularios,
+ * historiales y administradores de gastos fijos y tarjetas.
+ */
+
 import LoadingState from "@/components/LoadingState";
+import { CreditCardsView } from "@/components/budget/CreditCardsView";
 import { FixedPaymentsSection } from "@/components/budget/FixedPaymentsSection";
 import { VariableMovementForm } from "@/components/budget/VariableMovementForm";
 import { VariableMovementsSection } from "@/components/budget/VariableMovementsSection";
@@ -12,26 +25,38 @@ interface BudgetContentProps {
   dashboard: BudgetDashboardController;
 }
 
+/**
+ * Renderiza la vista principal del presupuesto.
+ *
+ * Lee el controlador del dashboard y conecta cada componente con
+ * los datos y acciones que necesita. Según ui.view muestra gastos
+ * fijos, movimientos variables o el resumen financiero de tarjetas.
+ */
 export function BudgetContent({
   dashboard,
 }: BudgetContentProps) {
   const {
     actions,
     budget,
+
+    creditCards,
+    creditCardSummaries,
+
     period,
     summary,
     ui,
   } = dashboard;
 
-  // TARJETAS - 1. Abre el administrador de tarjetas.
+  /*
+   * Estas referencias conectan cada vista con las acciones que abren
+   * sus respectivos modales de configuración o registro.
+   */
   const abrirConfiguracionTarjetas =
     actions.openCreditCards;
 
-  // TARJETAS - 2. Mantiene separado el administrador de gastos fijos.
   const abrirConfiguracionFijos =
     actions.openFixedCommitments;
 
-  // TARJETAS - 3. Conserva el flujo existente para registrar pagos fijos.
   const abrirPagoFijo =
     actions.openFixedPayment;
 
@@ -44,7 +69,38 @@ export function BudgetContent({
         }
       />
 
-      {budget.cargando ? (
+      {ui.view === "tarjetas" ? (
+        /*
+         * La vista de tarjetas recibe los saldos calculados por el
+         * dashboard y espera tanto los movimientos como las tarjetas
+         * antes de mostrar resultados financieros definitivos.
+         */
+        <CreditCardsView
+          resumenes={
+            creditCardSummaries
+              .resumenes
+          }
+          totalSaldoActual={
+            creditCardSummaries
+              .totalSaldoActual
+          }
+          totalCompras={
+            creditCardSummaries
+              .totalCompras
+          }
+          totalPagos={
+            creditCardSummaries
+              .totalPagos
+          }
+          cargando={
+            budget.cargando ||
+            creditCards.cargando
+          }
+          onConfigurar={
+            abrirConfiguracionTarjetas
+          }
+        />
+      ) : budget.cargando ? (
         <LoadingState />
       ) : ui.view === "fijos" ? (
         <FixedPaymentsSection
@@ -78,9 +134,6 @@ export function BudgetContent({
             budget
               .eliminandoPagoFijoId
           }
-          onConfigurarTarjetas={
-            abrirConfiguracionTarjetas
-          }
           onConfigurar={
             abrirConfiguracionFijos
           }
@@ -94,7 +147,15 @@ export function BudgetContent({
         />
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+          {/*
+           * El formulario recibe únicamente tarjetas activas porque
+           * son las únicas que pueden seleccionarse en gastos nuevos.
+           */}
           <VariableMovementForm
+            tarjetasActivas={
+              creditCards
+                .tarjetasActivas
+            }
             mesSeleccionado={
               period.mesSeleccionado
             }
@@ -112,9 +173,18 @@ export function BudgetContent({
             }
           />
 
+          {/*
+           * El historial recibe todas las tarjetas, incluso las
+           * inactivas, para poder mostrar correctamente el nombre
+           * de una tarjeta usada en movimientos anteriores.
+           */}
           <VariableMovementsSection
             movimientos={
               summary.movimientos
+            }
+            tarjetas={
+              creditCards
+                .tarjetas
             }
             quincenaSeleccionada={
               period
@@ -134,3 +204,5 @@ export function BudgetContent({
     </>
   );
 }
+
+export default BudgetContent;

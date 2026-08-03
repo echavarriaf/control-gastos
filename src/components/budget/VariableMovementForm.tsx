@@ -3,11 +3,14 @@
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  CreditCard,
   LoaderCircle,
   Plus,
 } from "lucide-react";
+
 import {
   useEffect,
+  useMemo,
   useState,
   type FormEvent,
 } from "react";
@@ -22,6 +25,7 @@ import type {
   CategoriaVariable,
   NuevoMovimiento,
   Quincena,
+  TarjetaCredito,
   TipoMovimiento,
 } from "@/lib/budget/types";
 
@@ -34,19 +38,69 @@ interface VariableMovementFormProps {
   mesSeleccionado: string;
   quincenaSeleccionada: Quincena;
   guardando: boolean;
+
+  tarjetasActivas:
+    TarjetaCredito[];
+
   onRegistrar: (
     movimiento: NuevoMovimiento,
   ) => Promise<boolean>;
+}
+
+/**
+ * TARJETAS - 1. Busca la tarjeta predeterminada según
+ * la categoría: Walmart para comida y Costco para gas.
+ */
+function obtenerTarjetaPredeterminada(
+  categoria:
+    CategoriaVariable,
+
+  tarjetas:
+    TarjetaCredito[],
+): string {
+  const nombreBuscado =
+    categoria === "comida"
+      ? "walmart"
+      : "costco";
+
+  const coincidencia =
+    tarjetas.find(
+      (tarjeta) =>
+        tarjeta.nombre
+          .trim()
+          .toLowerCase()
+          .includes(
+            nombreBuscado,
+          ),
+    );
+
+  return (
+    coincidencia?.id ??
+    tarjetas[0]?.id ??
+    ""
+  );
+}
+
+function etiquetaTarjeta(
+  tarjeta:
+    TarjetaCredito,
+): string {
+  return tarjeta.ultimosCuatro
+    ? `${tarjeta.nombre} · •••• ${tarjeta.ultimosCuatro}`
+    : tarjeta.nombre;
 }
 
 export function VariableMovementForm({
   mesSeleccionado,
   quincenaSeleccionada,
   guardando,
+  tarjetasActivas,
   onRegistrar,
 }: VariableMovementFormProps) {
   const [tipo, setTipo] =
-    useState<TipoMovimiento>("gasto");
+    useState<TipoMovimiento>(
+      "gasto",
+    );
 
   const [concepto, setConcepto] =
     useState("");
@@ -54,21 +108,53 @@ export function VariableMovementForm({
   const [monto, setMonto] =
     useState("");
 
-  const [categoriaGasto, setCategoriaGasto] =
-    useState<CategoriaVariable>("comida");
+  const [
+    categoriaGasto,
+    setCategoriaGasto,
+  ] =
+    useState<CategoriaVariable>(
+      "comida",
+    );
 
-  const [categoriaPago, setCategoriaPago] =
-    useState<CategoriaPago>("general");
+  const [
+    categoriaPago,
+    setCategoriaPago,
+  ] =
+    useState<CategoriaPago>(
+      "general",
+    );
 
-  const [fecha, setFecha] = useState(() =>
-    fechaParaPeriodo(
-      mesSeleccionado,
-      quincenaSeleccionada,
-    ),
-  );
+  const [
+    tarjetaId,
+    setTarjetaId,
+  ] =
+    useState("");
 
-  const [errorLocal, setErrorLocal] =
-    useState<string | null>(null);
+  const [fecha, setFecha] =
+    useState(() =>
+      fechaParaPeriodo(
+        mesSeleccionado,
+        quincenaSeleccionada,
+      ),
+    );
+
+  const [
+    errorLocal,
+    setErrorLocal,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const tarjetasDisponibles =
+    useMemo(
+      () =>
+        tarjetasActivas.filter(
+          (tarjeta) =>
+            tarjeta.activa,
+        ),
+      [tarjetasActivas],
+    );
 
   useEffect(() => {
     setFecha(
@@ -82,65 +168,176 @@ export function VariableMovementForm({
     quincenaSeleccionada,
   ]);
 
-  const enviarFormulario = async (
-    event: FormEvent<HTMLFormElement>,
+  /**
+   * TARJETAS - 2. Conserva una selección manual válida;
+   * cuando no existe, aplica automáticamente el valor
+   * predeterminado de la categoría actual.
+   */
+  useEffect(() => {
+    setTarjetaId(
+      (seleccionActual) => {
+        const seleccionValida =
+          tarjetasDisponibles.some(
+            (tarjeta) =>
+              tarjeta.id ===
+              seleccionActual,
+          );
+
+        if (seleccionValida) {
+          return seleccionActual;
+        }
+
+        return obtenerTarjetaPredeterminada(
+          categoriaGasto,
+          tarjetasDisponibles,
+        );
+      },
+    );
+  }, [
+    categoriaGasto,
+    tarjetasDisponibles,
+  ]);
+
+  const seleccionarCategoria =
+    (
+      categoria:
+        CategoriaVariable,
+    ) => {
+      setCategoriaGasto(
+        categoria,
+      );
+
+      setTarjetaId(
+        obtenerTarjetaPredeterminada(
+          categoria,
+          tarjetasDisponibles,
+        ),
+      );
+    };
+
+  const seleccionarTipo = (
+    nuevoTipo:
+      TipoMovimiento,
   ) => {
-    event.preventDefault();
+    setTipo(nuevoTipo);
     setErrorLocal(null);
 
-    const montoValidado = montoSeguro(monto);
-
-    if (!concepto.trim()) {
-      setErrorLocal(
-        "Escribe una descripción para el movimiento.",
+    if (
+      nuevoTipo === "pago" &&
+      !tarjetaId
+    ) {
+      setTarjetaId(
+        tarjetasDisponibles[0]
+          ?.id ?? "",
       );
-      return;
     }
-
-    if (!montoValidado) {
-      setErrorLocal(
-        "Ingresa un monto mayor que cero.",
-      );
-      return;
-    }
-
-    if (!fecha) {
-      setErrorLocal(
-        "Selecciona la fecha del movimiento.",
-      );
-      return;
-    }
-
-    const movimiento: NuevoMovimiento =
-      tipo === "gasto"
-        ? {
-            tipo: "gasto",
-            concepto: concepto.trim(),
-            monto: montoValidado,
-            categoria: categoriaGasto,
-            fecha,
-          }
-        : {
-            tipo: "pago",
-            concepto: concepto.trim(),
-            monto: montoValidado,
-            categoria: categoriaPago,
-            fecha,
-          };
-
-    const guardado =
-      await onRegistrar(movimiento);
-
-    if (!guardado) {
-      return;
-    }
-
-    setConcepto("");
-    setMonto("");
-    setErrorLocal(null);
   };
 
-  const esGasto = tipo === "gasto";
+  const enviarFormulario =
+    async (
+      event:
+        FormEvent<HTMLFormElement>,
+    ) => {
+      event.preventDefault();
+      setErrorLocal(null);
+
+      const montoValidado =
+        montoSeguro(monto);
+
+      if (!concepto.trim()) {
+        setErrorLocal(
+          "Escribe una descripción para el movimiento.",
+        );
+        return;
+      }
+
+      if (!montoValidado) {
+        setErrorLocal(
+          "Ingresa un monto mayor que cero.",
+        );
+        return;
+      }
+
+      if (!fecha) {
+        setErrorLocal(
+          "Selecciona la fecha del movimiento.",
+        );
+        return;
+      }
+
+      if (
+        tipo === "pago" &&
+        !tarjetaId
+      ) {
+        setErrorLocal(
+          "Selecciona la tarjeta que estás pagando.",
+        );
+        return;
+      }
+
+      /**
+       * TARJETAS - 3. Guarda tarjetaId en cada gasto
+       * o pago, permitiendo cambiar la tarjeta sugerida.
+       */
+      const movimiento:
+        NuevoMovimiento =
+        tipo === "gasto"
+          ? {
+              tipo: "gasto",
+              concepto:
+                concepto.trim(),
+              monto:
+                montoValidado,
+              categoria:
+                categoriaGasto,
+              fecha,
+              metodoPago:
+                tarjetaId
+                  ? "tarjeta_credito"
+                  : "debito",
+              tarjetaId:
+                tarjetaId ||
+                null,
+            }
+          : {
+              tipo: "pago",
+              concepto:
+                concepto.trim(),
+              monto:
+                montoValidado,
+              categoria:
+                categoriaPago,
+              fecha,
+              tarjetaId,
+            };
+
+      const guardado =
+        await onRegistrar(
+          movimiento,
+        );
+
+      if (!guardado) {
+        return;
+      }
+
+      setConcepto("");
+      setMonto("");
+      setErrorLocal(null);
+
+      if (
+        tipo === "gasto"
+      ) {
+        setTarjetaId(
+          obtenerTarjetaPredeterminada(
+            categoriaGasto,
+            tarjetasDisponibles,
+          ),
+        );
+      }
+    };
+
+  const esGasto =
+    tipo === "gasto";
 
   return (
     <section
@@ -163,19 +360,29 @@ export function VariableMovementForm({
       <div className="mt-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
         <TypeButton
           tipo="gasto"
-          seleccionado={tipo === "gasto"}
-          onSelect={setTipo}
+          seleccionado={
+            tipo === "gasto"
+          }
+          onSelect={
+            seleccionarTipo
+          }
         />
 
         <TypeButton
           tipo="pago"
-          seleccionado={tipo === "pago"}
-          onSelect={setTipo}
+          seleccionado={
+            tipo === "pago"
+          }
+          onSelect={
+            seleccionarTipo
+          }
         />
       </div>
 
       <form
-        onSubmit={enviarFormulario}
+        onSubmit={
+          enviarFormulario
+        }
         className="mt-4 space-y-4"
       >
         <div>
@@ -191,12 +398,14 @@ export function VariableMovementForm({
             type="text"
             value={concepto}
             onChange={(event) =>
-              setConcepto(event.target.value)
+              setConcepto(
+                event.target.value,
+              )
             }
             placeholder={
               esGasto
                 ? "Ej. Supermercado o combustible"
-                : "Ej. Pago tarjeta AMEX"
+                : "Ej. Pago tarjeta Walmart"
             }
             disabled={guardando}
             className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -220,7 +429,9 @@ export function VariableMovementForm({
               step="0.01"
               value={monto}
               onChange={(event) =>
-                setMonto(event.target.value)
+                setMonto(
+                  event.target.value,
+                )
               }
               placeholder="0.00"
               disabled={guardando}
@@ -241,7 +452,9 @@ export function VariableMovementForm({
               type="date"
               value={fecha}
               onChange={(event) =>
-                setFecha(event.target.value)
+                setFecha(
+                  event.target.value,
+                )
               }
               disabled={guardando}
               className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
@@ -256,36 +469,49 @@ export function VariableMovementForm({
             </legend>
 
             <div className="grid grid-cols-2 gap-2">
-              {CATEGORIA_KEYS.map((key) => {
-                const configuracion =
-                  CATEGORIAS_VARIABLES[key];
+              {CATEGORIA_KEYS.map(
+                (key) => {
+                  const configuracion =
+                    CATEGORIAS_VARIABLES[
+                      key
+                    ];
 
-                const Icono =
-                  configuracion.icon;
+                  const Icono =
+                    configuracion.icon;
 
-                const seleccionada =
-                  categoriaGasto === key;
+                  const seleccionada =
+                    categoriaGasto ===
+                    key;
 
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() =>
-                      setCategoriaGasto(key)
-                    }
-                    disabled={guardando}
-                    aria-pressed={seleccionada}
-                    className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-black transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
-                      seleccionada
-                        ? `${configuracion.color} border-transparent text-white shadow-sm`
-                        : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Icono className="h-4 w-4" />
-                    {configuracion.label}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() =>
+                        seleccionarCategoria(
+                          key,
+                        )
+                      }
+                      disabled={
+                        guardando
+                      }
+                      aria-pressed={
+                        seleccionada
+                      }
+                      className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-black transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+                        seleccionada
+                          ? `${configuracion.color} border-transparent text-white shadow-sm`
+                          : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Icono className="h-4 w-4" />
+                      {
+                        configuracion.label
+                      }
+                    </button>
+                  );
+                },
+              )}
             </div>
           </fieldset>
         ) : (
@@ -294,12 +520,14 @@ export function VariableMovementForm({
               htmlFor="pago-categoria"
               className="mb-1.5 block text-xs font-black text-slate-700"
             >
-              Aplicar el pago a
+              Clasificación del pago
             </label>
 
             <select
               id="pago-categoria"
-              value={categoriaPago}
+              value={
+                categoriaPago
+              }
               onChange={(event) =>
                 setCategoriaPago(
                   event.target
@@ -310,27 +538,88 @@ export function VariableMovementForm({
               className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="general">
-                Saldo variable general
+                Pago general de tarjeta
               </option>
 
-              {CATEGORIA_KEYS.map((key) => (
-                <option key={key} value={key}>
-                  {
-                    CATEGORIAS_VARIABLES[key]
-                      .label
-                  }
-                </option>
-              ))}
+              {CATEGORIA_KEYS.map(
+                (key) => (
+                  <option
+                    key={key}
+                    value={key}
+                  >
+                    {
+                      CATEGORIAS_VARIABLES[
+                        key
+                      ].label
+                    }
+                  </option>
+                ),
+              )}
             </select>
-
-            <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-slate-500">
-              Un pago general reduce el saldo
-              combinado de Comida y Gas. Un pago
-              por categoría aumenta nuevamente el
-              disponible de esa categoría.
-            </p>
           </div>
         )}
+
+        <div>
+          <label
+            htmlFor="movimiento-tarjeta"
+            className="mb-1.5 flex items-center gap-2 text-xs font-black text-slate-700"
+          >
+            <CreditCard className="h-4 w-4 text-indigo-600" />
+
+            {esGasto
+              ? "Tarjeta utilizada"
+              : "Tarjeta pagada"}
+          </label>
+
+          <select
+            id="movimiento-tarjeta"
+            value={tarjetaId}
+            onChange={(event) =>
+              setTarjetaId(
+                event.target.value,
+              )
+            }
+            disabled={
+              guardando ||
+              tarjetasDisponibles
+                .length === 0
+            }
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {esGasto && (
+              <option value="">
+                Sin tarjeta · efectivo o débito
+              </option>
+            )}
+
+            {!esGasto &&
+              tarjetasDisponibles
+                .length === 0 && (
+                <option value="">
+                  No hay tarjetas activas
+                </option>
+              )}
+
+            {tarjetasDisponibles.map(
+              (tarjeta) => (
+                <option
+                  key={tarjeta.id}
+                  value={tarjeta.id}
+                >
+                  {etiquetaTarjeta(
+                    tarjeta,
+                  )}
+                </option>
+              ),
+            )}
+          </select>
+
+          <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-slate-500">
+            {esGasto
+              ? "Comida selecciona Walmart y Gas selecciona Costco automáticamente. Puedes cambiarla antes de guardar."
+              : "Selecciona la tarjeta cuyo saldo disminuirá con este pago."}
+          </p>
+        </div>
 
         {errorLocal && (
           <p
@@ -370,7 +659,11 @@ export function VariableMovementForm({
 interface TypeButtonProps {
   tipo: TipoMovimiento;
   seleccionado: boolean;
-  onSelect: (tipo: TipoMovimiento) => void;
+
+  onSelect: (
+    tipo:
+      TipoMovimiento,
+  ) => void;
 }
 
 function TypeButton({
@@ -378,17 +671,23 @@ function TypeButton({
   seleccionado,
   onSelect,
 }: TypeButtonProps) {
-  const esGasto = tipo === "gasto";
+  const esGasto =
+    tipo === "gasto";
 
-  const Icono = esGasto
-    ? ArrowDownCircle
-    : ArrowUpCircle;
+  const Icono =
+    esGasto
+      ? ArrowDownCircle
+      : ArrowUpCircle;
 
   return (
     <button
       type="button"
-      onClick={() => onSelect(tipo)}
-      aria-pressed={seleccionado}
+      onClick={() =>
+        onSelect(tipo)
+      }
+      aria-pressed={
+        seleccionado
+      }
       className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-black transition active:scale-[0.98] ${
         seleccionado
           ? esGasto
@@ -402,7 +701,9 @@ function TypeButton({
         className="h-4 w-4"
       />
 
-      {esGasto ? "Gasto" : "Pago"}
+      {esGasto
+        ? "Gasto"
+        : "Pago"}
     </button>
   );
 }

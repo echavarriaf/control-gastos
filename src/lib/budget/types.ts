@@ -1,13 +1,18 @@
-/**
- * Tipos base del presupuesto.
+/*
+ * Nombre: Tipos del dominio del presupuesto
+ * Ruta: src/lib/budget/types.ts
+ * Autor: Felix Echavarria
+ * Fecha: 2026-08-02
  *
- * IMPORTANTE:
- * El control principal de ingresos usa ciclos de pago,
- * no quincenas del calendario. Un ciclo puede empezar en
- * cualquier fecha y termina justo antes del próximo pago.
+ * Descripción:
+ * Define las estructuras y valores permitidos para ingresos,
+ * gastos, tarjetas, compromisos y ciclos del presupuesto.
+ * TypeScript utiliza estos tipos para detectar datos incompletos
+ * o valores inválidos antes de ejecutar la aplicación.
  *
- * `Quincena` se conserva temporalmente porque la interfaz
- * actual todavía la utiliza para algunos resúmenes.
+ * El control principal de ingresos usa ciclos de pago de 14 días.
+ * `Quincena` se conserva porque algunas partes de la interfaz
+ * todavía agrupan los datos en dos periodos presupuestarios.
  */
 
 export type CategoriaVariable =
@@ -22,9 +27,16 @@ export type TipoMovimiento =
   | "gasto"
   | "pago";
 
+/**
+ * Define las secciones principales disponibles en la navegación.
+ *
+ * ViewTabs utiliza estos valores para cambiar el contenido visible
+ * sin salir de la página principal del presupuesto.
+ */
 export type Vista =
   | "fijos"
-  | "movimientos";
+  | "movimientos"
+  | "tarjetas";
 
 /**
  * Tipo legado para la interfaz actual.

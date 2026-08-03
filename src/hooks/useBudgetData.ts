@@ -22,6 +22,7 @@ import {
 import type {
   GastoVariable,
   LimitesVariables,
+  MetodoPagoMovimiento,
   Movimiento,
   NuevoMovimiento,
   NuevoPagoFijo,
@@ -72,6 +73,30 @@ function normalizarCreadoEn(
   }
 
   return fallback;
+}
+
+/**
+ * TARJETAS - 1. Normaliza la referencia de tarjeta y
+ * el método de pago de documentos nuevos o antiguos.
+ */
+function normalizarTarjetaId(
+  value: unknown,
+): string | null {
+  return typeof value === "string" &&
+    value.trim()
+    ? value.trim()
+    : null;
+}
+
+function normalizarMetodoMovimiento(
+  value: unknown,
+): MetodoPagoMovimiento | undefined {
+  return value === "efectivo" ||
+    value === "debito" ||
+    value === "cuenta_bancaria" ||
+    value === "tarjeta_credito"
+    ? value
+    : undefined;
 }
 
 /**
@@ -220,6 +245,20 @@ export function useBudgetData() {
                 data.creadoEn,
                 fecha,
               ),
+
+              /**
+               * TARJETAS - 2. Recupera la tarjeta usada
+               * y el método de pago desde Firestore.
+               */
+              metodoPago:
+                normalizarMetodoMovimiento(
+                  data.metodoPago,
+                ),
+
+              tarjetaId:
+                normalizarTarjetaId(
+                  data.tarjetaId,
+                ),
             } satisfies GastoVariable,
           ];
         });
@@ -266,6 +305,23 @@ export function useBudgetData() {
               data.creadoEn,
               fecha,
             ),
+
+            tarjetaId:
+              normalizarTarjetaId(
+                data.tarjetaId,
+              ),
+
+            referencia:
+              typeof data.referencia ===
+              "string"
+                ? data.referencia
+                : "",
+
+            notas:
+              typeof data.notas ===
+              "string"
+                ? data.notas
+                : "",
           } satisfies PagoTarjeta;
         });
 
@@ -363,6 +419,23 @@ export function useBudgetData() {
           monto: movimiento.monto,
           categoria: movimiento.categoria,
           fecha: convertirFechaInputAISO(movimiento.fecha),
+
+          /**
+           * TARJETAS - 3. Persiste la tarjeta seleccionada
+           * para aumentar posteriormente su saldo.
+           */
+          metodoPago:
+            movimiento.metodoPago ??
+            (
+              movimiento.tarjetaId
+                ? "tarjeta_credito"
+                : "debito"
+            ),
+
+          tarjetaId:
+            movimiento.tarjetaId ??
+            null,
+
           creadoEn: serverTimestamp(),
         });
       } else {
@@ -372,6 +445,19 @@ export function useBudgetData() {
           monto: movimiento.monto,
           categoria: movimiento.categoria,
           fecha: convertirFechaInputAISO(movimiento.fecha),
+
+          tarjetaId:
+            movimiento.tarjetaId ??
+            null,
+
+          referencia:
+            movimiento.referencia
+              ?.trim() ?? "",
+
+          notas:
+            movimiento.notas
+              ?.trim() ?? "",
+
           creadoEn: serverTimestamp(),
         });
       }

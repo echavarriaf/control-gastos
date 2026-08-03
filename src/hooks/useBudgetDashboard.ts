@@ -1,5 +1,18 @@
 "use client";
 
+/*
+ * Nombre: Controlador principal del presupuesto
+ * Ruta: src/hooks/useBudgetDashboard.ts
+ * Autor: Felix Echavarria
+ * Fecha: 2026-08-02
+ *
+ * Descripción:
+ * Reúne los hooks de datos, periodos, ingresos, gastos fijos,
+ * tarjetas y notificaciones. Expone un solo controlador para que
+ * los componentes puedan leer estados y ejecutar acciones sin
+ * conocer cómo se administra cada fuente de datos internamente.
+ */
+
 import {
   useCallback,
   useState,
@@ -9,6 +22,7 @@ import { useBudgetData } from "@/hooks/useBudgetData";
 import { useBudgetPeriod } from "@/hooks/useBudgetPeriod";
 import { useBudgetSummary } from "@/hooks/useBudgetSummary";
 import { useCreditCards } from "@/hooks/useCreditCards";
+import { useCreditCardSummaries } from "@/hooks/useCreditCardSummaries";
 import { useBudgetVisualAlerts } from "@/hooks/useBudgetVisualAlerts";
 import { useFixedCommitments } from "@/hooks/useFixedCommitments";
 import { useIncomeData } from "@/hooks/useIncomeData";
@@ -22,6 +36,13 @@ import type {
   Vista,
 } from "@/lib/budget/types";
 
+/**
+ * Construye el controlador completo de la pantalla principal.
+ *
+ * Inicializa cada hook especializado, combina sus datos derivados
+ * y devuelve estados, resultados y acciones en una estructura que
+ * BudgetDashboard y sus componentes pueden consumir directamente.
+ */
 export function useBudgetDashboard() {
   const period =
     useBudgetPeriod();
@@ -32,12 +53,24 @@ export function useBudgetDashboard() {
   const fixedCommitments =
     useFixedCommitments();
 
-  /**
-   * 1. Conecta el administrador de tarjetas con
-   * el controlador principal del presupuesto.
-   */
   const creditCards =
     useCreditCards();
+
+  /*
+   * Calcula el saldo actual de cada tarjeta usando las tarjetas
+   * configuradas, las compras y los pagos cargados desde Firestore.
+   */
+  const creditCardSummaries =
+    useCreditCardSummaries({
+      tarjetas:
+        creditCards.tarjetas,
+
+      gastos:
+        budget.gastos,
+
+      pagos:
+        budget.pagos,
+    });
 
   const income =
     useIncomeData();
@@ -74,9 +107,9 @@ export function useBudgetDashboard() {
   ] =
     useState(false);
 
-  /**
-   * TARJETAS - 1. Mantiene el estado de apertura
-   * del administrador de tarjetas.
+  /*
+   * Mantiene la visibilidad del modal usado para crear,
+   * editar, activar o desactivar tarjetas.
    */
   const [
     creditCardsOpen,
@@ -162,9 +195,9 @@ export function useBudgetDashboard() {
             ) ?? null
         : null;
 
-  /**
-   * 2. Incluye los errores de tarjetas dentro
-   * del sistema general de mensajes.
+  /*
+   * Combina los errores de los distintos controladores para que
+   * la interfaz muestre un único mensaje de retroalimentación.
    */
   const feedbackError =
     budget.error ??
@@ -234,11 +267,8 @@ export function useBudgetDashboard() {
     budget,
     fixedCommitments,
 
-    /**
-     * 3. Expone tarjetas, operaciones y estados
-     * para las próximas vistas y modales.
-     */
     creditCards,
+    creditCardSummaries,
 
     summary,
     income,
@@ -255,10 +285,6 @@ export function useBudgetDashboard() {
       incomeSettingsOpen,
       fixedCommitmentsOpen,
 
-      /**
-       * TARJETAS - 2. Expone el estado del modal
-       * para que pueda ser renderizado.
-       */
       creditCardsOpen,
 
       selectedFixedCommitment,
@@ -305,10 +331,6 @@ export function useBudgetDashboard() {
             false,
           ),
 
-      /**
-       * TARJETAS - 3. Expone las acciones para
-       * abrir y cerrar el administrador.
-       */
       openCreditCards:
         () =>
           setCreditCardsOpen(
