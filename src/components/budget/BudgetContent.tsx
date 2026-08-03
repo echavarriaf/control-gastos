@@ -23,6 +23,18 @@ export function BudgetContent({
     ui,
   } = dashboard;
 
+  // TARJETAS - 1. Abre el administrador de tarjetas.
+  const abrirConfiguracionTarjetas =
+    actions.openCreditCards;
+
+  // TARJETAS - 2. Mantiene separado el administrador de gastos fijos.
+  const abrirConfiguracionFijos =
+    actions.openFixedCommitments;
+
+  // TARJETAS - 3. Conserva el flujo existente para registrar pagos fijos.
+  const abrirPagoFijo =
+    actions.openFixedPayment;
+
   return (
     <>
       <ViewTabs
@@ -66,13 +78,14 @@ export function BudgetContent({
             budget
               .eliminandoPagoFijoId
           }
+          onConfigurarTarjetas={
+            abrirConfiguracionTarjetas
+          }
           onConfigurar={
-            actions
-              .openFixedCommitments
+            abrirConfiguracionFijos
           }
           onRegistrarPago={
-            actions
-              .openFixedPayment
+            abrirPagoFijo
           }
           onEliminarPago={
             budget

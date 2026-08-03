@@ -8,6 +8,7 @@ import {
 import { useBudgetData } from "@/hooks/useBudgetData";
 import { useBudgetPeriod } from "@/hooks/useBudgetPeriod";
 import { useBudgetSummary } from "@/hooks/useBudgetSummary";
+import { useCreditCards } from "@/hooks/useCreditCards";
 import { useBudgetVisualAlerts } from "@/hooks/useBudgetVisualAlerts";
 import { useFixedCommitments } from "@/hooks/useFixedCommitments";
 import { useIncomeData } from "@/hooks/useIncomeData";
@@ -30,6 +31,13 @@ export function useBudgetDashboard() {
 
   const fixedCommitments =
     useFixedCommitments();
+
+  /**
+   * 1. Conecta el administrador de tarjetas con
+   * el controlador principal del presupuesto.
+   */
+  const creditCards =
+    useCreditCards();
 
   const income =
     useIncomeData();
@@ -63,6 +71,16 @@ export function useBudgetDashboard() {
   const [
     fixedCommitmentsOpen,
     setFixedCommitmentsOpen,
+  ] =
+    useState(false);
+
+  /**
+   * TARJETAS - 1. Mantiene el estado de apertura
+   * del administrador de tarjetas.
+   */
+  const [
+    creditCardsOpen,
+    setCreditCardsOpen,
   ] =
     useState(false);
 
@@ -144,9 +162,14 @@ export function useBudgetDashboard() {
             ) ?? null
         : null;
 
+  /**
+   * 2. Incluye los errores de tarjetas dentro
+   * del sistema general de mensajes.
+   */
   const feedbackError =
     budget.error ??
     fixedCommitments.error ??
+    creditCards.error ??
     income.error ??
     incomeTransactions.error;
 
@@ -158,6 +181,9 @@ export function useBudgetDashboard() {
         fixedCommitments
           .limpiarError();
 
+        creditCards
+          .limpiarError();
+
         income.limpiarError();
 
         incomeTransactions
@@ -166,6 +192,7 @@ export function useBudgetDashboard() {
       [
         budget,
         fixedCommitments,
+        creditCards,
         income,
         incomeTransactions,
       ],
@@ -206,6 +233,13 @@ export function useBudgetDashboard() {
     period,
     budget,
     fixedCommitments,
+
+    /**
+     * 3. Expone tarjetas, operaciones y estados
+     * para las próximas vistas y modales.
+     */
+    creditCards,
+
     summary,
     income,
     incomeTransactions,
@@ -220,6 +254,13 @@ export function useBudgetDashboard() {
       budgetSettingsOpen,
       incomeSettingsOpen,
       fixedCommitmentsOpen,
+
+      /**
+       * TARJETAS - 2. Expone el estado del modal
+       * para que pueda ser renderizado.
+       */
+      creditCardsOpen,
+
       selectedFixedCommitment,
       selectedIncomeCycle,
     },
@@ -261,6 +302,22 @@ export function useBudgetDashboard() {
       closeFixedCommitments:
         () =>
           setFixedCommitmentsOpen(
+            false,
+          ),
+
+      /**
+       * TARJETAS - 3. Expone las acciones para
+       * abrir y cerrar el administrador.
+       */
+      openCreditCards:
+        () =>
+          setCreditCardsOpen(
+            true,
+          ),
+
+      closeCreditCards:
+        () =>
+          setCreditCardsOpen(
             false,
           ),
 

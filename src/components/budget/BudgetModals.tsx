@@ -1,6 +1,7 @@
 "use client";
 
 import { BudgetSettingsModal } from "@/components/budget/BudgetSettingsModal";
+import CreditCardsModal from "@/components/budget/CreditCardsModal";
 import { FixedCommitmentsModal } from "@/components/budget/FixedCommitmentsModal";
 import { FixedPaymentModal } from "@/components/budget/FixedPaymentModal";
 import IncomeReceiptModal from "@/components/budget/IncomeReceiptModal";
@@ -18,6 +19,13 @@ export function BudgetModals({
   const {
     actions,
     budget,
+
+    /**
+     * TARJETAS - 1. Obtiene el controlador de tarjetas
+     * desde el dashboard principal.
+     */
+    creditCards,
+
     fixedCommitments,
     income,
     incomeTransactions,
@@ -108,6 +116,46 @@ export function BudgetModals({
         }
       />
 
+      {/**
+       * TARJETAS - 2. Conecta el estado y las operaciones
+       * del hook con el administrador visual.
+       */}
+      <CreditCardsModal
+        abierto={
+          ui.creditCardsOpen
+        }
+        tarjetas={
+          creditCards.tarjetas
+        }
+        cargando={
+          creditCards.cargando
+        }
+        guardando={
+          creditCards.guardando
+        }
+        actualizandoId={
+          creditCards
+            .actualizandoId
+        }
+        onCerrar={
+          actions.closeCreditCards
+        }
+        onCrear={
+          creditCards.crearTarjeta
+        }
+        onActualizar={
+          creditCards
+            .actualizarTarjeta
+        }
+        onCambiarEstado={
+          creditCards.cambiarEstado
+        }
+      />
+
+      {/**
+       * TARJETAS - 3. El modal permanece centralizado
+       * junto con los demás modales del presupuesto.
+       */}
       <BudgetSettingsModal
         abierto={
           ui.budgetSettingsOpen

@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  CreditCard,
   Settings2,
 } from "lucide-react";
 
@@ -33,6 +34,12 @@ interface FixedPaymentsSectionProps {
 
   eliminandoPagoFijoId: string | null;
 
+  /**
+   * TARJETAS - 1. Abre el administrador de
+   * tarjetas desde la sección de gastos fijos.
+   */
+  onConfigurarTarjetas: () => void;
+
   onConfigurar: () => void;
 
   onRegistrarPago: (
@@ -53,6 +60,7 @@ export function FixedPaymentsSection({
   totalPagadoFijoQuincena,
   porcentajeFijoPagado,
   eliminandoPagoFijoId,
+  onConfigurarTarjetas,
   onConfigurar,
   onRegistrarPago,
   onEliminarPago,
@@ -101,7 +109,31 @@ export function FixedPaymentsSection({
             </p>
           </div>
 
-          <div className="flex items-stretch gap-2 sm:items-start">
+          <div className="flex flex-wrap items-stretch gap-2 sm:items-start">
+            {/**
+             * TARJETAS - 2. Añade un acceso visible
+             * sin esperar a la futura vista Tarjetas.
+             */}
+            <button
+              type="button"
+              onClick={
+                onConfigurarTarjetas
+              }
+              aria-label="Administrar tarjetas"
+              title="Administrar tarjetas"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-3.5 text-xs font-black text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100 active:scale-95"
+            >
+              <CreditCard className="h-4 w-4" />
+
+              <span className="hidden sm:inline">
+                Tarjetas
+              </span>
+            </button>
+
+            {/**
+             * TARJETAS - 3. Conserva separado el
+             * acceso a la configuración de gastos fijos.
+             */}
             <button
               type="button"
               onClick={onConfigurar}

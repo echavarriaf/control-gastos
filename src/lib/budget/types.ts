@@ -276,11 +276,22 @@ export interface NuevoIngreso {
   notas: string;
 }
 
+/**
+ * Tarjeta de crédito administrada por el presupuesto.
+ *
+ * `saldoInicial` es una fotografía del saldo en
+ * `fechaSaldoInicial`. A partir de esa base, el saldo
+ * puede calcularse sumando compras y restando pagos
+ * asociados a la tarjeta.
+ */
 export interface TarjetaCredito {
   id: string;
   nombre: string;
   ultimosCuatro: string;
 
+  saldoInicial: number;
+  fechaSaldoInicial: string;
+
   diaCorte: number;
   diaPago: number;
 
@@ -293,12 +304,24 @@ export interface TarjetaCredito {
   limiteCredito: number | null;
 
   notas: string;
+
+  creadoEn?: string;
+  actualizadoEn?: string;
 }
 
+/**
+ * Datos necesarios para registrar una tarjeta.
+ *
+ * El identificador y las marcas de tiempo son asignados
+ * por Firestore.
+ */
 export interface NuevaTarjetaCredito {
   nombre: string;
   ultimosCuatro: string;
 
+  saldoInicial: number;
+  fechaSaldoInicial: string;
+
   diaCorte: number;
   diaPago: number;
 
@@ -312,6 +335,12 @@ export interface NuevaTarjetaCredito {
 
   notas: string;
 }
+
+/**
+ * Cambios permitidos al editar o desactivar una tarjeta.
+ */
+export type ActualizacionTarjetaCredito =
+  Partial<NuevaTarjetaCredito>;
 
 export interface GastoVariable {
   id: string;
