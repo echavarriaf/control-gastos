@@ -119,7 +119,7 @@ export function BudgetHeader({
       <div className="relative flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-black uppercase tracking-[0.24em] text-indigo-300">
-            Presupuesto mensual de Felo
+            Presupuesto mensual
           </p>
 
           <h1 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">

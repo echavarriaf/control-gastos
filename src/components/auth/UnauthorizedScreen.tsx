@@ -1,142 +1,165 @@
 "use client";
 
+/*
+ * Nombre: Pantalla de solicitud de acceso
+ * Ruta: src/components/auth/UnauthorizedScreen.tsx
+ * Autor: Felix Echavarria
+ * Fecha: 2026-08-04
+ *
+ * Descripción:
+ * Informa al usuario autenticado que su solicitud de acceso fue
+ * registrada y permanece pendiente de revisión. No muestra el UID
+ * ni instrucciones internas de Firebase.
+ */
+
 import {
-  Check,
-  Clipboard,
+  Clock3,
   LoaderCircle,
   LogOut,
   RefreshCw,
-  ShieldAlert,
+  ShieldCheck,
+  XCircle,
 } from "lucide-react";
-
-import {
-  useState,
-} from "react";
 
 import {
   useAuth,
 } from "@/contexts/AuthContext";
 
+/**
+ * Muestra el estado de la solicitud de acceso del usuario actual.
+ *
+ * Obtiene la solicitud desde AuthContext y adapta el mensaje cuando
+ * está pendiente, rechazada o todavía no pudo cargarse. También
+ * permite comprobar nuevamente la autorización y cerrar la sesión.
+ */
 export function UnauthorizedScreen() {
   const {
     user,
+    accessRequest,
     error,
     checkingAuthorization,
+    creatingAccessRequest,
     signingOut,
     refreshAuthorization,
     signOutUser,
   } = useAuth();
 
-  const [
-    copied,
-    setCopied,
-  ] =
-    useState(false);
-
-  if (
-    !user
-  ) {
+  if (!user) {
     return null;
   }
 
-  const copyUid =
-    async () => {
-      try {
-        await navigator.clipboard.writeText(
-          user.uid,
-        );
+  const solicitudRechazada =
+    accessRequest?.estado ===
+    "rechazada";
 
-        setCopied(
-          true,
-        );
+  const procesando =
+    checkingAuthorization ||
+    creatingAccessRequest ||
+    signingOut;
 
-        window.setTimeout(
-          () =>
-            setCopied(
-              false,
-            ),
-          2_000,
-        );
-      } catch (
-        copyError
-      ) {
-        console.error(
-          "No se pudo copiar el UID:",
-          copyError,
-        );
-      }
-    };
+  const titulo =
+    solicitudRechazada
+      ? "La solicitud no fue aprobada"
+      : "Solicitud de acceso enviada";
+
+  const descripcion =
+    solicitudRechazada
+      ? "El administrador revisó esta cuenta y decidió no habilitar su acceso."
+      : "El administrador recibió tu solicitud. Podrás entrar cuando sea aprobada.";
+
+  const correo =
+    accessRequest?.email ||
+    user.email ||
+    "Cuenta de Google";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-slate-900 antialiased">
       <section className="w-full max-w-lg rounded-[2rem] border border-white/10 bg-slate-50 p-6 shadow-2xl sm:p-8">
         <div className="flex items-start gap-4">
-          <div className="rounded-2xl bg-amber-100 p-3 text-amber-700">
-            <ShieldAlert className="h-7 w-7" />
+          <div
+            className={`rounded-2xl p-3 ${
+              solicitudRechazada
+                ? "bg-rose-100 text-rose-700"
+                : "bg-amber-100 text-amber-700"
+            }`}
+          >
+            {solicitudRechazada ? (
+              <XCircle className="h-7 w-7" />
+            ) : (
+              <Clock3 className="h-7 w-7" />
+            )}
           </div>
 
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">
-              Cuenta pendiente de autorización
+          <div className="min-w-0">
+            <p
+              className={`text-[10px] font-black uppercase tracking-[0.2em] ${
+                solicitudRechazada
+                  ? "text-rose-700"
+                  : "text-amber-700"
+              }`}
+            >
+              {solicitudRechazada
+                ? "Acceso rechazado"
+                : "Pendiente de autorización"}
             </p>
 
             <h1 className="mt-2 text-2xl font-black text-slate-950">
-              Tu sesión funciona, pero todavía no tiene acceso
+              {titulo}
             </h1>
 
             <p className="mt-2 text-sm font-medium leading-6 text-slate-600">
-              Agrega este UID como documento en Firestore para
-              habilitar la cuenta de{" "}
-              {user.email ?? "Google"}.
+              {descripcion}
             </p>
           </div>
         </div>
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-            ID del documento
-          </p>
-
-          <div className="mt-2 flex items-center gap-2">
-            <code className="min-w-0 flex-1 break-all rounded-xl bg-slate-100 px-3 py-3 text-xs font-bold text-slate-700">
-              {user.uid}
-            </code>
-
-            <button
-              type="button"
-              onClick={() => {
-                void copyUid();
-              }}
-              className="shrink-0 rounded-xl border border-slate-200 bg-white p-3 text-slate-600 transition hover:bg-slate-50"
-              aria-label="Copiar UID"
-              title="Copiar UID"
-            >
-              {copied ? (
-                <Check className="h-4 w-4 text-emerald-600" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-100 text-sm font-black text-indigo-700">
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="h-full w-full object-cover"
+                />
               ) : (
-                <Clipboard className="h-4 w-4" />
+                (
+                  user.displayName ??
+                  correo
+                )
+                  .trim()
+                  .charAt(0)
+                  .toUpperCase() ||
+                "U"
               )}
-            </button>
+            </div>
+
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-slate-950">
+                {accessRequest?.nombre ||
+                  user.displayName ||
+                  "Usuario de Google"}
+              </p>
+
+              <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                {correo}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm font-semibold leading-6 text-indigo-950">
-          <p>
-            En Firebase Console crea:
-          </p>
+        {!solicitudRechazada ? (
+          <div className="mt-4 flex items-start gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-indigo-950">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" />
 
-          <code className="mt-2 block rounded-xl bg-white/70 px-3 py-2 text-xs">
-            allowedUsers/{user.uid}
-          </code>
-
-          <p className="mt-2">
-            Y agrega un campo booleano:
-          </p>
-
-          <code className="mt-2 block rounded-xl bg-white/70 px-3 py-2 text-xs">
-            activo: true
-          </code>
-        </div>
+            <p className="text-sm font-semibold leading-6">
+              No necesitas enviar ningún código ni realizar otro paso.
+              Usa <strong>Comprobar acceso</strong> después de recibir
+              la confirmación del administrador.
+            </p>
+          </div>
+        ) : null}
 
         {error ? (
           <p
@@ -150,16 +173,14 @@ export function UnauthorizedScreen() {
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button
             type="button"
-            disabled={
-              checkingAuthorization ||
-              signingOut
-            }
+            disabled={procesando}
             onClick={() => {
               void refreshAuthorization();
             }}
             className="flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3.5 text-sm font-black text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {checkingAuthorization ? (
+            {checkingAuthorization ||
+            creatingAccessRequest ? (
               <LoaderCircle className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
@@ -170,10 +191,7 @@ export function UnauthorizedScreen() {
 
           <button
             type="button"
-            disabled={
-              signingOut ||
-              checkingAuthorization
-            }
+            disabled={procesando}
             onClick={() => {
               void signOutUser();
             }}

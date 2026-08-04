@@ -1,5 +1,17 @@
 "use client";
 
+/*
+ * Nombre: Contexto de autenticación
+ * Ruta: src/contexts/AuthContext.tsx
+ * Autor: Felix Echavarria
+ * Fecha: 2026-08-03
+ *
+ * Descripción:
+ * Administra la sesión con Google, comprueba si el usuario está
+ * autorizado y registra una solicitud de acceso cuando una cuenta
+ * autenticada todavía no pertenece a allowedUsers.
+ */
+
 import {
   createContext,
   useCallback,
@@ -25,7 +37,13 @@ import {
 import {
   doc,
   getDoc,
+  setDoc,
 } from "firebase/firestore";
+
+import type {
+  NuevaSolicitudAcceso,
+  SolicitudAcceso,
+} from "@/lib/auth/types";
 
 import {
   auth,
@@ -39,6 +57,8 @@ interface AuthContextValue {
   signingIn: boolean;
   signingOut: boolean;
   checkingAuthorization: boolean;
+  creatingAccessRequest: boolean;
+  accessRequest: SolicitudAcceso | null;
   error: string | null;
 
   signInWithGoogle: () => Promise<boolean>;
@@ -56,6 +76,10 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Convierte los errores de Firebase Authentication en mensajes
+ * comprensibles para la interfaz.
+ */
 function getAuthErrorMessage(
   error: unknown,
 ): string {
@@ -88,6 +112,10 @@ function getAuthErrorMessage(
   }
 }
 
+/**
+ * Determina si el inicio con ventana emergente debe cambiar a
+ * redirección, principalmente cuando el navegador bloquea el popup.
+ */
 function shouldUseRedirect(
   error: unknown,
 ): boolean {
@@ -136,6 +164,20 @@ export function AuthProvider({
     useState(false);
 
   const [
+    creatingAccessRequest,
+    setCreatingAccessRequest,
+  ] =
+    useState(false);
+
+  const [
+    accessRequest,
+    setAccessRequest,
+  ] =
+    useState<SolicitudAcceso | null>(
+      null,
+    );
+
+  const [
     signingIn,
     setSigningIn,
   ] =
@@ -155,6 +197,149 @@ export function AuthProvider({
       null,
     );
 
+  /**
+   * Recupera una solicitud existente o crea la primera solicitud
+   * del usuario. Utiliza el UID como ID del documento para impedir
+   * que la misma cuenta genere solicitudes duplicadas.
+   */
+  const createOrLoadAccessRequest =
+    useCallback(
+      async (
+        currentUser: User,
+      ): Promise<SolicitudAcceso | null> => {
+        setCreatingAccessRequest(
+          true,
+        );
+
+        try {
+          const requestReference =
+            doc(
+              db,
+              "accessRequests",
+              currentUser.uid,
+            );
+
+          const requestSnapshot =
+            await getDoc(
+              requestReference,
+            );
+
+          if (
+            requestSnapshot.exists()
+          ) {
+            const existingRequest =
+              requestSnapshot.data() as
+                SolicitudAcceso;
+
+            if (
+              auth.currentUser?.uid ===
+              currentUser.uid
+            ) {
+              setAccessRequest(
+                existingRequest,
+              );
+            }
+
+            return existingRequest;
+          }
+
+          const now =
+            new Date().toISOString();
+
+          const newRequest:
+            NuevaSolicitudAcceso = {
+              uid:
+                currentUser.uid,
+
+              nombre:
+                currentUser.displayName
+                  ?.trim() ||
+                "Usuario de Google",
+
+              email:
+                currentUser.email
+                  ?.trim()
+                  .toLowerCase() ||
+                "",
+
+              fotoUrl:
+                currentUser.photoURL ??
+                null,
+
+              estado:
+                "pendiente",
+
+              solicitadoEn:
+                now,
+
+              actualizadoEn:
+                now,
+
+              revisadoEn:
+                null,
+
+              revisadoPor:
+                null,
+
+              correoNotificacionEnviado:
+                false,
+
+              correoNotificacionEnviadoEn:
+                null,
+            };
+
+          await setDoc(
+            requestReference,
+            newRequest,
+          );
+
+          if (
+            auth.currentUser?.uid ===
+            currentUser.uid
+          ) {
+            setAccessRequest(
+              newRequest,
+            );
+          }
+
+          return newRequest;
+        } catch (
+          requestError
+        ) {
+          console.error(
+            "No se pudo crear o recuperar la solicitud de acceso:",
+            requestError,
+          );
+
+          if (
+            auth.currentUser?.uid ===
+            currentUser.uid
+          ) {
+            setAccessRequest(
+              null,
+            );
+
+            setError(
+              "No se pudo enviar la solicitud de acceso. Intenta nuevamente.",
+            );
+          }
+
+          return null;
+        } finally {
+          setCreatingAccessRequest(
+            false,
+          );
+        }
+      },
+      [],
+    );
+
+  /**
+   * Comprueba el documento allowedUsers del usuario autenticado.
+   *
+   * Cuando la cuenta todavía no está autorizada, crea o recupera
+   * automáticamente su documento en accessRequests.
+   */
   const checkAuthorization =
     useCallback(
       async (
@@ -192,6 +377,23 @@ export function AuthProvider({
             );
           }
 
+          if (
+            isAuthorized
+          ) {
+            if (
+              auth.currentUser?.uid ===
+              currentUser.uid
+            ) {
+              setAccessRequest(
+                null,
+              );
+            }
+          } else {
+            await createOrLoadAccessRequest(
+              currentUser,
+            );
+          }
+
           return isAuthorized;
         } catch (
           authorizationError
@@ -221,7 +423,9 @@ export function AuthProvider({
           );
         }
       },
-      [],
+      [
+        createOrLoadAccessRequest,
+      ],
     );
 
   useEffect(() => {
@@ -259,6 +463,14 @@ export function AuthProvider({
             false,
           );
 
+          setAccessRequest(
+            null,
+          );
+
+          setCreatingAccessRequest(
+            false,
+          );
+
           setAuthReady(
             true,
           );
@@ -270,6 +482,14 @@ export function AuthProvider({
               currentUser,
             );
           } else {
+            setAccessRequest(
+              null,
+            );
+
+            setCreatingAccessRequest(
+              false,
+            );
+
             setCheckingAuthorization(
               false,
             );
@@ -289,6 +509,14 @@ export function AuthProvider({
           );
 
           setAuthorized(
+            false,
+          );
+
+          setAccessRequest(
+            null,
+          );
+
+          setCreatingAccessRequest(
             false,
           );
 
@@ -401,6 +629,10 @@ export function AuthProvider({
             auth,
           );
 
+          setAccessRequest(
+            null,
+          );
+
           return true;
         } catch (
           signOutError
@@ -457,11 +689,14 @@ export function AuthProvider({
 
         loading:
           !authReady ||
-          checkingAuthorization,
+          checkingAuthorization ||
+          creatingAccessRequest,
 
         signingIn,
         signingOut,
         checkingAuthorization,
+        creatingAccessRequest,
+        accessRequest,
         error,
 
         signInWithGoogle,
@@ -480,6 +715,8 @@ export function AuthProvider({
         signingIn,
         signingOut,
         checkingAuthorization,
+        creatingAccessRequest,
+        accessRequest,
         error,
         signInWithGoogle,
         signOutUser,
@@ -498,6 +735,10 @@ export function AuthProvider({
   );
 }
 
+/**
+ * Entrega el estado y las acciones de autenticación a cualquier
+ * componente ubicado dentro de AuthProvider.
+ */
 export function useAuth(): AuthContextValue {
   const context =
     useContext(
