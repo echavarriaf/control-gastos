@@ -516,66 +516,89 @@ export function useBudgetData() {
     }
   };
 
-  const eliminarMovimiento = async (movimiento: Movimiento) => {
-    const confirmado = window.confirm(
-      `¿Eliminar "${movimiento.concepto}" por ${formatoMoneda.format(
-        movimiento.monto,
-      )}?`,
+  const eliminarMovimiento = async (
+  movimiento: Movimiento,
+): Promise<void> => {
+  const idEliminacion =
+    `${movimiento.tipo}-${movimiento.id}`;
+
+  setEliminandoMovimientoId(
+    idEliminacion,
+  );
+
+  setError(null);
+
+  try {
+    const coleccion =
+      movimiento.tipo === "gasto"
+        ? "gastos"
+        : "pagosTarjeta";
+
+    await deleteDoc(
+      doc(
+        db,
+        coleccion,
+        movimiento.id,
+      ),
     );
 
-    if (!confirmado) return;
-
-    const idEliminacion = `${movimiento.tipo}-${movimiento.id}`;
-    setEliminandoMovimientoId(idEliminacion);
-    setError(null);
-
     try {
-      const coleccion =
-        movimiento.tipo === "gasto" ? "gastos" : "pagosTarjeta";
-      await deleteDoc(doc(db, coleccion, movimiento.id));
+      await evaluarAlertasPush();
+    } catch (pushError) {
+      console.error(
+        "El movimiento se eliminó, pero no se pudieron evaluar las alertas push.",
+        pushError,
+      );
 
-      try {
-        await evaluarAlertasPush();
-      } catch (pushError) {
-        console.error(
-          "El movimiento se eliminó, pero no se pudieron evaluar las alertas push.",
-          pushError,
-        );
-
-        setError(
-          "El movimiento se eliminó, pero no se pudieron evaluar las alertas push.",
-        );
-      }
-    } catch (eliminarError) {
-      console.error(eliminarError);
-      setError("No se pudo eliminar el movimiento.");
-    } finally {
-      setEliminandoMovimientoId(null);
+      setError(
+        "El movimiento se eliminó, pero no se pudieron evaluar las alertas push.",
+      );
     }
-  };
-
-  const eliminarPagoFijo = async (pago: PagoFijo) => {
-    const confirmado = window.confirm(
-      `¿Eliminar el pago de ${pago.descripcion} por ${formatoMoneda.format(
-        pago.monto,
-      )}?`,
+  } catch (eliminarError) {
+    console.error(
+      eliminarError,
     );
 
-    if (!confirmado) return;
+    setError(
+      "No se pudo eliminar el movimiento.",
+    );
+  } finally {
+    setEliminandoMovimientoId(
+      null,
+    );
+  }
+};
+  const eliminarPagoFijo = async (
+  pago: PagoFijo,
+): Promise<void> => {
+  setEliminandoPagoFijoId(
+    pago.id,
+  );
 
-    setEliminandoPagoFijoId(pago.id);
-    setError(null);
+  setError(null);
 
-    try {
-      await deleteDoc(doc(db, "pagosFijos", pago.id));
-    } catch (eliminarError) {
-      console.error(eliminarError);
-      setError("No se pudo eliminar el pago fijo.");
-    } finally {
-      setEliminandoPagoFijoId(null);
-    }
-  };
+  try {
+    await deleteDoc(
+      doc(
+        db,
+        "pagosFijos",
+        pago.id,
+      ),
+    );
+  } catch (eliminarError) {
+    console.error(
+      eliminarError,
+    );
 
+    setError(
+      "No se pudo eliminar el pago fijo.",
+    );
+  } finally {
+    setEliminandoPagoFijoId(
+      null,
+    );
+  }
+};
   const guardarLimites = async (
     nuevosLimites: LimitesVariables,
   ): Promise<boolean> => {

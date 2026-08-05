@@ -4,19 +4,20 @@
  * Nombre: Sección de pagos fijos
  * Ruta: src/components/budget/FixedPaymentsSection.tsx
  * Autor: Felix Echavarria
- * Fecha: 2026-08-02
+ * Fecha: 2026-08-04
  *
  * Descripción:
  * Presenta el resumen mensual de compromisos fijos, su progreso
  * de pago y las tarjetas individuales de cada compromiso. Permite
- * abrir la configuración de gastos fijos, registrar pagos y
- * eliminar registros de pagos existentes.
+ * abrir el historial centralizado, configurar gastos fijos,
+ * registrar pagos y eliminar registros de pagos existentes.
  */
 
 import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  History,
   Settings2,
 } from "lucide-react";
 
@@ -60,6 +61,9 @@ interface FixedPaymentsSectionProps {
 
   eliminandoPagoFijoId:
     string | null;
+
+  onAbrirHistorial:
+    () => void;
 
   onConfigurar:
     () => void;
@@ -116,6 +120,7 @@ export function FixedPaymentsSection({
   totalPagadoFijoQuincena,
   porcentajeFijoPagado,
   eliminandoPagoFijoId,
+  onAbrirHistorial,
   onConfigurar,
   onRegistrarPago,
   onEliminarPago,
@@ -168,6 +173,22 @@ export function FixedPaymentsSection({
           </div>
 
           <div className="flex flex-wrap items-stretch gap-2 sm:items-start">
+            <button
+              type="button"
+              onClick={
+                onAbrirHistorial
+              }
+              aria-label="Abrir historial de gastos fijos"
+              title="Historial de gastos fijos"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 text-xs font-black text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:scale-95"
+            >
+              <History className="h-4 w-4" />
+
+              <span className="hidden sm:inline">
+                Historial
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={

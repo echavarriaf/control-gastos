@@ -4,7 +4,7 @@
  * Nombre: Contenido principal del presupuesto
  * Ruta: src/components/budget/BudgetContent.tsx
  * Autor: Felix Echavarria
- * Fecha: 2026-08-02
+ * Fecha: 2026-08-04
  *
  * Descripción:
  * Decide qué vista del presupuesto debe mostrarse y conecta
@@ -59,6 +59,15 @@ export function BudgetContent({
 
   const abrirPagoFijo =
     actions.openFixedPayment;
+
+  /**
+   * Abre el historial centralizado de gastos fijos.
+   *
+   * Usa la acción expuesta por el controlador para que la sección
+   * de gastos fijos no administre estado global por su cuenta.
+   */
+  const abrirHistorialFijos =
+    actions.openFixedPaymentsHistory;
 
   return (
     <>
@@ -133,6 +142,9 @@ export function BudgetContent({
           eliminandoPagoFijoId={
             budget
               .eliminandoPagoFijoId
+          }
+          onAbrirHistorial={
+            abrirHistorialFijos
           }
           onConfigurar={
             abrirConfiguracionFijos

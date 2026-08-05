@@ -1,31 +1,64 @@
 "use client";
 
-import { BudgetSettingsModal } from "@/components/budget/BudgetSettingsModal";
-import CreditCardsModal from "@/components/budget/CreditCardsModal";
-import { FixedCommitmentsModal } from "@/components/budget/FixedCommitmentsModal";
-import { FixedPaymentModal } from "@/components/budget/FixedPaymentModal";
-import IncomeReceiptModal from "@/components/budget/IncomeReceiptModal";
-import { IncomeSettingsModal } from "@/components/budget/IncomeSettingsModal";
+/*
+ * Nombre: Modales del presupuesto
+ * Ruta: src/components/budget/BudgetModals.tsx
+ * Autor: Felix Echavarria
+ * Fecha: 2026-08-04
+ *
+ * Descripción:
+ * Centraliza todos los modales utilizados por el dashboard del
+ * presupuesto. Conecta cada ventana con los datos, estados y
+ * acciones expuestos por useBudgetDashboard.
+ */
 
-import type { BudgetDashboardController } from "@/hooks/useBudgetDashboard";
+import {
+  BudgetSettingsModal,
+} from "@/components/budget/BudgetSettingsModal";
+
+import CreditCardsModal from "@/components/budget/CreditCardsModal";
+
+import {
+  FixedCommitmentsModal,
+} from "@/components/budget/FixedCommitmentsModal";
+
+import {
+  FixedPaymentModal,
+} from "@/components/budget/FixedPaymentModal";
+
+import {
+  FixedPaymentsHistoryModal,
+} from "@/components/budget/FixedPaymentsHistoryModal";
+
+import IncomeReceiptModal from "@/components/budget/IncomeReceiptModal";
+
+import {
+  IncomeSettingsModal,
+} from "@/components/budget/IncomeSettingsModal";
+
+import type {
+  BudgetDashboardController,
+} from "@/hooks/useBudgetDashboard";
 
 interface BudgetModalsProps {
-  dashboard: BudgetDashboardController;
+  dashboard:
+  BudgetDashboardController;
 }
 
+/**
+ * Renderiza y conecta todos los modales del presupuesto.
+ *
+ * Recibe el controlador principal, extrae los datos y acciones
+ * necesarios y los distribuye entre cada ventana. De esta forma,
+ * los modales no necesitan acceder directamente a otros hooks.
+ */
 export function BudgetModals({
   dashboard,
 }: BudgetModalsProps) {
   const {
     actions,
     budget,
-
-    /**
-     * TARJETAS - 1. Obtiene el controlador de tarjetas
-     * desde el dashboard principal.
-     */
     creditCards,
-
     fixedCommitments,
     income,
     incomeTransactions,
@@ -35,18 +68,20 @@ export function BudgetModals({
     ui,
   } = dashboard;
 
-  /**
-   * Busca el resumen correspondiente al gasto fijo
-   * seleccionado para enviar al modal el saldo pendiente
-   * real del periodo.
+/**
+   * Obtiene el resumen del gasto fijo seleccionado.
+   *
+   * Busca el compromiso por ID dentro de resumenFijos para enviar
+   * al modal de pago el saldo pendiente real del periodo.
    */
   const selectedFixedSummary =
     ui.selectedFixedCommitment
       ? summary.resumenFijos.find(
-          (item) =>
-            item.compromiso.id ===
-            ui.selectedFixedCommitment?.id,
-        ) ?? null
+        (item) =>
+          item.compromiso.id ===
+          ui.selectedFixedCommitment
+            ?.id,
+      ) ?? null
       : null;
 
   return (
@@ -75,6 +110,30 @@ export function BudgetModals({
         }
         onRegistrar={
           budget.registrarPagoFijo
+        }
+      />
+
+      <FixedPaymentsHistoryModal
+        abierto={
+          ui.fixedPaymentsHistoryOpen
+        }
+        pagos={
+          budget.pagosFijos
+        }
+        mesInicial={
+          period.mesSeleccionado
+        }
+        cargando={
+          budget.cargando
+        }
+        eliminandoPagoFijoId={
+          budget.eliminandoPagoFijoId
+        }
+        onCerrar={
+          actions.closeFixedPaymentsHistory
+        }
+        onEliminarPago={
+          budget.eliminarPagoFijo
         }
       />
 
@@ -116,10 +175,6 @@ export function BudgetModals({
         }
       />
 
-      {/**
-       * TARJETAS - 2. Conecta el estado y las operaciones
-       * del hook con el administrador visual.
-       */}
       <CreditCardsModal
         abierto={
           ui.creditCardsOpen
@@ -152,10 +207,6 @@ export function BudgetModals({
         }
       />
 
-      {/**
-       * TARJETAS - 3. El modal permanece centralizado
-       * junto con los demás modales del presupuesto.
-       */}
       <BudgetSettingsModal
         abierto={
           ui.budgetSettingsOpen

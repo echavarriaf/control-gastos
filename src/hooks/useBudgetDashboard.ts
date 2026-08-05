@@ -4,7 +4,7 @@
  * Nombre: Controlador principal del presupuesto
  * Ruta: src/hooks/useBudgetDashboard.ts
  * Autor: Felix Echavarria
- * Fecha: 2026-08-02
+ * Fecha: 2026-08-04
  *
  * Descripción:
  * Reúne los hooks de datos, periodos, ingresos, gastos fijos,
@@ -104,6 +104,18 @@ export function useBudgetDashboard() {
   const [
     fixedCommitmentsOpen,
     setFixedCommitmentsOpen,
+  ] =
+    useState(false);
+
+  /**
+   * Mantiene la visibilidad del historial centralizado de pagos fijos.
+   *
+   * El booleano permite que cualquier botón conectado al controlador
+   * abra o cierre la ventana sin duplicar estado entre componentes.
+   */
+  const [
+    fixedPaymentsHistoryOpen,
+    setFixedPaymentsHistoryOpen,
   ] =
     useState(false);
 
@@ -284,6 +296,7 @@ export function useBudgetDashboard() {
       budgetSettingsOpen,
       incomeSettingsOpen,
       fixedCommitmentsOpen,
+      fixedPaymentsHistoryOpen,
 
       creditCardsOpen,
 
@@ -328,6 +341,30 @@ export function useBudgetDashboard() {
       closeFixedCommitments:
         () =>
           setFixedCommitmentsOpen(
+            false,
+          ),
+
+      /**
+       * Abre el historial centralizado de pagos fijos.
+       *
+       * Cambia únicamente el estado del modal; los movimientos siguen
+       * viniendo de budget.pagosFijos como fuente de verdad.
+       */
+      openFixedPaymentsHistory:
+        () =>
+          setFixedPaymentsHistoryOpen(
+            true,
+          ),
+
+      /**
+       * Cierra el historial centralizado de pagos fijos.
+       *
+       * Restablece el booleano de visibilidad sin modificar filtros,
+       * pagos ni datos almacenados en Firestore.
+       */
+      closeFixedPaymentsHistory:
+        () =>
+          setFixedPaymentsHistoryOpen(
             false,
           ),
 
