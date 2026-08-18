@@ -4,7 +4,7 @@
  * Nombre: Resumen del presupuesto
  * Ruta: src/hooks/useBudgetSummary.ts
  * Autor: Felix Echavarria
- * Fecha: 2026-08-02
+ * Fecha: 2026-08-18
  *
  * Descripción:
  * Calcula los totales mensuales y quincenales del presupuesto,
@@ -15,6 +15,11 @@
  * reducen nuevamente el gasto de Comida o Gas. Una compra consume
  * el presupuesto de su categoría y el pago solamente reduce la
  * deuda de la tarjeta.
+ *
+ * El presupuesto quincenal aplica carry-over continuo por categoría:
+ * cualquier exceso de una quincena reduce el disponible de la
+ * siguiente hasta que el arrastre sea absorbido. El sobrante positivo
+ * no se acumula como crédito.
  */
 
 import {
@@ -25,6 +30,12 @@ import {
   CATEGORIA_KEYS,
 } from "@/lib/budget/constants";
 
+import {
+  calcularCarryOverQuincenal,
+  type MovimientoCarryOver,
+  type ResumenCategoriaConCarryOver,
+} from "@/lib/budget/carry-over";
+
 import type {
   CompromisoFijo,
   GastoVariable,
@@ -33,7 +44,6 @@ import type {
   PagoFijo,
   PagoTarjeta,
   Quincena,
-  ResumenCategoria,
   ResumenFijo,
 } from "@/lib/budget/types";
 
@@ -72,11 +82,9 @@ interface UseBudgetSummaryArgs {
 /**
  * Calcula todos los resúmenes financieros visibles en el dashboard.
  *
- * Filtra los registros por mes y quincena, suma los gastos variables,
- * calcula el estado de los compromisos fijos y combina compras y pagos
- * en un historial ordenado. Los pagos de tarjetas no se restan del
- * consumo de las categorías porque su función es reducir la deuda de
- * la tarjeta, no restaurar el presupuesto ya gastado.
+ * Para el carry-over usa todo el historial de gastos disponible en
+ * memoria. De esta forma Q2 puede recibir exceso de Q1 y Q1 del mes
+ * siguiente puede recibir exceso de Q2 del mes anterior.
  */
 export function useBudgetSummary({
   gastos,
@@ -131,15 +139,6 @@ export function useBudgetSummary({
             idsCompromisosActivos.has(
               pago.compromisoId,
             ),
-        );
-
-      const gastosQuincena =
-        gastosMes.filter(
-          (gasto) =>
-            obtenerQuincenaDesdeISO(
-              gasto.fecha,
-            ) ===
-            quincenaSeleccionada,
         );
 
       const pagosFijosQuincena =
@@ -219,21 +218,118 @@ export function useBudgetSummary({
           limiteVariableMensual,
         );
 
+      /*
+       * Construye el historial mínimo que necesita el motor de carry.
+       * Los registros con fecha inválida se ignoran sin romper el resumen.
+       */
+      const movimientosCarryOver:
+        MovimientoCarryOver[] =
+        gastos.flatMap(
+          (gasto) => {
+            const periodo =
+              obtenerPeriodoDesdeISO(
+                gasto.fecha,
+              );
+
+            const quincena =
+              obtenerQuincenaDesdeISO(
+                gasto.fecha,
+              );
+
+            if (
+              !periodo ||
+              !quincena
+            ) {
+              return [];
+            }
+
+            return [
+              {
+                categoria:
+                  gasto.categoria,
+
+                monto:
+                  gasto.monto,
+
+                periodo,
+
+                quincena,
+              },
+            ];
+          },
+        );
+
+      const carryOver =
+        calcularCarryOverQuincenal({
+          movimientos:
+            movimientosCarryOver,
+
+          limites,
+
+          periodoObjetivo:
+            mesSeleccionado,
+
+          quincenaObjetivo:
+            quincenaSeleccionada,
+        });
+
       const saldoVariableQuincena =
-        gastosQuincena.reduce(
+        CATEGORIA_KEYS.reduce(
           (
             total,
-            gasto,
+            key,
           ) =>
             total +
-            gasto.monto,
+            carryOver[key]
+              .saldoQuincena,
+          0,
+        );
+
+      const excedenteVariableAnterior =
+        CATEGORIA_KEYS.reduce(
+          (
+            total,
+            key,
+          ) =>
+            total +
+            carryOver[key]
+              .excedenteAnterior,
+          0,
+        );
+
+      const limiteVariableQuincenalEfectivo =
+        CATEGORIA_KEYS.reduce(
+          (
+            total,
+            key,
+          ) =>
+            total +
+            carryOver[key]
+              .limiteQuincenalEfectivo,
           0,
         );
 
       const disponibleVariableQuincena =
-        Math.max(
-          limiteVariableQuincenal -
-            saldoVariableQuincena,
+        CATEGORIA_KEYS.reduce(
+          (
+            total,
+            key,
+          ) =>
+            total +
+            carryOver[key]
+              .disponibleQuincena,
+          0,
+        );
+
+      const excedenteVariableSiguiente =
+        CATEGORIA_KEYS.reduce(
+          (
+            total,
+            key,
+          ) =>
+            total +
+            carryOver[key]
+              .excedenteSiguiente,
           0,
         );
 
@@ -272,13 +368,8 @@ export function useBudgetSummary({
           0,
         );
 
-      /*
-       * Cada categoría se calcula usando únicamente sus compras.
-       * Los pagos de tarjetas permanecen separados para evitar
-       * que Comida o Gas recuperen presupuesto al pagar la deuda.
-       */
       const resumenCategorias:
-        ResumenCategoria[] =
+        ResumenCategoriaConCarryOver[] =
         CATEGORIA_KEYS.map(
           (key) => {
             const saldoMes =
@@ -298,22 +389,8 @@ export function useBudgetSummary({
                   0,
                 );
 
-            const saldoQuincena =
-              gastosQuincena
-                .filter(
-                  (gasto) =>
-                    gasto.categoria ===
-                    key,
-                )
-                .reduce(
-                  (
-                    total,
-                    gasto,
-                  ) =>
-                    total +
-                    gasto.monto,
-                  0,
-                );
+            const detalleCarry =
+              carryOver[key];
 
             return {
               key,
@@ -335,22 +412,7 @@ export function useBudgetSummary({
                     .mensual,
                 ),
 
-              saldoQuincena,
-
-              disponibleQuincena:
-                Math.max(
-                  limites[key]
-                    .quincenal -
-                    saldoQuincena,
-                  0,
-                ),
-
-              porcentajeQuincena:
-                porcentaje(
-                  saldoQuincena,
-                  limites[key]
-                    .quincenal,
-                ),
+              ...detalleCarry,
             };
           },
         );
@@ -431,16 +493,12 @@ export function useBudgetSummary({
           },
         );
 
-      /*
-       * El historial sí contiene compras y pagos de tarjetas.
-       * Ambos tipos se ordenan por fecha y, cuando coinciden,
-       * por la fecha exacta en que fueron creados.
-       */
       const movimientos:
         Movimiento[] = [
           ...gastosMes.map(
             (gasto) => ({
               ...gasto,
+
               tipo:
                 "gasto" as const,
             }),
@@ -449,6 +507,7 @@ export function useBudgetSummary({
           ...pagosMes.map(
             (pago) => ({
               ...pago,
+
               tipo:
                 "pago" as const,
             }),
@@ -510,20 +569,41 @@ export function useBudgetSummary({
 
       return {
         totalFijo,
+
         limiteVariableMensual,
+
         limiteVariableQuincenal,
+
         totalPlanMensual,
+
         saldoVariableMes,
+
         disponibleVariableMes,
+
         porcentajeVariableMes,
+
         saldoVariableQuincena,
+
+        excedenteVariableAnterior,
+
+        limiteVariableQuincenalEfectivo,
+
         disponibleVariableQuincena,
+
+        excedenteVariableSiguiente,
+
         totalPagadoFijoMes,
+
         totalPendienteFijoMes,
+
         porcentajeFijoPagado,
+
         totalPagadoFijoQuincena,
+
         resumenCategorias,
+
         resumenFijos,
+
         movimientos,
 
         mesesDisponibles:

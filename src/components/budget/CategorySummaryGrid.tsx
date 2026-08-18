@@ -1,11 +1,16 @@
 "use client";
 
-import { CATEGORIAS_VARIABLES } from "@/lib/budget/constants";
+import {
+  CATEGORIAS_VARIABLES,
+} from "@/lib/budget/constants";
+
+import type {
+  ResumenCategoriaConCarryOver,
+} from "@/lib/budget/carry-over";
 
 import type {
   LimitesVariables,
   Quincena,
-  ResumenCategoria,
 } from "@/lib/budget/types";
 
 import {
@@ -15,9 +20,14 @@ import {
 } from "@/lib/budget/utils";
 
 interface CategorySummaryGridProps {
-  resumenCategorias: ResumenCategoria[];
-  limites: LimitesVariables;
-  quincenaSeleccionada: Quincena;
+  resumenCategorias:
+    ResumenCategoriaConCarryOver[];
+
+  limites:
+    LimitesVariables;
+
+  quincenaSeleccionada:
+    Quincena;
 }
 
 export function CategorySummaryGrid({
@@ -44,43 +54,61 @@ export function CategorySummaryGrid({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {resumenCategorias.map((resumen) => (
-          <CategoryCard
-            key={resumen.key}
-            resumen={resumen}
-            limiteMensual={
-              limites[resumen.key].mensual
-            }
-            limiteQuincenal={
-              limites[resumen.key].quincenal
-            }
-            quincenaSeleccionada={
-              quincenaSeleccionada
-            }
-          />
-        ))}
+        {resumenCategorias.map(
+          (
+            resumen,
+          ) => (
+            <CategoryCard
+              key={
+                resumen.key
+              }
+              resumen={
+                resumen
+              }
+              limiteMensual={
+                limites[
+                  resumen.key
+                ].mensual
+              }
+              quincenaSeleccionada={
+                quincenaSeleccionada
+              }
+            />
+          ),
+        )}
       </div>
     </section>
   );
 }
 
 interface CategoryCardProps {
-  resumen: ResumenCategoria;
-  limiteMensual: number;
-  limiteQuincenal: number;
-  quincenaSeleccionada: Quincena;
+  resumen:
+    ResumenCategoriaConCarryOver;
+
+  limiteMensual:
+    number;
+
+  quincenaSeleccionada:
+    Quincena;
 }
 
 function CategoryCard({
   resumen,
   limiteMensual,
-  limiteQuincenal,
   quincenaSeleccionada,
 }: CategoryCardProps) {
   const configuracion =
-    CATEGORIAS_VARIABLES[resumen.key];
+    CATEGORIAS_VARIABLES[
+      resumen.key
+    ];
 
-  const Icono = configuracion.icon;
+  const Icono =
+    configuracion.icon;
+
+  const tieneArrastre =
+    resumen
+      .excedenteAnterior >
+    0;
 
   return (
     <article
@@ -96,7 +124,9 @@ function CategoryCard({
 
           <div>
             <h3 className="text-base font-black text-slate-900">
-              {configuracion.label}
+              {
+                configuracion.label
+              }
             </h3>
 
             <p className="text-xs font-semibold text-slate-500">
@@ -111,26 +141,40 @@ function CategoryCard({
         <span
           className={`rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black ${configuracion.text}`}
         >
-          {resumen.porcentajeMes.toFixed(0)}%
+          {resumen
+            .porcentajeMes
+            .toFixed(
+              0,
+            )}
+          %
         </span>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
         <Metric
           label="Saldo mensual"
-          value={resumen.saldoMes}
+          value={
+            resumen
+              .saldoMes
+          }
         />
 
         <Metric
           label="Disponible"
-          value={resumen.disponibleMes}
+          value={
+            resumen
+              .disponibleMes
+          }
           valueClassName="text-emerald-700"
         />
       </div>
 
       <ProgressBlock
         label="Uso mensual"
-        porcentaje={resumen.porcentajeMes}
+        porcentaje={
+          resumen
+            .porcentajeMes
+        }
       />
 
       <div className="my-4 border-t border-slate-200/80" />
@@ -139,12 +183,15 @@ function CategoryCard({
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
             Quincena{" "}
-            {quincenaSeleccionada}
+            {
+              quincenaSeleccionada
+            }
           </p>
 
           <p className="mt-1 text-sm font-black text-slate-900">
             {formatoMoneda.format(
-              resumen.saldoQuincena,
+              resumen
+                .saldoQuincena,
             )}{" "}
             usados
           </p>
@@ -157,36 +204,95 @@ function CategoryCard({
 
           <p className="mt-1 text-sm font-black text-emerald-700">
             {formatoMoneda.format(
-              resumen.disponibleQuincena,
+              resumen
+                .disponibleQuincena,
             )}
           </p>
         </div>
       </div>
 
+      {tieneArrastre && (
+        <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 p-3">
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-wider text-amber-700">
+              Arrastre anterior
+            </p>
+
+            <p className="mt-1 text-sm font-black text-amber-900">
+              {formatoMoneda.format(
+                resumen
+                  .excedenteAnterior,
+              )}
+            </p>
+          </div>
+
+          <div className="text-right">
+            <p className="text-[9px] font-black uppercase tracking-wider text-amber-700">
+              Límite efectivo
+            </p>
+
+            <p className="mt-1 text-sm font-black text-amber-900">
+              {formatoMoneda.format(
+                resumen
+                  .limiteQuincenalEfectivo,
+              )}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="mt-3">
         <ProgressBlock
-          label={`Límite ${formatoMoneda.format(
-            limiteQuincenal,
-          )}`}
+          label={
+            tieneArrastre
+              ? `Uso + arrastre / límite ${formatoMoneda.format(
+                  resumen
+                    .limiteQuincenalBase,
+                )}`
+              : `Límite ${formatoMoneda.format(
+                  resumen
+                    .limiteQuincenalBase,
+                )}`
+          }
           porcentaje={
-            resumen.porcentajeQuincena
+            resumen
+              .porcentajeQuincena
           }
         />
       </div>
+
+      {resumen
+        .excedenteSiguiente >
+        0 && (
+        <p className="mt-3 rounded-xl bg-white/75 px-3 py-2 text-[10px] font-bold text-rose-700">
+          {formatoMoneda.format(
+            resumen
+              .excedenteSiguiente,
+          )}{" "}
+          pasarán a la próxima
+          quincena.
+        </p>
+      )}
     </article>
   );
 }
 
 interface MetricProps {
-  label: string;
-  value: number;
-  valueClassName?: string;
+  label:
+    string;
+
+  value:
+    number;
+
+  valueClassName?:
+    string;
 }
 
 function Metric({
   label,
   value,
-  valueClassName = "text-slate-900",
+  valueClassName =
+    "text-slate-900",
 }: MetricProps) {
   return (
     <div className="rounded-2xl bg-white/75 p-3">
@@ -197,15 +303,22 @@ function Metric({
       <p
         className={`mt-1 text-base font-black ${valueClassName}`}
       >
-        {formatoMoneda.format(value)}
+        {
+          formatoMoneda.format(
+            value,
+          )
+        }
       </p>
     </div>
   );
 }
 
 interface ProgressBlockProps {
-  label: string;
-  porcentaje: number;
+  label:
+    string;
+
+  porcentaje:
+    number;
 }
 
 function ProgressBlock({
@@ -215,9 +328,16 @@ function ProgressBlock({
   return (
     <div className="mt-4">
       <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500">
-        <span>{label}</span>
+        <span>
+          {label}
+        </span>
 
-        <span>{porcentaje.toFixed(0)}%</span>
+        <span>
+          {porcentaje.toFixed(
+            0,
+          )}
+          %
+        </span>
       </div>
 
       <div className="h-2.5 overflow-hidden rounded-full bg-white/80">
@@ -226,9 +346,10 @@ function ProgressBlock({
             porcentaje,
           )}`}
           style={{
-            width: `${anchoBarra(
-              porcentaje,
-            )}%`,
+            width:
+              `${anchoBarra(
+                porcentaje,
+              )}%`,
           }}
         />
       </div>
