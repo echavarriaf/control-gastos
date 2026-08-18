@@ -1,17 +1,17 @@
 "use client";
 
 import { BottomNavigation } from "@/components/budget/BottomNavigation";
-import { BudgetContent } from "@/components/budget/BudgetContent";
+import  BudgetContent  from "@/components/budget/BudgetContent";
 import { BudgetHeader } from "@/components/budget/BudgetHeader";
-import { BudgetModals } from "@/components/budget/BudgetModals";
-import { BudgetOverview } from "@/components/budget/BudgetOverview";
+import  BudgetModals  from "@/components/budget/BudgetModals";
+import  BudgetOverview  from "@/components/budget/BudgetOverview";
 import { PeriodSelector } from "@/components/budget/PeriodSelector";
 
 import { useBudgetDashboard } from "@/hooks/useBudgetDashboard";
 
 export function BudgetDashboard() {
   const dashboard = useBudgetDashboard();
-  const { actions, budget, period, push, summary, ui } = dashboard;
+  const { actions, period, push, summary, ui } = dashboard;
 
   return (
     <main className="min-h-screen bg-slate-950 px-0 py-0 text-slate-900 antialiased sm:px-5 sm:py-5">

@@ -2,6 +2,7 @@
 
 import {
   Banknote,
+  CalendarDays,
   Check,
   CheckCircle2,
   Clock3,
@@ -89,17 +90,28 @@ export function FixedPaymentCard({
                 resumen.compromiso.monto,
               )}
             </p>
+            
+            <div className="mt-1 flex items-center gap-1 text-[10px] font-bold text-indigo-600">
+              <CalendarDays className="h-3 w-3" />
+
+              <span>
+                Vence el día{" "}
+                {
+                  resumen.compromiso
+                    .diaVencimiento
+                }
+              </span>
+            </div>
           </div>
         </div>
 
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${
-            pagado
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${pagado
               ? "bg-emerald-100 text-emerald-700"
               : parcial
                 ? "bg-amber-100 text-amber-700"
                 : "bg-slate-100 text-slate-600"
-          }`}
+            }`}
         >
           {pagado
             ? "Pagado"
@@ -111,13 +123,12 @@ export function FixedPaymentCard({
 
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-white">
         <div
-          className={`h-full rounded-full ${
-            pagado
+          className={`h-full rounded-full ${pagado
               ? "bg-emerald-500"
               : parcial
                 ? "bg-amber-400"
                 : "bg-slate-300"
-          }`}
+            }`}
           style={{
             width: `${anchoBarra(
               resumen.porcentajePagado,
@@ -158,7 +169,7 @@ export function FixedPaymentCard({
             ·{" "}
             {
               METODOS_PAGO[
-                resumen.ultimoPago.metodo
+              resumen.ultimoPago.metodo
               ]
             }{" "}
             ·{" "}
@@ -201,7 +212,7 @@ export function FixedPaymentCard({
                 <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
                   {pago.metodo ===
                     "transferencia" ||
-                  pago.metodo ===
+                    pago.metodo ===
                     "debito_automatico" ? (
                     <Landmark className="h-3.5 w-3.5" />
                   ) : (
@@ -213,16 +224,16 @@ export function FixedPaymentCard({
                   <p className="truncate text-[11px] font-black text-slate-800">
                     {
                       METODOS_PAGO[
-                        pago.metodo
+                      pago.metodo
                       ]
                     }{" "}
                     ·{" "}
                     {pago.periodicidad ===
-                    "mensual"
+                      "mensual"
                       ? "Mensual"
                       : `${obtenerQuincenaDesdeISO(
-                          pago.fecha,
-                        )}.ª quincena`}
+                        pago.fecha,
+                      )}.ª quincena`}
                   </p>
 
                   <p className="mt-0.5 truncate text-[9px] font-semibold text-slate-400">
@@ -256,7 +267,7 @@ export function FixedPaymentCard({
                   aria-label={`Eliminar pago de ${pago.descripcion}`}
                 >
                   {eliminandoPagoFijoId ===
-                  pago.id ? (
+                    pago.id ? (
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Trash2 className="h-3.5 w-3.5" />

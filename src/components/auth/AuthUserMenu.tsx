@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- Las fotos de perfil usan URLs externas del proveedor de autenticación. */
 
 import {
     ChevronDown,

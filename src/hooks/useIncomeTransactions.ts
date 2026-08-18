@@ -7,9 +7,7 @@ import {
 } from "react";
 
 import {
-  collection,
   deleteDoc,
-  doc,
   onSnapshot,
   orderBy,
   query,
@@ -17,7 +15,12 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+
+import {
+  getUserCollection,
+  getUserDocument,
+} from "@/lib/firestore/user-paths";
 
 import type {
   CicloPago,
@@ -27,17 +30,26 @@ import type {
 } from "@/lib/budget/types";
 
 type IngresoGuardable =
-  Omit<Ingreso, "id"> & {
-    creadoEn: string;
-    actualizadoEn: string;
+  Omit<
+    Ingreso,
+    "id"
+  > & {
+    creadoEn:
+      string;
+
+    actualizadoEn:
+      string;
   };
 
 function esNumeroValido(
   value: unknown,
 ): value is number {
   return (
-    typeof value === "number" &&
-    Number.isFinite(value) &&
+    typeof value ===
+      "number" &&
+    Number.isFinite(
+      value,
+    ) &&
     value >= 0
   );
 }
@@ -45,34 +57,65 @@ function esNumeroValido(
 function esTexto(
   value: unknown,
 ): value is string {
-  return typeof value === "string";
+  return (
+    typeof value ===
+    "string"
+  );
 }
 
 function esEstadoIngreso(
   value: unknown,
 ): value is EstadoIngreso {
   return (
-    value === "proyectado" ||
-    value === "recibido" ||
-    value === "cancelado"
+    value ===
+      "proyectado" ||
+    value ===
+      "recibido" ||
+    value ===
+      "cancelado"
   );
 }
 
 function normalizarIngreso(
-  id: string,
-  data: Record<string, unknown>,
+  id:
+    string,
+
+  data:
+    Record<
+      string,
+      unknown
+    >,
 ): Ingreso | null {
   if (
-    !esTexto(data.descripcion) ||
-    !esNumeroValido(data.monto) ||
-    !esTexto(data.fechaProgramada) ||
-    !esTexto(data.periodoCalendario) ||
-    !esNumeroValido(data.numeroPagoMes) ||
-    !esNumeroValido(data.numeroPagoAnual) ||
-    !esTexto(data.fuente) ||
-    !esEstadoIngreso(data.estado) ||
-    typeof data.recurrente !== "boolean" ||
-    !esTexto(data.notas)
+    !esTexto(
+      data.descripcion,
+    ) ||
+    !esNumeroValido(
+      data.monto,
+    ) ||
+    !esTexto(
+      data.fechaProgramada,
+    ) ||
+    !esTexto(
+      data.periodoCalendario,
+    ) ||
+    !esNumeroValido(
+      data.numeroPagoMes,
+    ) ||
+    !esNumeroValido(
+      data.numeroPagoAnual,
+    ) ||
+    !esTexto(
+      data.fuente,
+    ) ||
+    !esEstadoIngreso(
+      data.estado,
+    ) ||
+    typeof data.recurrente !==
+      "boolean" ||
+    !esTexto(
+      data.notas,
+    )
   ) {
     return null;
   }
@@ -81,12 +124,18 @@ function normalizarIngreso(
     id,
 
     configuracionIngresoId:
-      esTexto(data.configuracionIngresoId)
-        ? data.configuracionIngresoId
+      esTexto(
+        data
+          .configuracionIngresoId,
+      )
+        ? data
+            .configuracionIngresoId
         : null,
 
     cicloPagoId:
-      esTexto(data.cicloPagoId)
+      esTexto(
+        data.cicloPagoId,
+      )
         ? data.cicloPagoId
         : id,
 
@@ -100,7 +149,9 @@ function normalizarIngreso(
       data.fechaProgramada,
 
     fechaRecibida:
-      esTexto(data.fechaRecibida)
+      esTexto(
+        data.fechaRecibida,
+      )
         ? data.fechaRecibida
         : null,
 
@@ -118,7 +169,8 @@ function normalizarIngreso(
       ),
 
     fuente:
-      data.fuente as Ingreso["fuente"],
+      data.fuente as
+        Ingreso["fuente"],
 
     estado:
       data.estado,
@@ -132,11 +184,20 @@ function normalizarIngreso(
 }
 
 function construirIngresoDesdeCiclo(
-  ciclo: CicloPago,
-  configuracion: ConfiguracionIngreso,
-  monto: number,
-  estado: EstadoIngreso,
-  fechaRecibida: string | null,
+  ciclo:
+    CicloPago,
+
+  configuracion:
+    ConfiguracionIngreso,
+
+  monto:
+    number,
+
+  estado:
+    EstadoIngreso,
+
+  fechaRecibida:
+    string | null,
 ): Ingreso {
   return {
     id:
@@ -149,17 +210,20 @@ function construirIngresoDesdeCiclo(
       ciclo.id,
 
     descripcion:
-      configuracion.descripcion,
+      configuracion
+        .descripcion,
 
     monto,
 
     fechaProgramada:
-      ciclo.fechaPagoProgramada,
+      ciclo
+        .fechaPagoProgramada,
 
     fechaRecibida,
 
     periodoCalendario:
-      ciclo.periodoCalendario,
+      ciclo
+        .periodoCalendario,
 
     numeroPagoMes:
       ciclo.numeroPagoMes,
@@ -181,22 +245,30 @@ function construirIngresoDesdeCiclo(
 }
 
 function prepararParaGuardar(
-  ingreso: Ingreso,
-  creadoEn?: string,
+  ingreso:
+    Ingreso,
+
+  creadoEn?:
+    string,
 ): IngresoGuardable {
   const {
-    id: _id,
+    id,
     ...datos
-  } = ingreso;
+  } =
+    ingreso;
+
+  void id;
 
   const ahora =
-    new Date().toISOString();
+    new Date()
+      .toISOString();
 
   return {
     ...datos,
 
     creadoEn:
-      creadoEn ?? ahora,
+      creadoEn ??
+      ahora,
 
     actualizadoEn:
       ahora,
@@ -208,45 +280,63 @@ function prepararParaGuardar(
  *
  * Colección:
  *
- * ingresos/{cicloPagoId}
- *
- * Se usa el ID del ciclo como ID del documento para evitar
- * registrar dos veces el mismo pago.
+ * users/{uid}/ingresos/{cicloPagoId}
  */
 export function useIncomeTransactions() {
+  const {
+    user,
+    authorized,
+  } = useAuth();
+
+  const uid =
+    authorized
+      ? user?.uid ?? null
+      : null;
+
   const [
     ingresos,
     setIngresos,
   ] =
-    useState<Ingreso[]>([]);
+    useState<
+      Ingreso[]
+    >([]);
 
   const [
     cargando,
     setCargando,
   ] =
-    useState(true);
+    useState(
+      true,
+    );
 
   const [
     guardando,
     setGuardando,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     error,
     setError,
   ] =
-    useState<string | null>(
-      null,
-    );
+    useState<
+      string | null
+    >(null);
 
   useEffect(() => {
+    if (!uid) {
+      return;
+    }
+
     const consulta =
       query(
-        collection(
-          db,
+        getUserCollection(
+          uid,
           "ingresos",
         ),
+
         orderBy(
           "fechaProgramada",
           "desc",
@@ -256,20 +346,27 @@ export function useIncomeTransactions() {
     return onSnapshot(
       consulta,
 
-      (snapshot) => {
+      (
+        snapshot,
+      ) => {
         const siguientesIngresos =
           snapshot.docs
-            .map((documento) =>
-              normalizarIngreso(
-                documento.id,
-                documento.data(),
-              ),
+            .map(
+              (
+                documento,
+              ) =>
+                normalizarIngreso(
+                  documento.id,
+                  documento.data(),
+                ),
             )
             .filter(
               (
                 ingreso,
-              ): ingreso is Ingreso =>
-                ingreso !== null,
+              ): ingreso is
+                Ingreso =>
+                ingreso !==
+                null,
             );
 
         setIngresos(
@@ -281,7 +378,9 @@ export function useIncomeTransactions() {
         );
       },
 
-      (snapshotError) => {
+      (
+        snapshotError,
+      ) => {
         console.error(
           snapshotError,
         );
@@ -295,15 +394,20 @@ export function useIncomeTransactions() {
         );
       },
     );
-  }, []);
+  }, [
+    uid,
+  ]);
 
   const ingresosPorCiclo =
     useMemo(
       () =>
         new Map(
           ingresos.map(
-            (ingreso) => [
-              ingreso.cicloPagoId,
+            (
+              ingreso,
+            ) => [
+              ingreso
+                .cicloPagoId,
               ingreso,
             ],
           ),
@@ -315,8 +419,17 @@ export function useIncomeTransactions() {
 
   const guardarIngreso =
     async (
-      ingreso: Ingreso,
+      ingreso:
+        Ingreso,
     ): Promise<boolean> => {
+      if (!uid) {
+        setError(
+          "No existe un usuario autorizado para guardar el ingreso.",
+        );
+
+        return false;
+      }
+
       setGuardando(
         true,
       );
@@ -328,25 +441,30 @@ export function useIncomeTransactions() {
       try {
         const existente =
           ingresosPorCiclo.get(
-            ingreso.cicloPagoId,
+            ingreso
+              .cicloPagoId,
           );
 
         await setDoc(
-          doc(
-            db,
+          getUserDocument(
+            uid,
             "ingresos",
-            ingreso.cicloPagoId,
+            ingreso
+              .cicloPagoId,
           ),
 
           prepararParaGuardar(
             ingreso,
+
             existente
               ? undefined
-              : new Date().toISOString(),
+              : new Date()
+                  .toISOString(),
           ),
 
           {
-            merge: true,
+            merge:
+              true,
           },
         );
 
@@ -372,10 +490,15 @@ export function useIncomeTransactions() {
 
   const registrarIngresoProyectado =
     async (
-      ciclo: CicloPago,
-      configuracion: ConfiguracionIngreso,
+      ciclo:
+        CicloPago,
+
+      configuracion:
+        ConfiguracionIngreso,
+
       monto =
-        configuracion.montoEstimado,
+        configuracion
+          .montoEstimado,
     ): Promise<boolean> =>
       guardarIngreso(
         construirIngresoDesdeCiclo(
@@ -389,11 +512,18 @@ export function useIncomeTransactions() {
 
   const registrarIngresoRecibido =
     async (
-      ciclo: CicloPago,
-      configuracion: ConfiguracionIngreso,
-      monto: number,
+      ciclo:
+        CicloPago,
+
+      configuracion:
+        ConfiguracionIngreso,
+
+      monto:
+        number,
+
       fechaRecibida =
-        ciclo.fechaPagoProgramada,
+        ciclo
+          .fechaPagoProgramada,
     ): Promise<boolean> =>
       guardarIngreso(
         construirIngresoDesdeCiclo(
@@ -407,12 +537,27 @@ export function useIncomeTransactions() {
 
   const marcarComoRecibido =
     async (
-      cicloPagoId: string,
-      monto: number,
-      fechaRecibida: string,
+      cicloPagoId:
+        string,
+
+      monto:
+        number,
+
+      fechaRecibida:
+        string,
     ): Promise<boolean> => {
+      if (!uid) {
+        setError(
+          "No existe un usuario autorizado para actualizar el ingreso.",
+        );
+
+        return false;
+      }
+
       if (
-        !esNumeroValido(monto) ||
+        !esNumeroValido(
+          monto,
+        ) ||
         monto <= 0
       ) {
         setError(
@@ -432,19 +577,23 @@ export function useIncomeTransactions() {
 
       try {
         await updateDoc(
-          doc(
-            db,
+          getUserDocument(
+            uid,
             "ingresos",
             cicloPagoId,
           ),
 
           {
             monto,
+
             fechaRecibida,
+
             estado:
               "recibido",
+
             actualizadoEn:
-              new Date().toISOString(),
+              new Date()
+                .toISOString(),
           },
         );
 
@@ -470,8 +619,17 @@ export function useIncomeTransactions() {
 
   const eliminarIngreso =
     async (
-      cicloPagoId: string,
+      cicloPagoId:
+        string,
     ): Promise<boolean> => {
+      if (!uid) {
+        setError(
+          "No existe un usuario autorizado para eliminar el ingreso.",
+        );
+
+        return false;
+      }
+
       setGuardando(
         true,
       );
@@ -482,8 +640,8 @@ export function useIncomeTransactions() {
 
       try {
         await deleteDoc(
-          doc(
-            db,
+          getUserDocument(
+            uid,
             "ingresos",
             cicloPagoId,
           ),

@@ -119,7 +119,7 @@ export async function POST(
       request,
     );
 
-  if (!autorizacion.ok) {
+  if ("response" in autorizacion) {
     return autorizacion.response;
   }
 
@@ -127,11 +127,15 @@ export async function POST(
     const ahora = obtenerInfoPeriodo(new Date());
 
     const [limites, datos] = await Promise.all([
-      cargarLimites(),
-      cargarDatosPeriodo(ahora.periodo),
+      cargarLimites(autorizacion.uid),
+      cargarDatosPeriodo(
+        autorizacion.uid,
+        ahora.periodo,
+      ),
     ]);
 
     const alertas = await prepararAlertas({
+      uid: autorizacion.uid,
       periodo: ahora.periodo,
       quincena: ahora.quincena,
       limites,
@@ -152,12 +156,15 @@ export async function POST(
       });
     }
 
-    const fids = await cargarFidsActivos();
+    const fids = await cargarFidsActivos(
+      autorizacion.uid,
+    );
 
     if (fids.length === 0) {
       await Promise.all(
         alertas.map((alerta) =>
           liberarAlertaParaReintento(
+            autorizacion.uid,
             alerta,
             "No hay dispositivos push activos.",
           ),
@@ -182,16 +189,25 @@ export async function POST(
 
     for (const alerta of alertas) {
       try {
-        const resultado = await enviarAlerta(alerta, fids);
+        const resultado = await enviarAlerta(
+          autorizacion.uid,
+          alerta,
+          fids,
+        );
 
         enviados += resultado.enviados;
         fallidos += resultado.fallidos;
 
-        await marcarAlertaEntregada(alerta, resultado);
+        await marcarAlertaEntregada(
+          autorizacion.uid,
+          alerta,
+          resultado,
+        );
       } catch (error) {
         fallidos += fids.length;
 
         await liberarAlertaParaReintento(
+          autorizacion.uid,
           alerta,
           obtenerMensajeError(error),
         );
@@ -244,6 +260,7 @@ export async function GET(): Promise<NextResponse> {
 }
 
 interface PrepararAlertasArgs {
+  uid: string;
   periodo: string;
   quincena: Quincena;
   limites: LimitesVariables;
@@ -251,6 +268,7 @@ interface PrepararAlertasArgs {
 }
 
 async function prepararAlertas({
+  uid,
   periodo,
   quincena,
   limites,
@@ -274,6 +292,7 @@ async function prepararAlertas({
     );
 
     const alertaMensual = await reclamarAlerta({
+      uid,
       categoria,
       periodo,
       alcance: "mensual",
@@ -301,6 +320,7 @@ async function prepararAlertas({
     );
 
     const alertaQuincenal = await reclamarAlerta({
+      uid,
       categoria,
       periodo,
       alcance: "quincenal",
@@ -318,6 +338,7 @@ async function prepararAlertas({
 }
 
 interface ReclamarAlertaArgs {
+  uid: string;
   categoria: CategoriaVariable;
   periodo: string;
   alcance: AlcanceAlerta;
@@ -331,6 +352,7 @@ interface ReclamarAlertaArgs {
  * Esto evita que dos llamadas simultáneas envíen el mismo push.
  */
 async function reclamarAlerta({
+  uid,
   categoria,
   periodo,
   alcance,
@@ -354,6 +376,8 @@ async function reclamarAlerta({
   const attemptId = randomUUID();
 
   const referencia = getAdminDb()
+    .collection("users")
+    .doc(uid)
     .collection(ALERT_STATE_COLLECTION)
     .doc(alertKey);
 
@@ -460,10 +484,13 @@ async function reclamarAlerta({
 }
 
 async function marcarAlertaEntregada(
+  uid: string,
   alerta: AlertaPendiente,
   resultado: ResultadoEnvio,
 ): Promise<void> {
   const referencia = getAdminDb()
+    .collection("users")
+    .doc(uid)
     .collection(ALERT_STATE_COLLECTION)
     .doc(alerta.alertKey);
 
@@ -494,10 +521,13 @@ async function marcarAlertaEntregada(
 }
 
 async function liberarAlertaParaReintento(
+  uid: string,
   alerta: AlertaPendiente,
   error: string,
 ): Promise<void> {
   const referencia = getAdminDb()
+    .collection("users")
+    .doc(uid)
     .collection(ALERT_STATE_COLLECTION)
     .doc(alerta.alertKey);
 
@@ -525,6 +555,7 @@ async function liberarAlertaParaReintento(
 }
 
 async function enviarAlerta(
+  uid: string,
   alerta: AlertaPendiente,
   fids: string[],
 ): Promise<ResultadoEnvio> {
@@ -587,7 +618,10 @@ async function enviarAlerta(
       },
     );
 
-    await desactivarFidsInvalidos(invalidos);
+    await desactivarFidsInvalidos(
+      uid,
+      invalidos,
+    );
   }
 
   return {
@@ -656,8 +690,12 @@ function crearPayloadAlerta(
   };
 }
 
-async function cargarFidsActivos(): Promise<string[]> {
+async function cargarFidsActivos(
+  uid: string,
+): Promise<string[]> {
   const snapshot = await getAdminDb()
+    .collection("users")
+    .doc(uid)
     .collection(DEVICE_COLLECTION)
     .where("activo", "==", true)
     .get();
@@ -679,6 +717,7 @@ async function cargarFidsActivos(): Promise<string[]> {
 }
 
 async function desactivarFidsInvalidos(
+  uid: string,
   fids: string[],
 ): Promise<void> {
   if (fids.length === 0) {
@@ -689,6 +728,8 @@ async function desactivarFidsInvalidos(
 
   for (const fid of fids) {
     const referencia = getAdminDb()
+      .collection("users")
+      .doc(uid)
       .collection(DEVICE_COLLECTION)
       .doc(encodeURIComponent(fid));
 
@@ -709,8 +750,12 @@ async function desactivarFidsInvalidos(
   await batch.commit();
 }
 
-async function cargarLimites(): Promise<LimitesVariables> {
+async function cargarLimites(
+  uid: string,
+): Promise<LimitesVariables> {
   const snapshot = await getAdminDb()
+    .collection("users")
+    .doc(uid)
     .collection("configuracion")
     .doc("presupuestoFelo")
     .get();
@@ -755,6 +800,7 @@ function normalizarLimite(
  * El frontend actual guarda fecha como cadena ISO.
  */
 async function cargarDatosPeriodo(
+  uid: string,
   periodo: string,
 ): Promise<DatosPeriodo> {
   const { inicioBusqueda, finBusqueda } =
@@ -763,12 +809,16 @@ async function cargarDatosPeriodo(
   const [gastosSnapshot, pagosSnapshot] =
     await Promise.all([
       getAdminDb()
+        .collection("users")
+        .doc(uid)
         .collection("gastos")
         .where("fecha", ">=", inicioBusqueda)
         .where("fecha", "<", finBusqueda)
         .get(),
 
       getAdminDb()
+        .collection("users")
+        .doc(uid)
         .collection("pagosTarjeta")
         .where("fecha", ">=", inicioBusqueda)
         .where("fecha", "<", finBusqueda)
@@ -1009,7 +1059,7 @@ function normalizarNumero(
 
 function esObjeto(
   value: unknown,
-): value is Record<string, any> {
+): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 

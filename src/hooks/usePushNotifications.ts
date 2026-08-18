@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  doc,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
@@ -12,7 +11,11 @@ import {
   useState,
 } from "react";
 
-import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+
+import {
+  getUserDocument,
+} from "@/lib/firestore/user-paths";
 
 import {
   desregistrarDispositivoPush,
@@ -25,10 +28,7 @@ import {
   type EstadoPermisoPush,
 } from "@/lib/firebase-messaging";
 
-const DEVICE_COLLECTION =
-  "notificationDevices";
-
-const INSTALLATION_STORAGE_KEY =
+const INSTALLATION_STORAGE_KEY_PREFIX =
   "presupuesto-felo-fcm-installation-id";
 
 export type EstadoPush =
@@ -74,6 +74,21 @@ interface UsePushNotificationsResult {
  * - permite desactivar las notificaciones.
  */
 export function usePushNotifications(): UsePushNotificationsResult {
+  const {
+    user,
+    authorized,
+  } = useAuth();
+
+  const uid =
+    authorized
+      ? user?.uid ?? null
+      : null;
+
+  const storageKey =
+    uid
+      ? `${INSTALLATION_STORAGE_KEY_PREFIX}:${uid}`
+      : null;
+
   const [estado, setEstado] =
     useState<EstadoPush>("comprobando");
 
@@ -114,15 +129,23 @@ export function usePushNotifications(): UsePushNotificationsResult {
         fid: string,
         activo: boolean,
       ) => {
-        const referencia = doc(
-          db,
-          DEVICE_COLLECTION,
-          encodeURIComponent(fid),
-        );
+        if (!uid) {
+          throw new Error(
+            "No existe un usuario autorizado para guardar el dispositivo push.",
+          );
+        }
+
+        const referencia =
+          getUserDocument(
+            uid,
+            "notificationDevices",
+            encodeURIComponent(fid),
+          );
 
         await setDoc(
           referencia,
           {
+            uid,
             installationId: fid,
             activo,
             app: "presupuesto-felo",
@@ -170,7 +193,7 @@ export function usePushNotifications(): UsePushNotificationsResult {
           },
         );
       },
-      [],
+      [uid],
     );
 
   const manejarRegistro =
@@ -181,10 +204,12 @@ export function usePushNotifications(): UsePushNotificationsResult {
           true,
         );
 
-        window.localStorage.setItem(
-          INSTALLATION_STORAGE_KEY,
-          fid,
-        );
+        if (storageKey) {
+          window.localStorage.setItem(
+            storageKey,
+            fid,
+          );
+        }
 
         if (!montadoRef.current) {
           return;
@@ -194,7 +219,10 @@ export function usePushNotifications(): UsePushNotificationsResult {
         setEstado("activo");
         setError(null);
       },
-      [actualizarRegistroFirestore],
+      [
+        actualizarRegistroFirestore,
+        storageKey,
+      ],
     );
 
   const manejarDesregistro =
@@ -206,13 +234,18 @@ export function usePushNotifications(): UsePushNotificationsResult {
         );
 
         const guardado =
-          window.localStorage.getItem(
-            INSTALLATION_STORAGE_KEY,
-          );
+          storageKey
+            ? window.localStorage.getItem(
+                storageKey,
+              )
+            : null;
 
-        if (guardado === fid) {
+        if (
+          storageKey &&
+          guardado === fid
+        ) {
           window.localStorage.removeItem(
-            INSTALLATION_STORAGE_KEY,
+            storageKey,
           );
         }
 
@@ -223,11 +256,22 @@ export function usePushNotifications(): UsePushNotificationsResult {
         setInstallationId(null);
         setEstado("inactivo");
       },
-      [actualizarRegistroFirestore],
+      [
+        actualizarRegistroFirestore,
+        storageKey,
+      ],
     );
 
   const iniciarRegistro =
     useCallback(async (): Promise<boolean> => {
+      if (!uid) {
+        setError(
+          "No existe un usuario autorizado para activar las notificaciones.",
+        );
+        setEstado("error");
+        return false;
+      }
+
       setEstado("registrando");
       setError(null);
 
@@ -277,6 +321,7 @@ export function usePushNotifications(): UsePushNotificationsResult {
     }, [
       manejarDesregistro,
       manejarRegistro,
+      uid,
     ]);
 
   const activarPush =
@@ -348,9 +393,11 @@ export function usePushNotifications(): UsePushNotificationsResult {
 
       const fid =
         installationId ??
-        window.localStorage.getItem(
-          INSTALLATION_STORAGE_KEY,
-        );
+        (storageKey
+          ? window.localStorage.getItem(
+              storageKey,
+            )
+          : null);
 
       try {
         if (fid) {
@@ -362,9 +409,11 @@ export function usePushNotifications(): UsePushNotificationsResult {
 
         await desregistrarDispositivoPush();
 
-        window.localStorage.removeItem(
-          INSTALLATION_STORAGE_KEY,
-        );
+        if (storageKey) {
+          window.localStorage.removeItem(
+            storageKey,
+          );
+        }
 
         controlRegistroRef.current?.detenerEscucha();
         controlRegistroRef.current = null;
@@ -391,6 +440,7 @@ export function usePushNotifications(): UsePushNotificationsResult {
     }, [
       actualizarRegistroFirestore,
       installationId,
+      storageKey,
     ]);
 
   useEffect(() => {
@@ -401,6 +451,12 @@ export function usePushNotifications(): UsePushNotificationsResult {
       | undefined;
 
     const inicializar = async () => {
+      if (!uid || !storageKey) {
+        setInstallationId(null);
+        setEstado("comprobando");
+        return;
+      }
+
       const compatibilidad =
         await obtenerEstadoPush();
 
@@ -435,7 +491,7 @@ export function usePushNotifications(): UsePushNotificationsResult {
 
       const fidGuardado =
         window.localStorage.getItem(
-          INSTALLATION_STORAGE_KEY,
+          storageKey,
         );
 
       if (
@@ -534,7 +590,11 @@ export function usePushNotifications(): UsePushNotificationsResult {
       controlRegistroRef.current?.detenerEscucha();
       controlRegistroRef.current = null;
     };
-  }, [iniciarRegistro]);
+  }, [
+    iniciarRegistro,
+    storageKey,
+    uid,
+  ]);
 
   return {
     estado,

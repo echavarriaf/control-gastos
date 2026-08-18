@@ -44,7 +44,6 @@ import {
     formatoMoneda,
     obtenerQuincenaDesdeISO,
 } from "@/lib/budget/utils";
-import { ConfirmDialog } from "../ui/ConfirmDialog";
 
 interface FixedPaymentsHistoryModalProps {
     abierto: boolean;
@@ -55,7 +54,11 @@ interface FixedPaymentsHistoryModalProps {
 
     onCerrar: () => void;
 
-    onEliminarPago: (
+    // onEliminarPago: (
+    //     pago: PagoFijo,
+    // ) => void | Promise<void>;
+
+    onEliminar: (
         pago: PagoFijo,
     ) => void | Promise<void>;
 }
@@ -141,8 +144,8 @@ export function FixedPaymentsHistoryModal({
     mesInicial,
     cargando,
     eliminandoPagoFijoId,
+    onEliminar,
     onCerrar,
-    onEliminarPago,
 }: FixedPaymentsHistoryModalProps) {
     const [
         mesSeleccionado,
@@ -175,11 +178,6 @@ export function FixedPaymentsHistoryModal({
         useState<FiltroMetodo>(
             "todos",
         );
-
-    const [
-        pagoPendienteEliminar,
-        setPagoPendienteEliminar,
-    ] = useState<PagoFijo | null>(null);
 
     /**
      * Restablece los filtros cada vez que se abre el historial.
@@ -784,11 +782,34 @@ export function FixedPaymentsHistoryModal({
                                                     </div>
                                                 </div>
 
-                                                <strong className="shrink-0 text-base font-black text-emerald-700">
-                                                    {formatoMoneda.format(
-                                                        pago.monto,
-                                                    )}
-                                                </strong>
+                                                <div className="flex shrink-0 items-center gap-2">
+                                                    <strong className="text-base font-black text-emerald-700">
+                                                        {formatoMoneda.format(
+                                                            pago.monto,
+                                                        )}
+                                                    </strong>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            onEliminar(pago)
+                                                        }
+                                                        disabled={
+                                                            eliminandoPagoFijoId ===
+                                                            pago.id
+                                                        }
+                                                        title="Eliminar pago fijo"
+                                                        aria-label={`Eliminar pago de ${pago.descripcion}`}
+                                                        className="rounded-xl p-2 text-slate-300 transition hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                                    >
+                                                        {eliminandoPagoFijoId ===
+                                                            pago.id ? (
+                                                            <LoaderCircle className="h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <Trash2 className="h-4 w-4" />
+                                                        )}
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {pago.referencia ||
@@ -811,55 +832,12 @@ export function FixedPaymentsHistoryModal({
                                                             {pago.notas}
                                                         </p>
                                                     ) : null}
-
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setPagoPendienteEliminar(pago)
-                                                        }
-                                                        aria-label={`Eliminar pago de ${pago.descripcion}`}
-                                                        title="Eliminar pago"
-                                                        className="rounded-xl bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
                                                 </div>
                                             ) : null}
                                         </article>
                                     );
                                 },
                             )}
-                            <ConfirmDialog
-                                abierto={pagoPendienteEliminar !== null}
-                                titulo="Eliminar pago registrado"
-                                mensaje={
-                                    pagoPendienteEliminar
-                                        ? `Se eliminará el pago de ${formatoMoneda.format(
-                                            pagoPendienteEliminar.monto,
-                                        )} correspondiente a ${pagoPendienteEliminar.descripcion}. Esta acción no se puede deshacer.`
-                                        : ""
-                                }
-                                textoConfirmar="Eliminar pago"
-                                procesando={
-                                    pagoPendienteEliminar?.id ===
-                                    eliminandoPagoFijoId
-                                }
-                                peligroso
-                                onCancelar={() =>
-                                    setPagoPendienteEliminar(null)
-                                }
-                                onConfirmar={async () => {
-                                    if (!pagoPendienteEliminar) {
-                                        return;
-                                    }
-
-                                    await onEliminarPago(
-                                        pagoPendienteEliminar,
-                                    );
-
-                                    setPagoPendienteEliminar(null);
-                                }}
-                            />
                         </div>
                     )}
                 </div>

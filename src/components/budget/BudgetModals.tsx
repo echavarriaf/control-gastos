@@ -36,9 +36,16 @@ import {
   IncomeSettingsModal,
 } from "@/components/budget/IncomeSettingsModal";
 
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+
+import {
+  formatoMoneda,
+} from "@/lib/budget/utils";
+
 import type {
   BudgetDashboardController,
 } from "@/hooks/useBudgetDashboard";
+
 
 interface BudgetModalsProps {
   dashboard:
@@ -52,7 +59,7 @@ interface BudgetModalsProps {
  * necesarios y los distribuye entre cada ventana. De esta forma,
  * los modales no necesitan acceder directamente a otros hooks.
  */
-export function BudgetModals({
+function BudgetModals({
   dashboard,
 }: BudgetModalsProps) {
   const {
@@ -68,12 +75,12 @@ export function BudgetModals({
     ui,
   } = dashboard;
 
-/**
-   * Obtiene el resumen del gasto fijo seleccionado.
-   *
-   * Busca el compromiso por ID dentro de resumenFijos para enviar
-   * al modal de pago el saldo pendiente real del periodo.
-   */
+  /**
+     * Obtiene el resumen del gasto fijo seleccionado.
+     *
+     * Busca el compromiso por ID dentro de resumenFijos para enviar
+     * al modal de pago el saldo pendiente real del periodo.
+     */
   const selectedFixedSummary =
     ui.selectedFixedCommitment
       ? summary.resumenFijos.find(
@@ -132,8 +139,46 @@ export function BudgetModals({
         onCerrar={
           actions.closeFixedPaymentsHistory
         }
-        onEliminarPago={
-          budget.eliminarPagoFijo
+        onEliminar={
+          actions.solicitarEliminarPagoFijo
+        }
+      />
+
+      <ConfirmDialog
+        abierto={
+          ui.pagoFijoPendienteEliminar !==
+          null
+        }
+        titulo="Eliminar pago fijo"
+        mensaje={
+          ui.pagoFijoPendienteEliminar
+            ? `Se eliminará el pago de ${ui
+              .pagoFijoPendienteEliminar
+              .descripcion
+            } por ${formatoMoneda.format(
+              ui
+                .pagoFijoPendienteEliminar
+                .monto,
+            )}. Esta acción no se puede deshacer.`
+            : ""
+        }
+        textoConfirmar="Eliminar pago"
+        procesando={
+          ui.pagoFijoPendienteEliminar
+            ? budget
+              .eliminandoPagoFijoId ===
+            ui
+              .pagoFijoPendienteEliminar
+              .id
+            : false
+        }
+        onCancelar={
+          actions
+            .cancelarEliminarPagoFijo
+        }
+        onConfirmar={
+          actions
+            .confirmarEliminarPagoFijo
         }
       />
 
@@ -275,3 +320,5 @@ export function BudgetModals({
     </>
   );
 }
+
+export default BudgetModals;

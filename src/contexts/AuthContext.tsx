@@ -54,16 +54,28 @@ interface AuthContextValue {
   user: User | null;
   authorized: boolean;
   loading: boolean;
+
   signingIn: boolean;
   signingOut: boolean;
+
   checkingAuthorization: boolean;
   creatingAccessRequest: boolean;
-  accessRequest: SolicitudAcceso | null;
+
+  accessRequest:
+    | SolicitudAcceso
+    | null;
+
   error: string | null;
 
-  signInWithGoogle: () => Promise<boolean>;
-  signOutUser: () => Promise<boolean>;
-  refreshAuthorization: () => Promise<boolean>;
+  signInWithGoogle:
+    () => Promise<boolean>;
+
+  signOutUser:
+    () => Promise<boolean>;
+
+  refreshAuthorization:
+    () => Promise<boolean>;
+
   clearError: () => void;
 }
 
@@ -128,7 +140,8 @@ function shouldUseRedirect(
       : "";
 
   return (
-    code === "auth/popup-blocked" ||
+    code ===
+      "auth/popup-blocked" ||
     code ===
       "auth/operation-not-supported-in-this-environment"
   );
@@ -199,14 +212,18 @@ export function AuthProvider({
 
   /**
    * Recupera una solicitud existente o crea la primera solicitud
-   * del usuario. Utiliza el UID como ID del documento para impedir
-   * que la misma cuenta genere solicitudes duplicadas.
+   * del usuario.
+   *
+   * El UID se utiliza como ID del documento para impedir que una
+   * misma cuenta pueda crear múltiples solicitudes de acceso.
    */
   const createOrLoadAccessRequest =
     useCallback(
       async (
         currentUser: User,
-      ): Promise<SolicitudAcceso | null> => {
+      ): Promise<
+        SolicitudAcceso | null
+      > => {
         setCreatingAccessRequest(
           true,
         );
@@ -232,7 +249,8 @@ export function AuthProvider({
                 SolicitudAcceso;
 
             if (
-              auth.currentUser?.uid ===
+              auth.currentUser
+                ?.uid ===
               currentUser.uid
             ) {
               setAccessRequest(
@@ -244,7 +262,8 @@ export function AuthProvider({
           }
 
           const now =
-            new Date().toISOString();
+            new Date()
+              .toISOString();
 
           const newRequest:
             NuevaSolicitudAcceso = {
@@ -252,7 +271,8 @@ export function AuthProvider({
                 currentUser.uid,
 
               nombre:
-                currentUser.displayName
+                currentUser
+                  .displayName
                   ?.trim() ||
                 "Usuario de Google",
 
@@ -294,7 +314,8 @@ export function AuthProvider({
           );
 
           if (
-            auth.currentUser?.uid ===
+            auth.currentUser
+              ?.uid ===
             currentUser.uid
           ) {
             setAccessRequest(
@@ -312,7 +333,8 @@ export function AuthProvider({
           );
 
           if (
-            auth.currentUser?.uid ===
+            auth.currentUser
+              ?.uid ===
             currentUser.uid
           ) {
             setAccessRequest(
@@ -335,10 +357,10 @@ export function AuthProvider({
     );
 
   /**
-   * Comprueba el documento allowedUsers del usuario autenticado.
+   * Comprueba allowedUsers/{uid}.
    *
-   * Cuando la cuenta todavía no está autorizada, crea o recupera
-   * automáticamente su documento en accessRequests.
+   * Si la cuenta aún no está autorizada, crea o recupera
+   * automáticamente su solicitud en accessRequests/{uid}.
    */
   const checkAuthorization =
     useCallback(
@@ -365,11 +387,13 @@ export function AuthProvider({
 
           const isAuthorized =
             authorizationSnapshot.exists() &&
-            authorizationSnapshot.data()
+            authorizationSnapshot
+              .data()
               .activo === true;
 
           if (
-            auth.currentUser?.uid ===
+            auth.currentUser
+              ?.uid ===
             currentUser.uid
           ) {
             setAuthorized(
@@ -381,7 +405,8 @@ export function AuthProvider({
             isAuthorized
           ) {
             if (
-              auth.currentUser?.uid ===
+              auth.currentUser
+                ?.uid ===
               currentUser.uid
             ) {
               setAccessRequest(
@@ -404,7 +429,8 @@ export function AuthProvider({
           );
 
           if (
-            auth.currentUser?.uid ===
+            auth.currentUser
+              ?.uid ===
             currentUser.uid
           ) {
             setAuthorized(
@@ -428,12 +454,17 @@ export function AuthProvider({
       ],
     );
 
+  /**
+   * Recupera el resultado de un login por redirect y mantiene
+   * sincronizado el estado local con Firebase Authentication.
+   */
   useEffect(() => {
     void getRedirectResult(
       auth,
     ).catch(
       (
-        redirectError: unknown,
+        redirectError:
+          unknown,
       ) => {
         console.error(
           "No se pudo completar el acceso redirigido:",
@@ -539,6 +570,12 @@ export function AuthProvider({
     checkAuthorization,
   ]);
 
+  /**
+   * Inicia sesión mediante Google.
+   *
+   * Intenta primero popup y cambia automáticamente a redirect
+   * si el navegador bloquea la ventana emergente.
+   */
   const signInWithGoogle =
     useCallback(
       async (): Promise<boolean> => {
@@ -559,10 +596,12 @@ export function AuthProvider({
           const provider =
             new GoogleAuthProvider();
 
-          provider.setCustomParameters({
-            prompt:
-              "select_account",
-          });
+          provider.setCustomParameters(
+            {
+              prompt:
+                "select_account",
+            },
+          );
 
           try {
             await signInWithPopup(
@@ -613,6 +652,9 @@ export function AuthProvider({
       [],
     );
 
+  /**
+   * Cierra la sesión actual.
+   */
   const signOutUser =
     useCallback(
       async (): Promise<boolean> => {
@@ -656,6 +698,12 @@ export function AuthProvider({
       [],
     );
 
+  /**
+   * Permite volver a comprobar allowedUsers manualmente.
+   *
+   * Se utiliza especialmente después de que un administrador
+   * aprueba una solicitud de acceso.
+   */
   const refreshAuthorization =
     useCallback(
       async (): Promise<boolean> => {
@@ -694,9 +742,12 @@ export function AuthProvider({
 
         signingIn,
         signingOut,
+
         checkingAuthorization,
         creatingAccessRequest,
+
         accessRequest,
+
         error,
 
         signInWithGoogle,
@@ -739,7 +790,8 @@ export function AuthProvider({
  * Entrega el estado y las acciones de autenticación a cualquier
  * componente ubicado dentro de AuthProvider.
  */
-export function useAuth(): AuthContextValue {
+export function useAuth():
+  AuthContextValue {
   const context =
     useContext(
       AuthContext,

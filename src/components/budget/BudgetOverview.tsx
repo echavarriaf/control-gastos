@@ -10,7 +10,7 @@ interface BudgetOverviewProps {
   dashboard: BudgetDashboardController;
 }
 
-export function BudgetOverview({ dashboard }: BudgetOverviewProps) {
+function BudgetOverview({ dashboard }: BudgetOverviewProps) {
   const {
     actions,
     budget,
@@ -52,3 +52,5 @@ export function BudgetOverview({ dashboard }: BudgetOverviewProps) {
     </>
   );
 }
+
+export default BudgetOverview;

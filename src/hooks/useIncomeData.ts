@@ -7,12 +7,15 @@ import {
 } from "react";
 
 import {
-  doc,
   onSnapshot,
   setDoc,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+
+import {
+  getUserConfigDocument,
+} from "@/lib/firestore/user-paths";
 
 import {
   CONFIGURACION_INGRESO_PREDETERMINADA,
@@ -48,46 +51,56 @@ function obtenerFechaLocalISO(
   const mes =
     String(
       fecha.getMonth() + 1,
-    ).padStart(2, "0");
+    ).padStart(
+      2,
+      "0",
+    );
 
   const dia =
     String(
       fecha.getDate(),
-    ).padStart(2, "0");
+    ).padStart(
+      2,
+      "0",
+    );
 
   return `${anio}-${mes}-${dia}`;
 }
 
 interface ResultadoCiclosIngreso {
-  ciclos: CicloPago[];
-  cicloActual: CicloPago | null;
-  proximoCiclo: CicloPago | null;
+  ciclos:
+    CicloPago[];
 
-  periodoPresupuestarioActual: string;
-  quincenaPresupuestariaActual:
-    | 1
-    | 2
-    | null;
+  cicloActual:
+    CicloPago | null;
 
-  ciclosPeriodoPresupuestarioActual:
+  proximoCiclo:
+    CicloPago | null;
+
+  ciclosMesActual:
     CicloPago[];
 }
 
 /**
  * Lee y guarda la configuración del ingreso principal.
  *
- * Documento utilizado:
+ * Documento:
  *
- * configuracion/ingresoPrincipal
+ * users/{uid}/configuracion/ingresoPrincipal
  *
- * Los ciclos de pago no se guardan todavía en Firestore.
- * Se calculan a partir de:
- *
- * - fecha ancla;
- * - intervalo de 14 días;
- * - fecha actual.
+ * Los ciclos continúan calculándose localmente.
  */
 export function useIncomeData() {
+  const {
+    user,
+    authorized,
+  } = useAuth();
+
+  const uid =
+    authorized
+      ? user?.uid ?? null
+      : null;
+
   const [
     configuracion,
     setConfiguracion,
@@ -100,34 +113,43 @@ export function useIncomeData() {
     cargandoConfiguracion,
     setCargandoConfiguracion,
   ] =
-    useState(true);
+    useState(
+      true,
+    );
 
   const [
     guardandoConfiguracion,
     setGuardandoConfiguracion,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     error,
     setError,
   ] =
-    useState<string | null>(
-      null,
-    );
+    useState<
+      string | null
+    >(null);
 
   useEffect(() => {
+    if (!uid) {
+      return;
+    }
+
     const referencia =
-      doc(
-        db,
-        "configuracion",
+      getUserConfigDocument(
+        uid,
         ID_INGRESO_PRINCIPAL,
       );
 
     return onSnapshot(
       referencia,
 
-      (snapshot) => {
+      (
+        snapshot,
+      ) => {
         const siguienteConfiguracion =
           snapshot.exists()
             ? normalizarConfiguracionIngreso(
@@ -144,7 +166,9 @@ export function useIncomeData() {
         );
       },
 
-      (snapshotError) => {
+      (
+        snapshotError,
+      ) => {
         console.error(
           snapshotError,
         );
@@ -162,7 +186,9 @@ export function useIncomeData() {
         );
       },
     );
-  }, []);
+  }, [
+    uid,
+  ]);
 
   const resultadoCiclos =
     useMemo<ResultadoCiclosIngreso>(
@@ -171,13 +197,15 @@ export function useIncomeData() {
           obtenerFechaLocalISO();
 
         const intervaloDias =
-          configuracion.intervaloDias ??
+          configuracion
+            .intervaloDias ??
           14;
 
         const pagoBase =
           obtenerPagoEnOAntesDe(
             fechaReferencia,
-            configuracion.fechaAncla,
+            configuracion
+              .fechaAncla,
             intervaloDias,
           );
 
@@ -190,15 +218,20 @@ export function useIncomeData() {
         const ciclos =
           generarCiclosPago({
             configuracion,
+
             fechaInicio,
+
             cantidad:
               CANTIDAD_CICLOS_GENERADOS,
+
             fechaReferencia,
           });
 
         const cicloActual =
           ciclos.find(
-            (ciclo) =>
+            (
+              ciclo,
+            ) =>
               ciclo.estado ===
               "abierto",
           ) ??
@@ -206,29 +239,18 @@ export function useIncomeData() {
 
         const proximoCiclo =
           ciclos.find(
-            (ciclo) =>
+            (
+              ciclo,
+            ) =>
               ciclo.estado ===
               "proyectado",
           ) ??
           null;
 
-        const periodoPresupuestarioActual =
-          cicloActual
-            ?.periodoPresupuestario ??
+        const periodoActual =
           fechaReferencia.slice(
             0,
             7,
-          );
-
-        const quincenaPresupuestariaActual =
-          cicloActual
-            ?.quincenaPresupuestaria ??
-          null;
-
-        const ciclosPeriodoPresupuestarioActual =
-          obtenerCiclosDelMes(
-            ciclos,
-            periodoPresupuestarioActual,
           );
 
         return {
@@ -238,11 +260,11 @@ export function useIncomeData() {
 
           proximoCiclo,
 
-          periodoPresupuestarioActual,
-
-          quincenaPresupuestariaActual,
-
-          ciclosPeriodoPresupuestarioActual,
+          ciclosMesActual:
+            obtenerCiclosDelMes(
+              ciclos,
+              periodoActual,
+            ),
         };
       },
       [
@@ -255,6 +277,14 @@ export function useIncomeData() {
       siguienteConfiguracion:
         ConfiguracionIngreso,
     ): Promise<boolean> => {
+      if (!uid) {
+        setError(
+          "No existe un usuario autorizado para guardar la configuración del ingreso.",
+        );
+
+        return false;
+      }
+
       setGuardandoConfiguracion(
         true,
       );
@@ -270,9 +300,8 @@ export function useIncomeData() {
           );
 
         await setDoc(
-          doc(
-            db,
-            "configuracion",
+          getUserConfigDocument(
+            uid,
             ID_INGRESO_PRINCIPAL,
           ),
 
@@ -282,11 +311,13 @@ export function useIncomeData() {
             ),
 
             actualizadoEn:
-              new Date().toISOString(),
+              new Date()
+                .toISOString(),
           },
 
           {
-            merge: true,
+            merge:
+              true,
           },
         );
 
@@ -314,34 +345,20 @@ export function useIncomeData() {
     configuracion,
 
     ciclos:
-      resultadoCiclos.ciclos,
+      resultadoCiclos
+        .ciclos,
 
     cicloActual:
-      resultadoCiclos.cicloActual,
+      resultadoCiclos
+        .cicloActual,
 
     proximoCiclo:
-      resultadoCiclos.proximoCiclo,
-
-    periodoPresupuestarioActual:
       resultadoCiclos
-        .periodoPresupuestarioActual,
+        .proximoCiclo,
 
-    quincenaPresupuestariaActual:
-      resultadoCiclos
-        .quincenaPresupuestariaActual,
-
-    ciclosPeriodoPresupuestarioActual:
-      resultadoCiclos
-        .ciclosPeriodoPresupuestarioActual,
-
-    /**
-     * Alias temporal para no romper los componentes actuales.
-     * Ahora representa los dos ciclos del periodo
-     * presupuestario, no los depósitos del mes calendario.
-     */
     ciclosMesActual:
       resultadoCiclos
-        .ciclosPeriodoPresupuestarioActual,
+        .ciclosMesActual,
 
     cargando:
       cargandoConfiguracion,

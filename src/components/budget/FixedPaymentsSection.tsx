@@ -13,6 +13,8 @@
  * registrar pagos y eliminar registros de pagos existentes.
  */
 
+import { useMemo } from "react";
+
 import {
   CheckCircle2,
   CircleDollarSign,
@@ -145,6 +147,73 @@ export function FixedPaymentsSection({
         resumen.estado ===
         "pendiente",
     ).length;
+
+    const resumenFijosOrdenados =
+  useMemo(() => {
+    return [...resumenFijos].sort(
+      (a, b) => {
+        const aPagado =
+          a.estado === "pagado";
+
+        const bPagado =
+          b.estado === "pagado";
+
+        /*
+         * Todo compromiso pagado se mueve
+         * después de los pendientes y parciales.
+         */
+        if (aPagado !== bPagado) {
+          return aPagado ? 1 : -1;
+        }
+
+        /*
+         * Dentro de cada grupo se ordena por
+         * el día de vencimiento.
+         */
+        const diferenciaVencimiento =
+          a.compromiso
+            .diaVencimiento -
+          b.compromiso
+            .diaVencimiento;
+
+        if (
+          diferenciaVencimiento !== 0
+        ) {
+          return diferenciaVencimiento;
+        }
+
+        /*
+         * Si vencen el mismo día, primero
+         * se muestra el de mayor prioridad.
+         *
+         * Prioridad 1 = alta
+         * Prioridad 2 = media
+         * Prioridad 3 = baja
+         */
+        const diferenciaPrioridad =
+          a.compromiso.prioridad -
+          b.compromiso.prioridad;
+
+        if (
+          diferenciaPrioridad !== 0
+        ) {
+          return diferenciaPrioridad;
+        }
+
+        /*
+         * Último criterio estable:
+         * descripción alfabética.
+         */
+        return a.compromiso
+          .descripcion
+          .localeCompare(
+            b.compromiso
+              .descripcion,
+            "es",
+          );
+      },
+    );
+  }, [resumenFijos]);
 
   return (
     <section
@@ -292,7 +361,7 @@ export function FixedPaymentsSection({
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        {resumenFijos.map(
+        {resumenFijosOrdenados.map(
           (resumen) => (
             <FixedPaymentCard
               key={

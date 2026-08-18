@@ -32,7 +32,7 @@ interface BudgetContentProps {
  * los datos y acciones que necesita. Según ui.view muestra gastos
  * fijos, movimientos variables o el resumen financiero de tarjetas.
  */
-export function BudgetContent({
+function BudgetContent({
   dashboard,
 }: BudgetContentProps) {
   const {
@@ -153,8 +153,8 @@ export function BudgetContent({
             abrirPagoFijo
           }
           onEliminarPago={
-            budget
-              .eliminarPagoFijo
+            actions
+              .solicitarEliminarPagoFijo
           }
         />
       ) : (

@@ -2,8 +2,6 @@
 
 import {
   addDoc,
-  collection,
-  doc,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -16,7 +14,12 @@ import {
   useState,
 } from "react";
 
-import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+
+import {
+  getUserCollection,
+  getUserDocument,
+} from "@/lib/firestore/user-paths";
 
 import type {
   ActualizacionTarjetaCredito,
@@ -24,9 +27,6 @@ import type {
   NuevaTarjetaCredito,
   TarjetaCredito,
 } from "@/lib/budget/types";
-
-const COLECCION =
-  "tarjetasCredito";
 
 const ESTRATEGIAS_VALIDAS =
   new Set<EstrategiaPagoTarjeta>([
@@ -424,12 +424,23 @@ function ordenarTarjetas(
 }
 
 /**
- * 3. Expone lectura en tiempo real y operaciones CRUD.
+ * Expone lectura en tiempo real y operaciones CRUD.
  *
- * Walmart, Costco y cualquier tarjeta adicional se
- * administrarán desde esta única fuente de datos.
+ * Cada usuario administra exclusivamente:
+ *
+ * users/{uid}/tarjetasCredito
  */
 export function useCreditCards() {
+  const {
+    user,
+    authorized,
+  } = useAuth();
+
+  const uid =
+    authorized
+      ? user?.uid ?? null
+      : null;
+
   const [
     tarjetas,
     setTarjetas,
@@ -467,10 +478,14 @@ export function useCreditCards() {
     );
 
   useEffect(() => {
+    if (!uid) {
+      return;
+    }
+
     const referencia =
-      collection(
-        db,
-        COLECCION,
+      getUserCollection(
+        uid,
+        "tarjetasCredito",
       );
 
     return onSnapshot(
@@ -509,7 +524,7 @@ export function useCreditCards() {
         setCargando(false);
       },
     );
-  }, []);
+  }, [uid]);
 
   const tarjetasActivas =
     useMemo(
@@ -527,6 +542,14 @@ export function useCreditCards() {
         datos:
           NuevaTarjetaCredito,
       ): Promise<boolean> => {
+        if (!uid) {
+          setError(
+            "No existe un usuario autorizado para crear la tarjeta.",
+          );
+
+          return false;
+        }
+
         setGuardando(true);
         setError(null);
 
@@ -537,9 +560,9 @@ export function useCreditCards() {
             );
 
           await addDoc(
-            collection(
-              db,
-              COLECCION,
+            getUserCollection(
+              uid,
+              "tarjetasCredito",
             ),
             {
               ...tarjeta,
@@ -572,7 +595,7 @@ export function useCreditCards() {
           setGuardando(false);
         }
       },
-      [],
+      [uid],
     );
 
   const actualizarTarjeta =
@@ -583,6 +606,14 @@ export function useCreditCards() {
         cambios:
           ActualizacionTarjetaCredito,
       ): Promise<boolean> => {
+        if (!uid) {
+          setError(
+            "No existe un usuario autorizado para actualizar la tarjeta.",
+          );
+
+          return false;
+        }
+
         const actual =
           tarjetas.find(
             (tarjeta) =>
@@ -668,9 +699,9 @@ export function useCreditCards() {
             });
 
           await setDoc(
-            doc(
-              db,
-              COLECCION,
+            getUserDocument(
+              uid,
+              "tarjetasCredito",
               tarjetaId,
             ),
             {
@@ -708,6 +739,7 @@ export function useCreditCards() {
       },
       [
         tarjetas,
+        uid,
       ],
     );
 

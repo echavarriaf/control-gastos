@@ -78,7 +78,7 @@ export const app: FirebaseApp =
     : initializeApp(firebaseConfig);
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __presupuestoFeloFirestore:
     | Firestore
     | undefined;

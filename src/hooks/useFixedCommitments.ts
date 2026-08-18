@@ -2,12 +2,11 @@
 
 import {
   addDoc,
-  collection,
-  doc,
   onSnapshot,
   serverTimestamp,
   setDoc,
 } from "firebase/firestore";
+
 import {
   useCallback,
   useEffect,
@@ -15,8 +14,12 @@ import {
   useState,
 } from "react";
 
-import { db } from "@/lib/firebase";
-import { COMPROMISOS_FIJOS } from "@/lib/budget/constants";
+import { useAuth } from "@/contexts/AuthContext";
+
+import {
+  getUserCollection,
+  getUserDocument,
+} from "@/lib/firestore/user-paths";
 
 import type {
   ActualizacionCompromisoFijo,
@@ -26,9 +29,6 @@ import type {
   PrioridadPago,
   Quincena,
 } from "@/lib/budget/types";
-
-const COLECCION =
-  "compromisosFijos";
 
 const METODOS_VALIDOS =
   new Set<MetodoPagoFijo>([
@@ -59,7 +59,9 @@ function normalizarDia(
   predeterminado: number,
 ): number {
   const numero =
-    Math.trunc(Number(valor));
+    Math.trunc(
+      Number(valor),
+    );
 
   if (
     Number.isFinite(numero) &&
@@ -76,7 +78,10 @@ function normalizarQuincena(
   valor: unknown,
   diaVencimiento: number,
 ): Quincena {
-  if (valor === 1 || valor === 2) {
+  if (
+    valor === 1 ||
+    valor === 2
+  ) {
     return valor;
   }
 
@@ -87,7 +92,8 @@ function normalizarQuincena(
 
 function normalizarPrioridad(
   valor: unknown,
-  predeterminada: PrioridadPago,
+  predeterminada:
+    PrioridadPago,
 ): PrioridadPago {
   if (
     valor === 1 ||
@@ -102,24 +108,31 @@ function normalizarPrioridad(
 
 function normalizarMetodo(
   valor: unknown,
-  predeterminado: MetodoPagoFijo,
+  predeterminado:
+    MetodoPagoFijo,
 ): MetodoPagoFijo {
-  return typeof valor === "string" &&
+  return typeof valor ===
+      "string" &&
     METODOS_VALIDOS.has(
       valor as MetodoPagoFijo,
     )
-    ? (valor as MetodoPagoFijo)
+    ? (
+        valor as MetodoPagoFijo
+      )
     : predeterminado;
 }
 
 function normalizarTarjetaId(
   valor: unknown,
 ): string | null {
-  if (typeof valor !== "string") {
+  if (
+    typeof valor !== "string"
+  ) {
     return null;
   }
 
-  const tarjetaId = valor.trim();
+  const tarjetaId =
+    valor.trim();
 
   return tarjetaId.length > 0
     ? tarjetaId
@@ -161,30 +174,28 @@ function normalizarFecha(
 
 function normalizarDocumento(
   id: string,
-  data: Record<string, unknown>,
-  predeterminado?: CompromisoFijo,
+  data:
+    Record<string, unknown>,
 ): CompromisoFijo {
   const descripcion =
     typeof data.descripcion ===
       "string" &&
-    data.descripcion.trim().length >
-      0
+    data.descripcion
+      .trim()
+      .length > 0
       ? data.descripcion.trim()
-      : predeterminado
-          ?.descripcion ??
-        "Gasto fijo";
+      : "Gasto fijo";
 
   const monto =
     normalizarMonto(
       data.monto,
-      predeterminado?.monto ?? 0,
+      0,
     );
 
   const diaVencimiento =
     normalizarDia(
       data.diaVencimiento,
-      predeterminado
-        ?.diaVencimiento ?? 1,
+      1,
     );
 
   return {
@@ -203,16 +214,13 @@ function normalizarDocumento(
     prioridad:
       normalizarPrioridad(
         data.prioridad,
-        predeterminado
-          ?.prioridad ?? 2,
+        2,
       ),
 
     metodoPagoPreferido:
       normalizarMetodo(
         data.metodoPagoPreferido,
-        predeterminado
-          ?.metodoPagoPreferido ??
-          "transferencia",
+        "transferencia",
       ),
 
     tarjetaId:
@@ -224,30 +232,27 @@ function normalizarDocumento(
       typeof data.activo ===
       "boolean"
         ? data.activo
-        : predeterminado
-            ?.activo ?? true,
+        : true,
 
     creadoEn:
       normalizarFecha(
         data.creadoEn,
-      ) ??
-      predeterminado
-        ?.creadoEn,
+      ),
 
     actualizadoEn:
       normalizarFecha(
         data.actualizadoEn,
-      ) ??
-      predeterminado
-        ?.actualizadoEn,
+      ),
   };
 }
 
 function validarCompromiso(
-  compromiso: NuevoCompromisoFijo,
+  compromiso:
+    NuevoCompromisoFijo,
 ): NuevoCompromisoFijo {
   const descripcion =
-    compromiso.descripcion.trim();
+    compromiso.descripcion
+      .trim();
 
   if (!descripcion) {
     throw new Error(
@@ -282,9 +287,11 @@ function validarCompromiso(
 
   return {
     descripcion,
+
     monto:
       Math.round(
-        compromiso.monto * 100,
+        compromiso.monto *
+          100,
       ) / 100,
 
     diaVencimiento,
@@ -342,20 +349,31 @@ function ordenarCompromisos(
     );
   }
 
-  return a.descripcion.localeCompare(
-    b.descripcion,
-    "es",
-  );
+  return a.descripcion
+    .localeCompare(
+      b.descripcion,
+      "es",
+    );
 }
 
 export function useFixedCommitments() {
+  const {
+    user,
+    authorized,
+  } = useAuth();
+
+  const uid =
+    authorized
+      ? user?.uid ?? null
+      : null;
+
   const [
     compromisos,
     setCompromisos,
   ] =
-    useState<CompromisoFijo[]>(
-      COMPROMISOS_FIJOS,
-    );
+    useState<
+      CompromisoFijo[]
+    >([]);
 
   const [
     cargando,
@@ -373,78 +391,62 @@ export function useFixedCommitments() {
     actualizandoId,
     setActualizandoId,
   ] =
-    useState<string | null>(
-      null,
-    );
+    useState<
+      string | null
+    >(null);
 
   const [
     error,
     setError,
   ] =
-    useState<string | null>(
-      null,
-    );
+    useState<
+      string | null
+    >(null);
 
   useEffect(() => {
+    if (!uid) {
+      return;
+    }
+
     const referencia =
-      collection(
-        db,
-        COLECCION,
+      getUserCollection(
+        uid,
+        "compromisosFijos",
       );
 
     return onSnapshot(
       referencia,
 
-      (snapshot) => {
-        /*
-         * Los documentos de Firestore reemplazan los valores
-         * predeterminados con el mismo id. Así podemos editar
-         * o desactivar gastos existentes sin perder los ids
-         * utilizados por pagos anteriores.
-         */
-        const porId =
-          new Map<
-            string,
-            CompromisoFijo
-          >(
-            COMPROMISOS_FIJOS.map(
-              (compromiso) => [
-                compromiso.id,
-                compromiso,
-              ],
-            ),
-          );
-
-        snapshot.docs.forEach(
-          (documento) => {
-            const predeterminado =
-              porId.get(
-                documento.id,
-              );
-
-            porId.set(
-              documento.id,
-              normalizarDocumento(
-                documento.id,
-                documento.data(),
-                predeterminado,
-              ),
+      (
+        snapshot,
+      ) => {
+        const registros =
+          snapshot.docs
+            .map(
+              (
+                documento,
+              ) =>
+                normalizarDocumento(
+                  documento.id,
+                  documento.data(),
+                ),
+            )
+            .sort(
+              ordenarCompromisos,
             );
-          },
-        );
 
         setCompromisos(
-          Array.from(
-            porId.values(),
-          ).sort(
-            ordenarCompromisos,
-          ),
+          registros,
         );
 
-        setCargando(false);
+        setCargando(
+          false,
+        );
       },
 
-      (snapshotError) => {
+      (
+        snapshotError,
+      ) => {
         console.error(
           snapshotError,
         );
@@ -453,29 +455,31 @@ export function useFixedCommitments() {
           "No se pudieron cargar los gastos fijos configurables.",
         );
 
-        /*
-         * La lista inicial permanece disponible si Firestore
-         * todavía no permite leer la nueva colección.
-         */
         setCompromisos(
-          [...COMPROMISOS_FIJOS].sort(
-            ordenarCompromisos,
-          ),
+          [],
         );
 
-        setCargando(false);
+        setCargando(
+          false,
+        );
       },
     );
-  }, []);
+  }, [
+    uid,
+  ]);
 
   const compromisosActivos =
     useMemo(
       () =>
         compromisos.filter(
-          (compromiso) =>
+          (
+            compromiso,
+          ) =>
             compromiso.activo,
         ),
-      [compromisos],
+      [
+        compromisos,
+      ],
     );
 
   const crearCompromiso =
@@ -484,8 +488,21 @@ export function useFixedCommitments() {
         datos:
           NuevoCompromisoFijo,
       ): Promise<boolean> => {
-        setGuardando(true);
-        setError(null);
+        if (!uid) {
+          setError(
+            "No existe un usuario autorizado para crear el gasto fijo.",
+          );
+
+          return false;
+        }
+
+        setGuardando(
+          true,
+        );
+
+        setError(
+          null,
+        );
 
         try {
           const compromiso =
@@ -494,14 +511,16 @@ export function useFixedCommitments() {
             );
 
           await addDoc(
-            collection(
-              db,
-              COLECCION,
+            getUserCollection(
+              uid,
+              "compromisosFijos",
             ),
             {
               ...compromiso,
+
               creadoEn:
                 serverTimestamp(),
+
               actualizadoEn:
                 serverTimestamp(),
             },
@@ -524,22 +543,38 @@ export function useFixedCommitments() {
 
           return false;
         } finally {
-          setGuardando(false);
+          setGuardando(
+            false,
+          );
         }
       },
-      [],
+      [
+        uid,
+      ],
     );
 
   const actualizarCompromiso =
     useCallback(
       async (
-        compromisoId: string,
+        compromisoId:
+          string,
+
         cambios:
           ActualizacionCompromisoFijo,
       ): Promise<boolean> => {
+        if (!uid) {
+          setError(
+            "No existe un usuario autorizado para actualizar el gasto fijo.",
+          );
+
+          return false;
+        }
+
         const actual =
           compromisos.find(
-            (compromiso) =>
+            (
+              compromiso,
+            ) =>
               compromiso.id ===
               compromisoId,
           );
@@ -555,7 +590,10 @@ export function useFixedCommitments() {
         setActualizandoId(
           compromisoId,
         );
-        setError(null);
+
+        setError(
+          null,
+        );
 
         try {
           const compromiso =
@@ -594,7 +632,8 @@ export function useFixedCommitments() {
                 cambios.tarjetaId !==
                 undefined
                   ? cambios.tarjetaId
-                  : actual.tarjetaId,
+                  : actual
+                      .tarjetaId,
 
               activo:
                 cambios.activo ??
@@ -602,18 +641,20 @@ export function useFixedCommitments() {
             });
 
           await setDoc(
-            doc(
-              db,
-              COLECCION,
+            getUserDocument(
+              uid,
+              "compromisosFijos",
               compromisoId,
             ),
             {
               ...compromiso,
+
               actualizadoEn:
                 serverTimestamp(),
             },
             {
-              merge: true,
+              merge:
+                true,
             },
           );
 
@@ -639,14 +680,20 @@ export function useFixedCommitments() {
           );
         }
       },
-      [compromisos],
+      [
+        compromisos,
+        uid,
+      ],
     );
 
   const cambiarEstado =
     useCallback(
       async (
-        compromisoId: string,
-        activo: boolean,
+        compromisoId:
+          string,
+
+        activo:
+          boolean,
       ): Promise<boolean> =>
         actualizarCompromiso(
           compromisoId,
@@ -667,8 +714,11 @@ export function useFixedCommitments() {
     actualizandoId,
     error,
 
-    limpiarError: () =>
-      setError(null),
+    limpiarError:
+      () =>
+        setError(
+          null,
+        ),
 
     crearCompromiso,
     actualizarCompromiso,

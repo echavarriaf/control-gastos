@@ -33,6 +33,7 @@ import type {
   CicloPago,
   CompromisoFijo,
   Ingreso,
+  PagoFijo,
   Vista,
 } from "@/lib/budget/types";
 
@@ -106,6 +107,13 @@ export function useBudgetDashboard() {
     setFixedCommitmentsOpen,
   ] =
     useState(false);
+
+  const [
+    pagoFijoPendienteEliminar,
+    setPagoFijoPendienteEliminar,
+  ] = useState<PagoFijo | null>(
+    null,
+  );
 
   /**
    * Mantiene la visibilidad del historial centralizado de pagos fijos.
@@ -189,23 +197,23 @@ export function useBudgetDashboard() {
 
   const currentCycleIncome:
     Ingreso | null =
-      income.cicloActual
-        ? incomeTransactions
-            .ingresosPorCiclo
-            .get(
-              income.cicloActual.id,
-            ) ?? null
-        : null;
+    income.cicloActual
+      ? incomeTransactions
+        .ingresosPorCiclo
+        .get(
+          income.cicloActual.id,
+        ) ?? null
+      : null;
 
   const selectedCycleIncome:
     Ingreso | null =
-      selectedIncomeCycle
-        ? incomeTransactions
-            .ingresosPorCiclo
-            .get(
-              selectedIncomeCycle.id,
-            ) ?? null
-        : null;
+    selectedIncomeCycle
+      ? incomeTransactions
+        .ingresosPorCiclo
+        .get(
+          selectedIncomeCycle.id,
+        ) ?? null
+      : null;
 
   /*
    * Combina los errores de los distintos controladores para que
@@ -274,6 +282,29 @@ export function useBudgetDashboard() {
       ],
     );
 
+  const confirmarEliminarPagoFijo =
+    useCallback(async () => {
+      if (
+        !pagoFijoPendienteEliminar
+      ) {
+        return;
+      }
+
+      const eliminado =
+        await budget.eliminarPagoFijo(
+          pagoFijoPendienteEliminar,
+        );
+
+      if (eliminado) {
+        setPagoFijoPendienteEliminar(
+          null,
+        );
+      }
+    }, [
+      budget,
+      pagoFijoPendienteEliminar,
+    ]);
+
   return {
     period,
     budget,
@@ -302,6 +333,7 @@ export function useBudgetDashboard() {
 
       selectedFixedCommitment,
       selectedIncomeCycle,
+      pagoFijoPendienteEliminar,
     },
 
     actions: {
@@ -391,6 +423,21 @@ export function useBudgetDashboard() {
 
       openCurrentIncomeReceipt,
       closeIncomeReceipt,
+
+      solicitarEliminarPagoFijo:
+        setPagoFijoPendienteEliminar,
+
+      cancelarEliminarPagoFijo: () => {
+        if (
+          !budget.eliminandoPagoFijoId
+        ) {
+          setPagoFijoPendienteEliminar(
+            null,
+          );
+        }
+      },
+
+      confirmarEliminarPagoFijo,
     },
   };
 }

@@ -27,32 +27,41 @@ import {
 const ADMIN_APP_NAME =
   "presupuesto-felo-admin";
 
-let cachedApp: App | null = null;
-let cachedAuth: Auth | null = null;
-let cachedDb: Firestore | null = null;
-let cachedMessaging: Messaging | null = null;
+let cachedApp: App | null =
+  null;
+
+let cachedAuth: Auth | null =
+  null;
+
+let cachedDb: Firestore | null =
+  null;
+
+let cachedMessaging: Messaging | null =
+  null;
 
 /**
  * Obtiene o inicializa Firebase Admin.
  *
- * Este módulo solo puede importarse desde código
- * ejecutado en el servidor.
+ * Este módulo solo puede importarse desde código de servidor:
+ * Route Handlers, Server Actions o Server Components.
  */
 export function getFirebaseAdminApp(): App {
   if (cachedApp) {
     return cachedApp;
   }
 
-  const existingApp = getApps().find(
-    (firebaseApp) =>
-      firebaseApp.name ===
-      ADMIN_APP_NAME,
-  );
+  const existingApp =
+    getApps().find(
+      (firebaseApp) =>
+        firebaseApp.name ===
+        ADMIN_APP_NAME,
+    );
 
   if (existingApp) {
-    cachedApp = getApp(
-      ADMIN_APP_NAME,
-    );
+    cachedApp =
+      getApp(
+        ADMIN_APP_NAME,
+      );
 
     return cachedApp;
   }
@@ -74,21 +83,25 @@ export function getFirebaseAdminApp(): App {
       ),
     );
 
-  const serviceAccount: ServiceAccount = {
-    projectId,
-    clientEmail,
-    privateKey,
-  };
-
-  cachedApp = initializeApp(
-    {
-      credential: cert(
-        serviceAccount,
-      ),
+  const serviceAccount:
+    ServiceAccount = {
       projectId,
-    },
-    ADMIN_APP_NAME,
-  );
+      clientEmail,
+      privateKey,
+    };
+
+  cachedApp =
+    initializeApp(
+      {
+        credential:
+          cert(
+            serviceAccount,
+          ),
+
+        projectId,
+      },
+      ADMIN_APP_NAME,
+    );
 
   return cachedApp;
 }
@@ -113,14 +126,16 @@ export function getAdminAuth(): Auth {
 /**
  * Firestore con permisos administrativos.
  *
- * Solo debe utilizarse desde Route Handlers,
- * Server Actions u otro código del servidor.
+ * Las reglas de Firestore no limitan al Admin SDK.
+ * Por eso solo debe usarse desde rutas de servidor
+ * debidamente protegidas.
  */
 export function getAdminDb(): Firestore {
   if (!cachedDb) {
-    cachedDb = getFirestore(
-      getFirebaseAdminApp(),
-    );
+    cachedDb =
+      getFirestore(
+        getFirebaseAdminApp(),
+      );
   }
 
   return cachedDb;
@@ -131,9 +146,10 @@ export function getAdminDb(): Firestore {
  */
 export function getAdminMessaging(): Messaging {
   if (!cachedMessaging) {
-    cachedMessaging = getMessaging(
-      getFirebaseAdminApp(),
-    );
+    cachedMessaging =
+      getMessaging(
+        getFirebaseAdminApp(),
+      );
   }
 
   return cachedMessaging;
@@ -158,14 +174,16 @@ function getRequiredServerEnv(
 }
 
 /**
- * Vercel y los archivos .env suelen almacenar
- * los saltos de línea como caracteres "\\n".
+ * Vercel y los archivos .env suelen guardar los saltos
+ * de línea de la clave privada como caracteres "\\n".
  */
 function normalizePrivateKey(
   value: string,
 ): string {
   const withoutWrappingQuotes =
-    removeWrappingQuotes(value);
+    removeWrappingQuotes(
+      value,
+    );
 
   return withoutWrappingQuotes.replace(
     /\\n/g,
@@ -194,7 +212,10 @@ function removeWrappingQuotes(
     wrappedWithDoubleQuotes ||
     wrappedWithSingleQuotes
   ) {
-    return value.slice(1, -1);
+    return value.slice(
+      1,
+      -1,
+    );
   }
 
   return value;

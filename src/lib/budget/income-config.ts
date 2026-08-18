@@ -248,9 +248,11 @@ export function prepararConfiguracionIngresoParaGuardar(
     );
 
   const {
-    id: _id,
+    id,
     ...datos
   } = normalizada;
+
+  void id;
 
   return datos;
 }
