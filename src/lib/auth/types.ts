@@ -2,13 +2,30 @@
  * Nombre: Tipos de autenticación y solicitudes de acceso
  * Ruta: src/lib/auth/types.ts
  * Autor: Felix Echavarria
- * Fecha: 2026-08-03
+ * Fecha: 2026-08-18
  *
  * Descripción:
- * Define la estructura utilizada para guardar y administrar las
- * solicitudes de acceso de usuarios que iniciaron sesión con Google,
- * pero todavía no han sido autorizados para entrar a la aplicación.
+ * Define los roles de la aplicación, la estructura de autorización
+ * y las solicitudes de acceso creadas por cuentas autenticadas que
+ * todavía no han sido aprobadas por un administrador.
  */
+
+/**
+ * Roles soportados por la aplicación.
+ *
+ * - admin: puede utilizar las rutas administrativas del servidor.
+ * - usuario: puede utilizar únicamente su propio presupuesto.
+ */
+export type RolUsuario =
+  | "admin"
+  | "usuario";
+
+/**
+ * Acciones administrativas disponibles para revisar solicitudes.
+ */
+export type AccionSolicitudAcceso =
+  | "aprobar"
+  | "rechazar";
 
 /**
  * Representa las decisiones posibles para una solicitud de acceso.
@@ -59,7 +76,50 @@ export interface SolicitudAcceso {
  *
  * Inicializa los campos administrativos en null y el indicador de
  * correo en false. Después de crearla, el navegador no debe modificar
- * esos campos; la aprobación y la notificación se manejarán aparte.
+ * esos campos; la aprobación y la notificación se manejan en servidor.
  */
 export type NuevaSolicitudAcceso =
   SolicitudAcceso;
+
+/**
+ * Representa la parte estable de un documento de allowedUsers.
+ *
+ * Los timestamps administrativos se mantienen fuera de esta interfaz
+ * porque el servidor los almacena como timestamps nativos de Firestore.
+ */
+export interface UsuarioAutorizado {
+  uid: string;
+  activo: boolean;
+  rol: RolUsuario;
+  nombre: string;
+  email: string;
+  fotoUrl: string | null;
+}
+
+export function esRolUsuario(
+  value: unknown,
+): value is RolUsuario {
+  return (
+    value === "admin" ||
+    value === "usuario"
+  );
+}
+
+export function esAccionSolicitudAcceso(
+  value: unknown,
+): value is AccionSolicitudAcceso {
+  return (
+    value === "aprobar" ||
+    value === "rechazar"
+  );
+}
+
+export function esEstadoSolicitudAcceso(
+  value: unknown,
+): value is EstadoSolicitudAcceso {
+  return (
+    value === "pendiente" ||
+    value === "aprobada" ||
+    value === "rechazada"
+  );
+}

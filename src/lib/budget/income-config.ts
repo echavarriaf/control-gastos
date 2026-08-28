@@ -7,14 +7,27 @@ import type {
 export const ID_INGRESO_PRINCIPAL =
   "ingresoPrincipal";
 
+/**
+ * Una cuenta nueva todavía no tiene fecha ancla.
+ *
+ * La fecha real se establece cuando el usuario configura
+ * por primera vez su ingreso.
+ */
 export const FECHA_ANCLA_INGRESO_PRINCIPAL =
-  "2026-07-30";
+  "";
 
 export const INTERVALO_INGRESO_PRINCIPAL_DIAS =
   14;
 
+/**
+ * Una cuenta nueva no hereda ningún ingreso.
+ *
+ * El valor real vive en:
+ *
+ * users/{uid}/configuracion/ingresoPrincipal
+ */
 export const MONTO_ESTIMADO_INGRESO_PRINCIPAL =
-  1_600;
+  0;
 
 const FUENTES_INGRESO: FuenteIngreso[] = [
   "salario",
@@ -98,11 +111,14 @@ function normalizarTexto(
 }
 
 /**
- * Configuración local inicial.
+ * Estado neutro para una cuenta que todavía no ha configurado
+ * su ingreso principal.
  *
- * Firestore podrá reemplazar estos valores desde:
+ * Firestore reemplaza estos valores desde:
  *
- * configuracion/ingresoPrincipal
+ * users/{uid}/configuracion/ingresoPrincipal
+ *
+ * cuando el documento existe.
  */
 export const CONFIGURACION_INGRESO_PREDETERMINADA:
   ConfiguracionIngreso = {
@@ -110,7 +126,7 @@ export const CONFIGURACION_INGRESO_PREDETERMINADA:
       ID_INGRESO_PRINCIPAL,
 
     descripcion:
-      "Salario principal",
+      "Ingreso principal",
 
     montoEstimado:
       MONTO_ESTIMADO_INGRESO_PRINCIPAL,
@@ -128,14 +144,17 @@ export const CONFIGURACION_INGRESO_PREDETERMINADA:
       INTERVALO_INGRESO_PRINCIPAL_DIAS,
 
     activa:
-      true,
+      false,
 
     notas:
       "",
   };
 
 /**
- * Crea una configuración válida del ingreso principal.
+ * Crea una configuración del ingreso principal.
+ *
+ * El helper conserva un estado neutro hasta que el usuario
+ * establezca explícitamente los datos reales desde la interfaz.
  */
 export function crearConfiguracionIngresoPrincipal(
   montoEstimado =
@@ -155,6 +174,9 @@ export function crearConfiguracionIngresoPrincipal(
 /**
  * Convierte un documento de Firestore en una
  * ConfiguracionIngreso segura.
+ *
+ * Los documentos existentes con valores reales continúan
+ * utilizándose normalmente.
  */
 export function normalizarConfiguracionIngreso(
   data: unknown,
@@ -236,6 +258,7 @@ export function normalizarConfiguracionIngreso(
 
 /**
  * Objeto que se guarda en Firestore.
+ *
  * Se excluye `id` porque el identificador ya está
  * representado por la ruta del documento.
  */
@@ -248,11 +271,9 @@ export function prepararConfiguracionIngresoParaGuardar(
     );
 
   const {
-    id,
+    id: _id,
     ...datos
   } = normalizada;
-
-  void id;
 
   return datos;
 }

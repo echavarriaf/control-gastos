@@ -11,7 +11,9 @@ import {
   setDoc,
 } from "firebase/firestore";
 
-import { useAuth } from "@/contexts/AuthContext";
+import {
+  useAuth,
+} from "@/contexts/AuthContext";
 
 import {
   getUserConfigDocument,
@@ -82,23 +84,32 @@ interface ResultadoCiclosIngreso {
 }
 
 /**
- * Lee y guarda la configuración del ingreso principal.
+ * Lee y guarda la configuración del ingreso principal
+ * del usuario autenticado.
  *
  * Documento:
  *
  * users/{uid}/configuracion/ingresoPrincipal
  *
- * Los ciclos continúan calculándose localmente.
+ * Si el documento no existe, la cuenta se considera todavía
+ * sin configurar:
+ *
+ * - ingreso $0;
+ * - sin ciclo actual;
+ * - sin próximo ciclo;
+ * - sin proyección mensual.
  */
 export function useIncomeData() {
   const {
     user,
     authorized,
-  } = useAuth();
+  } =
+    useAuth();
 
   const uid =
     authorized
-      ? user?.uid ?? null
+      ? user?.uid ??
+        null
       : null;
 
   const [
@@ -129,70 +140,135 @@ export function useIncomeData() {
     error,
     setError,
   ] =
-    useState<
-      string | null
-    >(null);
+    useState<string | null>(
+      null,
+    );
 
-  useEffect(() => {
-    if (!uid) {
-      return;
-    }
-
-    const referencia =
-      getUserConfigDocument(
-        uid,
-        ID_INGRESO_PRINCIPAL,
+  useEffect(
+    () => {
+      /*
+       * Cada UID comienza desde un estado neutro mientras
+       * Firestore carga su propia configuración.
+       *
+       * Esto también evita que un cambio de sesión pueda
+       * mostrar temporalmente la configuración anterior.
+       */
+      setConfiguracion(
+        CONFIGURACION_INGRESO_PREDETERMINADA,
       );
 
-    return onSnapshot(
-      referencia,
+      setError(
+        null,
+      );
 
-      (
-        snapshot,
-      ) => {
-        const siguienteConfiguracion =
-          snapshot.exists()
-            ? normalizarConfiguracionIngreso(
-                snapshot.data(),
-              )
-            : CONFIGURACION_INGRESO_PREDETERMINADA;
-
-        setConfiguracion(
-          siguienteConfiguracion,
-        );
-
+      if (
+        !uid
+      ) {
         setCargandoConfiguracion(
           false,
         );
-      },
 
-      (
-        snapshotError,
-      ) => {
-        console.error(
+        return;
+      }
+
+      setCargandoConfiguracion(
+        true,
+      );
+
+      const referencia =
+        getUserConfigDocument(
+          uid,
+          ID_INGRESO_PRINCIPAL,
+        );
+
+      return onSnapshot(
+        referencia,
+
+        (
+          snapshot,
+        ) => {
+          const siguienteConfiguracion =
+            snapshot.exists()
+              ? normalizarConfiguracionIngreso(
+                  snapshot.data(),
+                )
+              : CONFIGURACION_INGRESO_PREDETERMINADA;
+
+          setConfiguracion(
+            siguienteConfiguracion,
+          );
+
+          setCargandoConfiguracion(
+            false,
+          );
+        },
+
+        (
           snapshotError,
-        );
+        ) => {
+          console.error(
+            snapshotError,
+          );
 
-        setConfiguracion(
-          CONFIGURACION_INGRESO_PREDETERMINADA,
-        );
+          setConfiguracion(
+            CONFIGURACION_INGRESO_PREDETERMINADA,
+          );
 
-        setError(
-          "No se pudo cargar la configuración del ingreso.",
-        );
+          setError(
+            "No se pudo cargar la configuración del ingreso.",
+          );
 
-        setCargandoConfiguracion(
-          false,
-        );
-      },
-    );
-  }, [
-    uid,
-  ]);
+          setCargandoConfiguracion(
+            false,
+          );
+        },
+      );
+    },
+    [
+      uid,
+    ],
+  );
 
   const resultadoCiclos =
     useMemo<ResultadoCiclosIngreso>(
       () => {
+        /*
+         * No generamos ciclos hasta que el usuario haya
+         * configurado explícitamente su ingreso.
+         *
+         * Esto impide que una cuenta nueva herede:
+         *
+         * - monto estimado;
+         * - fecha ancla;
+         * - proyección mensual;
+         * - ciclos de pago.
+         */
+        const ingresoConfigurado =
+          configuracion.activa &&
+          configuracion.montoEstimado >
+            0 &&
+          /^\d{4}-\d{2}-\d{2}$/.test(
+            configuracion.fechaAncla,
+          );
+
+        if (
+          !ingresoConfigurado
+        ) {
+          return {
+            ciclos:
+              [],
+
+            cicloActual:
+              null,
+
+            proximoCiclo:
+              null,
+
+            ciclosMesActual:
+              [],
+          };
+        }
+
         const fechaReferencia =
           obtenerFechaLocalISO();
 
@@ -204,8 +280,7 @@ export function useIncomeData() {
         const pagoBase =
           obtenerPagoEnOAntesDe(
             fechaReferencia,
-            configuracion
-              .fechaAncla,
+            configuracion.fechaAncla,
             intervaloDias,
           );
 
@@ -277,7 +352,9 @@ export function useIncomeData() {
       siguienteConfiguracion:
         ConfiguracionIngreso,
     ): Promise<boolean> => {
-      if (!uid) {
+      if (
+        !uid
+      ) {
         setError(
           "No existe un usuario autorizado para guardar la configuración del ingreso.",
         );
