@@ -1,39 +1,248 @@
+/*
+ * Nombre: Reglas de seguridad de Presupuesto Felo
+ * Ruta: firestore.rules
+ * Autor: Felix Echavarria
+ * Fecha: 2026-09-01
+ *
+ * Descripción:
+ * Protege los datos financieros de la aplicación y permite
+ * acceso únicamente a usuarios autenticados que estén activos
+ * en allowedUsers. También permite que una cuenta autenticada
+ * cree y consulte su propia solicitud de acceso pendiente.
+ * Cada escritura se valida antes de guardarse en Firestore.
+ */
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    /*
+     * Comprueba si existe una sesión de Firebase Authentication.
+     * Lo hace verificando que request.auth contenga un usuario.
+     */
+    function usuarioAutenticado() {
+      return request.auth != null;
+    }
+
+    /*
+     * Confirma que el usuario autenticado tiene permiso para usar
+     * la aplicación. Busca su UID en allowedUsers y exige activo=true.
+     */
+    function usuarioAutorizado() {
+      return usuarioAutenticado()
+        && exists(
+          /databases/$(database)/documents/allowedUsers/$(request.auth.uid)
+        )
+        && get(
+          /databases/$(database)/documents/allowedUsers/$(request.auth.uid)
+        ).data.activo == true;
+    }
+
+    /*
+     * Verifica que el usuario autenticado no solo esté autorizado,
+     * sino que además sea el propietario del namespace solicitado.
+     */
+    function usuarioPropietarioAutorizado(userId) {
+      return usuarioAutorizado()
+        && request.auth.uid == userId;
+    }
+
+    /*
+     * Valida textos obligatorios. Comprueba el tipo string y que
+     * su longitud esté dentro del mínimo y máximo permitidos.
+     */
     function textoValido(value, minLength, maxLength) {
       return value is string
         && value.size() >= minLength
         && value.size() <= maxLength;
     }
 
+    /*
+     * Valida campos de texto opcionales. Acepta null o reutiliza
+     * textoValido para comprobar contenido y longitud.
+     */
+    function textoONullValido(value, minLength, maxLength) {
+      return value == null
+        || textoValido(value, minLength, maxLength);
+    }
+
+    /*
+     * Valida importes que pueden ser cero. Exige un número dentro
+     * del rango financiero permitido por la aplicación.
+     */
     function montoValido(value) {
       return value is number
         && value >= 0
         && value <= 1000000;
     }
 
+    /*
+     * Valida importes obligatoriamente mayores que cero y evita
+     * valores negativos o exageradamente altos.
+     */
+    function montoPositivoValido(value) {
+      return value is number
+        && value > 0
+        && value <= 1000000;
+    }
+
+    /*
+     * Valida fechas almacenadas como texto ISO o texto compatible.
+     * Comprueba que tengan una longitud razonable.
+     */
     function fechaValida(value) {
       return textoValido(value, 10, 50);
     }
 
+    /*
+     * Valida fechas de calendario YYYY-MM-DD. Usa una expresión
+     * regular para exigir exactamente diez caracteres numéricos.
+     */
+    function fechaCalendarioValida(value) {
+      return value is string
+        && value.size() == 10
+        && value.matches(
+          '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+        );
+    }
+
+    /*
+     * Valida una fecha de calendario opcional. Acepta null o delega
+     * la comprobación a fechaCalendarioValida.
+     */
+    function fechaCalendarioONullValida(value) {
+      return value == null
+        || fechaCalendarioValida(value);
+    }
+
+    /*
+     * Valida periodos mensuales YYYY-MM. Comprueba longitud y patrón
+     * antes de aceptar el valor.
+     */
+    function periodoCalendarioValido(value) {
+      return value is string
+        && value.size() == 7
+        && value.matches(
+          '^[0-9]{4}-[0-9]{2}$'
+        );
+    }
+
+    /*
+     * Valida marcas de tiempo opcionales. Permite null o exige el
+     * tipo timestamp nativo de Firestore.
+     */
     function timestampONull(value) {
       return value == null
         || value is timestamp;
     }
 
+    /*
+     * Limita los gastos variables a las categorías soportadas.
+     * Actualmente solo acepta comida o gas.
+     */
     function categoriaVariableValida(value) {
       return value == "comida"
         || value == "gas";
     }
 
+    /*
+     * Limita la clasificación de pagos de tarjeta. Acepta comida,
+     * gas o general.
+     */
     function categoriaPagoValida(value) {
       return value == "comida"
         || value == "gas"
         || value == "general";
     }
 
+    /*
+     * Una categoría de compra puede consumir Comida/Gas o no estar
+     * asociada a ningún presupuesto. `null` representa categorías
+     * como "Otro" y futuras clasificaciones libres.
+     */
+    function categoriaPresupuestoGastoValida(value) {
+      return value == null
+        || categoriaVariableValida(value);
+    }
+
+    /*
+     * Valida la configuración completa de una categoría de compra
+     * perteneciente al usuario.
+     */
+    function categoriaTarjetaValida(data) {
+      return data.keys().hasOnly([
+          "nombre",
+          "categoriaPresupuesto",
+          "requiereComentario",
+          "activa",
+          "orden",
+          "esSistema",
+          "creadoEn",
+          "actualizadoEn"
+        ])
+        && data.keys().hasAll([
+          "nombre",
+          "categoriaPresupuesto",
+          "requiereComentario",
+          "activa",
+          "orden",
+          "esSistema",
+          "creadoEn",
+          "actualizadoEn"
+        ])
+        && textoValido(data.nombre, 1, 100)
+        && categoriaPresupuestoGastoValida(
+          data.categoriaPresupuesto
+        )
+        && data.requiereComentario is bool
+        && data.activa is bool
+        && data.orden is int
+        && data.orden >= 0
+        && data.orden <= 100000
+        && data.esSistema is bool
+        && data.creadoEn is timestamp
+        && data.actualizadoEn is timestamp;
+    }
+
+    /*
+     * Confirma que la categoría elegida para un gasto exista dentro
+     * del mismo usuario, esté activa, apunte al mismo presupuesto y,
+     * cuando lo exija, tenga un comentario no vacío.
+     */
+    function categoriaTarjetaGastoValida(
+      categoriaTarjetaId,
+      categoriaPresupuesto,
+      categoriaTarjetaNombre,
+      comentario,
+      userId
+    ) {
+      let categoriaRef = /databases/$(database)/documents/users/$(userId)/categoriasTarjeta/$(categoriaTarjetaId);
+
+      return textoValido(
+          categoriaTarjetaId,
+          1,
+          100
+        )
+        && exists(categoriaRef)
+        && get(categoriaRef).data.activa == true
+        && get(categoriaRef).data.categoriaPresupuesto
+          == categoriaPresupuesto
+        && get(categoriaRef).data.nombre
+          == categoriaTarjetaNombre
+        && (
+          get(categoriaRef).data.requiereComentario != true
+          || textoValido(
+            comentario,
+            1,
+            500
+          )
+        );
+    }
+
+    /*
+     * Valida los métodos disponibles para compromisos y pagos fijos
+     * comparando el valor con la lista permitida.
+     */
     function metodoPagoFijoValido(value) {
       return value == "debito_automatico"
         || value == "transferencia"
@@ -42,11 +251,45 @@ service cloud.firestore {
         || value == "otro";
     }
 
+    /*
+     * Valida cómo se pagó un gasto variable. Solo permite efectivo,
+     * débito, cuenta bancaria o tarjeta de crédito.
+     */
+    function metodoPagoMovimientoValido(value) {
+      return value == "efectivo"
+        || value == "debito"
+        || value == "cuenta_bancaria"
+        || value == "tarjeta_credito";
+    }
+
+    /*
+     * Valida una referencia de tarjeta dentro del namespace privado
+     * del mismo usuario. Impide enlazar movimientos con tarjetas
+     * pertenecientes a otro UID.
+     */
+    function tarjetaIdUsuarioValido(value, userId) {
+      return value == null
+        || (
+          textoValido(value, 1, 100)
+          && exists(
+            /databases/$(database)/documents/users/$(userId)/tarjetasCredito/$(value)
+          )
+        );
+    }
+
+    /*
+     * Valida la frecuencia de un pago fijo. Solo permite mensual
+     * o quincenal.
+     */
     function periodicidadValida(value) {
       return value == "mensual"
         || value == "quincenal";
     }
 
+    /*
+     * Valida el estado del permiso de notificaciones del navegador
+     * usando únicamente los estados reconocidos por la aplicación.
+     */
     function permisoPushValido(value) {
       return value == "default"
         || value == "granted"
@@ -54,47 +297,235 @@ service cloud.firestore {
         || value == "no_soportado";
     }
 
-    function gastoValido(data) {
+    /*
+     * Valida el origen de un ingreso comparándolo con las fuentes
+     * financieras admitidas por la aplicación.
+     */
+    function fuenteIngresoValida(value) {
+      return value == "salario"
+        || value == "bono"
+        || value == "horas_extra"
+        || value == "reembolso"
+        || value == "otro";
+    }
+
+    /*
+     * Valida la frecuencia configurada para ingresos recurrentes
+     * contra la lista de ciclos compatibles.
+     */
+    function frecuenciaIngresoValida(value) {
+      return value == "semanal"
+        || value == "cada_2_semanas"
+        || value == "dos_veces_mes"
+        || value == "mensual"
+        || value == "variable";
+    }
+
+    /*
+     * Valida el estado de un ingreso. Solo acepta proyectado,
+     * recibido o cancelado.
+     */
+    function estadoIngresoValido(value) {
+      return value == "proyectado"
+        || value == "recibido"
+        || value == "cancelado";
+    }
+
+    /*
+     * Valida la estrategia usada para pagar una tarjeta: saldo
+     * completo, pago objetivo o pago mínimo.
+     */
+    function estrategiaPagoTarjetaValida(value) {
+      return value == "saldo_completo"
+        || value == "pago_objetivo"
+        || value == "pago_minimo";
+    }
+
+    /*
+     * Valida un documento completo de tarjeta. Controla campos,
+     * tipos, saldo, fechas, días, estrategia y marcas de tiempo.
+     */
+    function tarjetaCreditoValida(data) {
+      return data.keys().hasOnly([
+          "nombre",
+          "ultimosCuatro",
+          "saldoInicial",
+          "fechaSaldoInicial",
+          "diaCorte",
+          "diaPago",
+          "activa",
+          "estrategiaPago",
+          "pagoObjetivo",
+          "limiteCredito",
+          "notas",
+          "creadoEn",
+          "actualizadoEn"
+        ])
+        && data.keys().hasAll([
+          "nombre",
+          "ultimosCuatro",
+          "saldoInicial",
+          "fechaSaldoInicial",
+          "diaCorte",
+          "diaPago",
+          "activa",
+          "estrategiaPago",
+          "pagoObjetivo",
+          "limiteCredito",
+          "notas",
+          "creadoEn",
+          "actualizadoEn"
+        ])
+        && textoValido(data.nombre, 1, 100)
+        && data.ultimosCuatro is string
+        && (
+          data.ultimosCuatro == ""
+          || data.ultimosCuatro.matches('^[0-9]{4}$')
+        )
+        && montoValido(data.saldoInicial)
+        && fechaCalendarioValida(data.fechaSaldoInicial)
+        && data.diaCorte is int
+        && data.diaCorte >= 1
+        && data.diaCorte <= 31
+        && data.diaPago is int
+        && data.diaPago >= 1
+        && data.diaPago <= 31
+        && data.activa is bool
+        && estrategiaPagoTarjetaValida(data.estrategiaPago)
+        && (
+          data.pagoObjetivo == null
+          || montoPositivoValido(data.pagoObjetivo)
+        )
+        && (
+          data.estrategiaPago != "pago_objetivo"
+          || data.pagoObjetivo != null
+        )
+        && (
+          data.limiteCredito == null
+          || montoPositivoValido(data.limiteCredito)
+        )
+        && data.notas is string
+        && data.notas.size() <= 1000
+        && data.creadoEn is timestamp
+        && data.actualizadoEn is timestamp;
+    }
+
+    /*
+     * Valida un gasto variable privado. Además de comprobar la
+     * estructura, la categoría configurable y tarjetaId deben
+     * pertenecer al mismo UID.
+     */
+    function gastoUsuarioValido(data, userId) {
       return data.keys().hasOnly([
           "concepto",
           "monto",
           "categoria",
-          "fecha"
+          "categoriaTarjetaId",
+          "categoriaTarjetaNombre",
+          "comentario",
+          "fecha",
+          "metodoPago",
+          "tarjetaId",
+          "creadoEn"
         ])
         && data.keys().hasAll([
           "concepto",
           "monto",
           "categoria",
-          "fecha"
+          "categoriaTarjetaId",
+          "categoriaTarjetaNombre",
+          "comentario",
+          "fecha",
+          "metodoPago",
+          "tarjetaId",
+          "creadoEn"
         ])
         && textoValido(data.concepto, 1, 200)
         && montoValido(data.monto)
-        && categoriaVariableValida(data.categoria)
-        && fechaValida(data.fecha);
+        && categoriaPresupuestoGastoValida(
+          data.categoria
+        )
+        && textoValido(
+          data.categoriaTarjetaNombre,
+          1,
+          100
+        )
+        && data.comentario is string
+        && data.comentario.size() <= 500
+        && categoriaTarjetaGastoValida(
+          data.categoriaTarjetaId,
+          data.categoria,
+          data.categoriaTarjetaNombre,
+          data.comentario,
+          userId
+        )
+        && fechaValida(data.fecha)
+        && metodoPagoMovimientoValido(data.metodoPago)
+        && tarjetaIdUsuarioValido(
+          data.tarjetaId,
+          userId
+        )
+        && (
+          (
+            data.metodoPago == "tarjeta_credito"
+            && data.tarjetaId != null
+          )
+          || (
+            data.metodoPago != "tarjeta_credito"
+            && data.tarjetaId == null
+          )
+        )
+        && data.creadoEn is timestamp;
     }
 
-    function pagoTarjetaValido(data) {
+    /*
+     * Valida un pago real a tarjeta privado. La tarjeta pagada debe
+     * pertenecer al mismo namespace del usuario autenticado.
+     */
+    function pagoTarjetaUsuarioValido(data, userId) {
       return data.keys().hasOnly([
           "concepto",
           "tarjeta",
           "monto",
           "categoria",
-          "fecha"
+          "fecha",
+          "tarjetaId",
+          "referencia",
+          "notas",
+          "creadoEn"
         ])
         && data.keys().hasAll([
           "concepto",
           "tarjeta",
           "monto",
           "categoria",
-          "fecha"
+          "fecha",
+          "tarjetaId",
+          "referencia",
+          "notas",
+          "creadoEn"
         ])
         && textoValido(data.concepto, 1, 200)
         && textoValido(data.tarjeta, 1, 200)
         && montoValido(data.monto)
         && categoriaPagoValida(data.categoria)
-        && fechaValida(data.fecha);
+        && fechaValida(data.fecha)
+        && tarjetaIdUsuarioValido(
+          data.tarjetaId,
+          userId
+        )
+        && data.tarjetaId != null
+        && data.referencia is string
+        && data.referencia.size() <= 250
+        && data.notas is string
+        && data.notas.size() <= 1000
+        && data.creadoEn is timestamp;
     }
 
+    /*
+     * Valida un pago de compromiso fijo. Comprueba la obligación,
+     * importe, fecha, método, periodo, quincena y datos descriptivos.
+     */
     function pagoFijoValido(data) {
       return data.keys().hasOnly([
           "compromisoId",
@@ -132,14 +563,90 @@ service cloud.firestore {
           data.quincena == 1
           || data.quincena == 2
         )
-        && textoValido(data.periodo, 7, 7)
+        && periodoCalendarioValido(data.periodo)
         && data.referencia is string
         && data.referencia.size() <= 250
         && data.notas is string
         && data.notas.size() <= 1000
-        && fechaValida(data.creadoEn);
+        && data.creadoEn is timestamp;
     }
 
+    /*
+     * Valida la quincena presupuestaria. Solo admite los valores
+     * numéricos 1 o 2.
+     */
+    function quincenaValida(value) {
+      return value == 1
+        || value == 2;
+    }
+
+    /*
+     * Valida la prioridad de un compromiso fijo comparándola con
+     * los niveles admitidos por el sistema.
+     */
+    function prioridadPagoValida(value) {
+      return value == 1
+        || value == 2
+        || value == 3;
+    }
+
+    /*
+     * Valida un compromiso fijo privado. Si referencia una tarjeta,
+     * esa tarjeta debe pertenecer al mismo UID.
+     */
+    function compromisoFijoUsuarioValido(data, userId) {
+      return data.keys().hasOnly([
+          "descripcion",
+          "monto",
+          "diaVencimiento",
+          "quincenaPresupuestaria",
+          "prioridad",
+          "metodoPagoPreferido",
+          "tarjetaId",
+          "activo",
+          "creadoEn",
+          "actualizadoEn"
+        ])
+        && data.keys().hasAll([
+          "descripcion",
+          "monto",
+          "diaVencimiento",
+          "quincenaPresupuestaria",
+          "prioridad",
+          "metodoPagoPreferido",
+          "tarjetaId",
+          "activo",
+          "actualizadoEn"
+        ])
+        && textoValido(data.descripcion, 1, 250)
+        && montoPositivoValido(data.monto)
+        && data.diaVencimiento is int
+        && data.diaVencimiento >= 1
+        && data.diaVencimiento <= 31
+        && quincenaValida(
+          data.quincenaPresupuestaria
+        )
+        && prioridadPagoValida(
+          data.prioridad
+        )
+        && metodoPagoFijoValido(
+          data.metodoPagoPreferido
+        )
+        && tarjetaIdUsuarioValido(
+          data.tarjetaId,
+          userId
+        )
+        && data.activo is bool
+        && timestampONull(
+          data.get("creadoEn", null)
+        )
+        && data.actualizadoEn is timestamp;
+    }
+
+    /*
+     * Valida los límites mensual y quincenal de una categoría.
+     * Exige ambos importes dentro del rango permitido.
+     */
     function limiteValido(data) {
       return data is map
         && data.keys().hasOnly([
@@ -154,6 +661,10 @@ service cloud.firestore {
         && montoValido(data.quincenal);
     }
 
+    /*
+     * Valida la configuración general del presupuesto. Exige límites
+     * completos para comida y gas, además de la fecha de actualización.
+     */
     function configuracionValida(data) {
       return data.keys().hasOnly([
           "limites",
@@ -177,8 +688,171 @@ service cloud.firestore {
         && fechaValida(data.actualizadoEn);
     }
 
+    /*
+     * Valida la plantilla del ingreso principal. Comprueba monto,
+     * frecuencia, fecha ancla, intervalo, estado y notas.
+     */
+    function configuracionIngresoValida(data) {
+      return data.keys().hasOnly([
+          "descripcion",
+          "montoEstimado",
+          "fuente",
+          "frecuencia",
+          "fechaAncla",
+          "intervaloDias",
+          "activa",
+          "notas",
+          "actualizadoEn"
+        ])
+        && data.keys().hasAll([
+          "descripcion",
+          "montoEstimado",
+          "fuente",
+          "frecuencia",
+          "fechaAncla",
+          "intervaloDias",
+          "activa",
+          "notas",
+          "actualizadoEn"
+        ])
+        && textoValido(data.descripcion, 1, 200)
+        && montoPositivoValido(data.montoEstimado)
+        && fuenteIngresoValida(data.fuente)
+        && frecuenciaIngresoValida(data.frecuencia)
+        && fechaCalendarioValida(data.fechaAncla)
+        && data.intervaloDias is int
+        && data.intervaloDias >= 1
+        && data.intervaloDias <= 366
+        && data.activa is bool
+        && data.notas is string
+        && data.notas.size() <= 1000
+        && fechaValida(data.actualizadoEn);
+    }
+
+    /*
+     * Valida cada ingreso programado o recibido. Comprueba identidad
+     * del ciclo, fechas, numeración, fuente, estado y marcas de tiempo.
+     */
+    function ingresoValido(data) {
+      return data.keys().hasOnly([
+          "configuracionIngresoId",
+          "cicloPagoId",
+          "descripcion",
+          "monto",
+          "fechaProgramada",
+          "fechaRecibida",
+          "periodoCalendario",
+          "numeroPagoMes",
+          "numeroPagoAnual",
+          "fuente",
+          "estado",
+          "recurrente",
+          "notas",
+          "creadoEn",
+          "actualizadoEn"
+        ])
+        && data.keys().hasAll([
+          "configuracionIngresoId",
+          "cicloPagoId",
+          "descripcion",
+          "monto",
+          "fechaProgramada",
+          "fechaRecibida",
+          "periodoCalendario",
+          "numeroPagoMes",
+          "numeroPagoAnual",
+          "fuente",
+          "estado",
+          "recurrente",
+          "notas",
+          "creadoEn",
+          "actualizadoEn"
+        ])
+        && textoONullValido(
+          data.configuracionIngresoId,
+          1,
+          100
+        )
+        && textoValido(data.cicloPagoId, 1, 150)
+        && textoValido(data.descripcion, 1, 200)
+        && montoPositivoValido(data.monto)
+        && fechaCalendarioValida(data.fechaProgramada)
+        && fechaCalendarioONullValida(data.fechaRecibida)
+        && periodoCalendarioValido(data.periodoCalendario)
+        && data.numeroPagoMes is int
+        && data.numeroPagoMes >= 1
+        && data.numeroPagoMes <= 3
+        && data.numeroPagoAnual is int
+        && data.numeroPagoAnual >= 1
+        && data.numeroPagoAnual <= 27
+        && fuenteIngresoValida(data.fuente)
+        && estadoIngresoValido(data.estado)
+        && data.recurrente is bool
+        && data.notas is string
+        && data.notas.size() <= 1000
+        && fechaValida(data.creadoEn)
+        && fechaValida(data.actualizadoEn)
+        && (
+          data.estado != "recibido"
+          || data.fechaRecibida != null
+        );
+    }
+
+    /*
+     * Valida la solicitud inicial creada por una cuenta que todavía
+     * no está autorizada. Exige que el UID coincida con la sesión,
+     * que el estado sea pendiente y que los campos administrativos
+     * permanezcan sin revisar ni notificar.
+     */
+    function solicitudAccesoInicialValida(data, userId) {
+      return data.keys().hasOnly([
+          "uid",
+          "nombre",
+          "email",
+          "fotoUrl",
+          "estado",
+          "solicitadoEn",
+          "actualizadoEn",
+          "revisadoEn",
+          "revisadoPor",
+          "correoNotificacionEnviado",
+          "correoNotificacionEnviadoEn"
+        ])
+        && data.keys().hasAll([
+          "uid",
+          "nombre",
+          "email",
+          "fotoUrl",
+          "estado",
+          "solicitadoEn",
+          "actualizadoEn",
+          "revisadoEn",
+          "revisadoPor",
+          "correoNotificacionEnviado",
+          "correoNotificacionEnviadoEn"
+        ])
+        && textoValido(data.uid, 1, 128)
+        && data.uid == userId
+        && request.auth.uid == userId
+        && textoValido(data.nombre, 1, 150)
+        && textoValido(data.email, 3, 320)
+        && textoONullValido(data.fotoUrl, 1, 2000)
+        && data.estado == "pendiente"
+        && fechaValida(data.solicitadoEn)
+        && fechaValida(data.actualizadoEn)
+        && data.revisadoEn == null
+        && data.revisadoPor == null
+        && data.correoNotificacionEnviado == false
+        && data.correoNotificacionEnviadoEn == null;
+    }
+
+    /*
+     * Devuelve la lista exacta de campos que un navegador puede
+     * escribir en notificationDevices.
+     */
     function camposClienteDispositivo() {
       return [
+        "uid",
         "installationId",
         "activo",
         "app",
@@ -194,8 +868,16 @@ service cloud.firestore {
       ];
     }
 
-    function dispositivoClienteValido(data) {
+    /*
+     * Valida la información de un dispositivo de notificaciones.
+     * Comprueba identidad, permiso, plataforma y timestamps.
+     */
+    function dispositivoClienteValido(
+      data,
+      userId
+    ) {
       return data.keys().hasAll([
+          "uid",
           "installationId",
           "activo",
           "app",
@@ -209,6 +891,8 @@ service cloud.firestore {
           "registradoEn",
           "desactivadoEn"
         ])
+        && data.uid == userId
+        && textoValido(data.uid, 1, 128)
         && textoValido(data.installationId, 10, 500)
         && data.activo is bool
         && data.app == "presupuesto-felo"
@@ -224,88 +908,262 @@ service cloud.firestore {
     }
 
     /*
-     * La aplicación actual no utiliza Firebase Authentication.
-     * Estas colecciones siguen accesibles para no romperla,
-     * pero cada escritura debe respetar el esquema esperado.
+     * Cada usuario autenticado puede leer únicamente
+     * su propio documento de autorización.
+     *
+     * Estos documentos se administran desde Firebase Console
+     * o mediante Firebase Admin SDK.
      */
-    match /gastos/{gastoId} {
-      allow read: if true;
+    match /allowedUsers/{userId} {
+      allow get:
+        if usuarioAutenticado()
+        && request.auth.uid == userId;
 
-      allow create, update:
-        if gastoValido(request.resource.data);
-
-      allow delete: if true;
-    }
-
-    match /pagosTarjeta/{pagoId} {
-      allow read: if true;
-
-      allow create, update:
-        if pagoTarjetaValido(request.resource.data);
-
-      allow delete: if true;
-    }
-
-    match /pagosFijos/{pagoFijoId} {
-      allow read: if true;
-
-      allow create, update:
-        if pagoFijoValido(request.resource.data);
-
-      allow delete: if true;
-    }
-
-    match /configuracion/presupuestoFelo {
-      allow read: if true;
-
-      allow create, update:
-        if configuracionValida(request.resource.data);
-
-      allow delete: if false;
+      allow list, create, update, delete:
+        if false;
     }
 
     /*
-     * Los Firebase Installation IDs nunca pueden leerse
-     * desde el navegador.
+     * Una cuenta autenticada puede consultar y crear únicamente su
+     * propia solicitud. El navegador no puede listarla, modificarla
+     * ni eliminarla después de crearla.
      */
-    match /notificationDevices/{deviceId} {
-      allow get, list: if false;
+    match /accessRequests/{userId} {
+      allow get:
+        if usuarioAutenticado()
+        && request.auth.uid == userId;
 
       allow create:
-        if request.resource.data.keys().hasOnly(
-          camposClienteDispositivo()
-        )
-        && dispositivoClienteValido(
-          request.resource.data
+        if usuarioAutenticado()
+        && request.auth.uid == userId
+        && solicitudAccesoInicialValida(
+          request.resource.data,
+          userId
         );
 
-      allow update:
-        if request.resource.data
-          .diff(resource.data)
-          .affectedKeys()
-          .hasOnly(camposClienteDispositivo())
-        && dispositivoClienteValido(
-          request.resource.data
-        )
-        && request.resource.data.installationId
-          == resource.data.installationId;
-
-      allow delete: if false;
+      allow list, update, delete:
+        if false;
     }
 
     /*
-     * Solo Firebase Admin puede acceder a los estados
-     * internos de deduplicación.
+     * ============================================================
+     * DATOS PRIVADOS POR USUARIO
+     * ============================================================
+     *
+     * Toda la información financiera del cliente vive debajo de
+     * users/{userId}/... . Las colecciones financieras legacy de
+     * la raíz quedan bloqueadas por el catch-all final.
      */
-    match /notificationAlertStates/{alertId} {
-      allow read, write: if false;
+    match /users/{userId} {
+      /*
+       * El documento raíz lo administra Firebase Admin/migraciones.
+       * El cliente no necesita leerlo ni escribirlo para acceder a
+       * sus subcolecciones.
+       */
+      allow read, write:
+        if false;
+
+      match /gastos/{gastoId} {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create, update:
+          if usuarioPropietarioAutorizado(userId)
+          && gastoUsuarioValido(
+            request.resource.data,
+            userId
+          );
+
+        allow delete:
+          if usuarioPropietarioAutorizado(userId);
+      }
+
+      match /pagosTarjeta/{pagoId} {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create, update:
+          if usuarioPropietarioAutorizado(userId)
+          && pagoTarjetaUsuarioValido(
+            request.resource.data,
+            userId
+          );
+
+        allow delete:
+          if usuarioPropietarioAutorizado(userId);
+      }
+
+      match /pagosFijos/{pagoFijoId} {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create, update:
+          if usuarioPropietarioAutorizado(userId)
+          && pagoFijoValido(request.resource.data);
+
+        allow delete:
+          if usuarioPropietarioAutorizado(userId);
+      }
+
+      match /tarjetasCredito/{tarjetaId} {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create, update:
+          if usuarioPropietarioAutorizado(userId)
+          && tarjetaCreditoValida(
+            request.resource.data
+          );
+
+        allow delete:
+          if false;
+      }
+
+      match /categoriasTarjeta/{categoriaId} {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create:
+          if usuarioPropietarioAutorizado(userId)
+          && categoriaTarjetaValida(
+            request.resource.data
+          );
+
+        allow update:
+          if usuarioPropietarioAutorizado(userId)
+          && categoriaTarjetaValida(
+            request.resource.data
+          )
+          && (
+            resource.data.esSistema != true
+            || request.resource.data.esSistema == true
+          );
+
+        allow delete:
+          if false;
+      }
+
+      match /compromisosFijos/{compromisoId} {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create, update:
+          if usuarioPropietarioAutorizado(userId)
+          && compromisoFijoUsuarioValido(
+            request.resource.data,
+            userId
+          );
+
+        allow delete:
+          if false;
+      }
+
+      match /configuracion/presupuestoFelo {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create, update:
+          if usuarioPropietarioAutorizado(userId)
+          && configuracionValida(
+            request.resource.data
+          );
+
+        allow delete:
+          if false;
+      }
+
+      match /configuracion/ingresoPrincipal {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create, update:
+          if usuarioPropietarioAutorizado(userId)
+          && configuracionIngresoValida(
+            request.resource.data
+          );
+
+        allow delete:
+          if false;
+      }
+
+      match /ingresos/{ingresoId} {
+        allow read:
+          if usuarioPropietarioAutorizado(userId);
+
+        allow create, update:
+          if usuarioPropietarioAutorizado(userId)
+          && ingresoValido(
+            request.resource.data
+          )
+          && request.resource.data.cicloPagoId
+            == ingresoId;
+
+        allow delete:
+          if usuarioPropietarioAutorizado(userId);
+      }
+
+      /*
+       * Cada dispositivo push pertenece exclusivamente al UID.
+       * El navegador puede crear o actualizar su propio registro,
+       * pero no listar FIDs ni leer registros de dispositivos.
+       */
+      match /notificationDevices/{deviceId} {
+        allow get, list:
+          if false;
+
+        allow create:
+          if usuarioPropietarioAutorizado(userId)
+          && request.resource.data.keys().hasOnly(
+            camposClienteDispositivo()
+          )
+          && dispositivoClienteValido(
+            request.resource.data,
+            userId
+          );
+
+        allow update:
+          if usuarioPropietarioAutorizado(userId)
+          && request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly(
+              camposClienteDispositivo()
+            )
+          && dispositivoClienteValido(
+            request.resource.data,
+            userId
+          )
+          && resource.data.uid == userId
+          && request.resource.data.uid
+            == resource.data.uid
+          && request.resource.data.installationId
+            == resource.data.installationId;
+
+        allow delete:
+          if false;
+      }
+
+      /*
+       * El estado de deduplicación de alertas es únicamente servidor.
+       * Firebase Admin puede leerlo/escribirlo ignorando estas reglas.
+       */
+      match /notificationAlertStates/{alertId} {
+        allow read, write:
+          if false;
+      }
     }
 
     /*
-     * Bloquea cualquier colección no declarada.
+     * Las colecciones push legacy de la raíz también quedan
+     * bloqueadas por el catch-all final.
+     */
+
+    /*
+     * Todo lo que no esté declarado queda bloqueado.
      */
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write:
+        if false;
     }
   }
 }

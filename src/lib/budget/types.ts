@@ -358,7 +358,16 @@ export interface GastoVariable {
   id: string;
   concepto: string;
   monto: number;
-  categoria: CategoriaVariable;
+
+  /**
+   * Categoría que consume presupuesto.
+   *
+   * `null` significa que la compra pertenece a una categoría de
+   * tarjeta sin presupuesto asociado, por ejemplo "Otro".
+   */
+  categoria:
+    CategoriaVariable | null;
+
   fecha: string;
   creadoEn: string;
 
@@ -367,6 +376,28 @@ export interface GastoVariable {
 
   tarjetaId?:
     string | null;
+
+  /**
+   * Identificador de la categoría configurable elegida al registrar
+   * la compra. Permite distinguir Supermercado, Gas, Otro y futuras
+   * categorías sin ampliar CategoriaVariable.
+   */
+  categoriaTarjetaId?:
+    string | null;
+
+  /**
+   * Copia del nombre visible de la categoría en el momento del gasto.
+   * Conserva un historial legible aunque la categoría cambie después.
+   */
+  categoriaTarjetaNombre?:
+    string;
+
+  /**
+   * Detalle libre del gasto. Es obligatorio cuando la categoría
+   * seleccionada tiene requiereComentario=true.
+   */
+  comentario?:
+    string;
 
   periodoEstadoCuenta?:
     string | null;
@@ -509,7 +540,14 @@ export interface NuevoGastoVariable {
   tipo: "gasto";
   concepto: string;
   monto: number;
-  categoria: CategoriaVariable;
+
+  /**
+   * Categoría presupuestaria asociada a la categoría configurable.
+   * Puede ser null para compras que no deben consumir Comida ni Gas.
+   */
+  categoria:
+    CategoriaVariable | null;
+
   fecha: string;
 
   metodoPago?:
@@ -517,6 +555,15 @@ export interface NuevoGastoVariable {
 
   tarjetaId?:
     string | null;
+
+  categoriaTarjetaId:
+    string;
+
+  categoriaTarjetaNombre:
+    string;
+
+  comentario:
+    string;
 }
 
 export interface NuevoPagoTarjeta {

@@ -4,8 +4,12 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   CreditCard,
+  Fuel,
   LoaderCircle,
   Plus,
+  Settings2,
+  ShoppingCart,
+  Tag,
 } from "lucide-react";
 
 import {
@@ -16,9 +20,19 @@ import {
 } from "react";
 
 import {
+  CardCategoriesManager,
+} from "@/components/budget/CardCategoriesManager";
+
+import {
   CATEGORIA_KEYS,
   CATEGORIAS_VARIABLES,
 } from "@/lib/budget/constants";
+
+import type {
+  ActualizacionCategoriaTarjeta,
+  CategoriaTarjeta,
+  NuevaCategoriaTarjeta,
+} from "@/lib/budget/card-categories";
 
 import type {
   CategoriaPago,
@@ -29,6 +43,10 @@ import type {
   TipoMovimiento,
 } from "@/lib/budget/types";
 
+import type {
+  DireccionCategoria,
+} from "@/hooks/useCardCategories";
+
 import {
   fechaParaPeriodo,
   montoSeguro,
@@ -36,36 +54,97 @@ import {
 
 interface VariableMovementFormProps {
   mesSeleccionado: string;
-  quincenaSeleccionada: Quincena;
-  guardando: boolean;
+
+  quincenaSeleccionada:
+    Quincena;
+
+  guardando:
+    boolean;
 
   tarjetasActivas:
     TarjetaCredito[];
 
+  /**
+   * Recibe activas e inactivas.
+   *
+   * El formulario filtra las activas y el administrador necesita
+   * todas para permitir reactivarlas.
+   */
+  categoriasTarjeta:
+    CategoriaTarjeta[];
+
+  cargandoCategorias:
+    boolean;
+
+  guardandoCategoria:
+    boolean;
+
+  actualizandoCategoriaId:
+    string | null;
+
+  reordenandoCategorias:
+    boolean;
+
   onRegistrar: (
-    movimiento: NuevoMovimiento,
+    movimiento:
+      NuevoMovimiento,
+  ) => Promise<boolean>;
+
+  onCrearCategoria: (
+    datos:
+      NuevaCategoriaTarjeta,
+  ) => Promise<boolean>;
+
+  onActualizarCategoria: (
+    categoria:
+      CategoriaTarjeta,
+
+    cambios:
+      ActualizacionCategoriaTarjeta,
+  ) => Promise<boolean>;
+
+  onCambiarEstadoCategoria: (
+    categoria:
+      CategoriaTarjeta,
+
+    activa:
+      boolean,
+  ) => Promise<boolean>;
+
+  onMoverCategoria: (
+    categoriaId:
+      string,
+
+    direccion:
+      DireccionCategoria,
   ) => Promise<boolean>;
 }
 
-/**
- * TARJETAS - 1. Busca la tarjeta predeterminada según
- * la categoría: Walmart para comida y Costco para gas.
- */
 function obtenerTarjetaPredeterminada(
-  categoria:
-    CategoriaVariable,
+  categoriaPresupuesto:
+    CategoriaVariable | null,
 
   tarjetas:
     TarjetaCredito[],
 ): string {
+  if (
+    categoriaPresupuesto ===
+    null
+  ) {
+    return "";
+  }
+
   const nombreBuscado =
-    categoria === "comida"
+    categoriaPresupuesto ===
+    "comida"
       ? "walmart"
       : "costco";
 
   const coincidencia =
     tarjetas.find(
-      (tarjeta) =>
+      (
+        tarjeta,
+      ) =>
         tarjeta.nombre
           .trim()
           .toLowerCase()
@@ -90,30 +169,83 @@ function etiquetaTarjeta(
     : tarjeta.nombre;
 }
 
+function iconoCategoria(
+  categoria:
+    CategoriaTarjeta,
+) {
+  if (
+    categoria
+      .categoriaPresupuesto ===
+    "comida"
+  ) {
+    return ShoppingCart;
+  }
+
+  if (
+    categoria
+      .categoriaPresupuesto ===
+    "gas"
+  ) {
+    return Fuel;
+  }
+
+  return Tag;
+}
+
 export function VariableMovementForm({
   mesSeleccionado,
   quincenaSeleccionada,
   guardando,
   tarjetasActivas,
+  categoriasTarjeta,
+  cargandoCategorias,
+  guardandoCategoria,
+  actualizandoCategoriaId,
+  reordenandoCategorias,
   onRegistrar,
+  onCrearCategoria,
+  onActualizarCategoria,
+  onCambiarEstadoCategoria,
+  onMoverCategoria,
 }: VariableMovementFormProps) {
-  const [tipo, setTipo] =
+  const [
+    tipo,
+    setTipo,
+  ] =
     useState<TipoMovimiento>(
       "gasto",
     );
 
-  const [concepto, setConcepto] =
-    useState("");
-
-  const [monto, setMonto] =
-    useState("");
+  const [
+    concepto,
+    setConcepto,
+  ] =
+    useState(
+      "",
+    );
 
   const [
-    categoriaGasto,
-    setCategoriaGasto,
+    monto,
+    setMonto,
   ] =
-    useState<CategoriaVariable>(
-      "comida",
+    useState(
+      "",
+    );
+
+  const [
+    categoriaTarjetaId,
+    setCategoriaTarjetaId,
+  ] =
+    useState(
+      "",
+    );
+
+  const [
+    comentario,
+    setComentario,
+  ] =
+    useState(
+      "",
     );
 
   const [
@@ -128,110 +260,264 @@ export function VariableMovementForm({
     tarjetaId,
     setTarjetaId,
   ] =
-    useState("");
+    useState(
+      "",
+    );
 
-  const [fecha, setFecha] =
-    useState(() =>
-      fechaParaPeriodo(
-        mesSeleccionado,
-        quincenaSeleccionada,
-      ),
+  const [
+    fecha,
+    setFecha,
+  ] =
+    useState(
+      () =>
+        fechaParaPeriodo(
+          mesSeleccionado,
+          quincenaSeleccionada,
+        ),
     );
 
   const [
     errorLocal,
     setErrorLocal,
   ] =
-    useState<string | null>(
+    useState<
+      string | null
+    >(
       null,
     );
+
+  const [
+    administradorCategoriasAbierto,
+    setAdministradorCategoriasAbierto,
+  ] =
+    useState(
+      false,
+    );
+
+  const esGasto =
+    tipo ===
+    "gasto";
 
   const tarjetasDisponibles =
     useMemo(
       () =>
         tarjetasActivas.filter(
-          (tarjeta) =>
+          (
+            tarjeta,
+          ) =>
             tarjeta.activa,
         ),
-      [tarjetasActivas],
+      [
+        tarjetasActivas,
+      ],
     );
 
-  useEffect(() => {
-    setFecha(
-      fechaParaPeriodo(
-        mesSeleccionado,
-        quincenaSeleccionada,
-      ),
+  const categoriasDisponibles =
+    useMemo(
+      () =>
+        categoriasTarjeta
+          .filter(
+            (
+              categoria,
+            ) =>
+              categoria.activa,
+          )
+          .sort(
+            (
+              a,
+              b,
+            ) =>
+              a.orden -
+                b.orden ||
+              a.nombre.localeCompare(
+                b.nombre,
+                "es",
+                {
+                  sensitivity:
+                    "base",
+                },
+              ),
+          ),
+      [
+        categoriasTarjeta,
+      ],
     );
-  }, [
-    mesSeleccionado,
-    quincenaSeleccionada,
-  ]);
 
-  /**
-   * TARJETAS - 2. Conserva una selección manual válida;
-   * cuando no existe, aplica automáticamente el valor
-   * predeterminado de la categoría actual.
-   */
-  useEffect(() => {
-    setTarjetaId(
-      (seleccionActual) => {
-        const seleccionValida =
-          tarjetasDisponibles.some(
-            (tarjeta) =>
-              tarjeta.id ===
-              seleccionActual,
+  const categoriaSeleccionada =
+    useMemo(
+      () =>
+        categoriasDisponibles.find(
+          (
+            categoria,
+          ) =>
+            categoria.id ===
+            categoriaTarjetaId,
+        ) ??
+        null,
+      [
+        categoriasDisponibles,
+        categoriaTarjetaId,
+      ],
+    );
+
+  useEffect(
+    () => {
+      setFecha(
+        fechaParaPeriodo(
+          mesSeleccionado,
+          quincenaSeleccionada,
+        ),
+      );
+    },
+    [
+      mesSeleccionado,
+      quincenaSeleccionada,
+    ],
+  );
+
+  useEffect(
+    () => {
+      setCategoriaTarjetaId(
+        (
+          seleccionActual,
+        ) => {
+          const seleccionValida =
+            categoriasDisponibles.some(
+              (
+                categoria,
+              ) =>
+                categoria.id ===
+                seleccionActual,
+            );
+
+          if (
+            seleccionValida
+          ) {
+            return seleccionActual;
+          }
+
+          return (
+            categoriasDisponibles[0]
+              ?.id ??
+            ""
           );
+        },
+      );
+    },
+    [
+      categoriasDisponibles,
+    ],
+  );
 
-        if (seleccionValida) {
-          return seleccionActual;
-        }
+  useEffect(
+    () => {
+      if (!esGasto) {
+        return;
+      }
 
-        return obtenerTarjetaPredeterminada(
-          categoriaGasto,
-          tarjetasDisponibles,
-        );
-      },
-    );
-  }, [
-    categoriaGasto,
-    tarjetasDisponibles,
-  ]);
+      setTarjetaId(
+        (
+          seleccionActual,
+        ) => {
+          const seleccionValida =
+            tarjetasDisponibles.some(
+              (
+                tarjeta,
+              ) =>
+                tarjeta.id ===
+                seleccionActual,
+            );
+
+          if (
+            seleccionValida
+          ) {
+            return seleccionActual;
+          }
+
+          return obtenerTarjetaPredeterminada(
+            categoriaSeleccionada
+              ?.categoriaPresupuesto ??
+              null,
+
+            tarjetasDisponibles,
+          );
+        },
+      );
+    },
+    [
+      categoriaSeleccionada,
+      esGasto,
+      tarjetasDisponibles,
+    ],
+  );
 
   const seleccionarCategoria =
     (
       categoria:
-        CategoriaVariable,
+        CategoriaTarjeta,
     ) => {
-      setCategoriaGasto(
-        categoria,
+      setCategoriaTarjetaId(
+        categoria.id,
+      );
+
+      setComentario(
+        "",
+      );
+
+      setErrorLocal(
+        null,
       );
 
       setTarjetaId(
         obtenerTarjetaPredeterminada(
-          categoria,
+          categoria
+            .categoriaPresupuesto,
+
           tarjetasDisponibles,
         ),
       );
     };
 
-  const seleccionarTipo = (
-    nuevoTipo:
-      TipoMovimiento,
-  ) => {
-    setTipo(nuevoTipo);
-    setErrorLocal(null);
-
-    if (
-      nuevoTipo === "pago" &&
-      !tarjetaId
-    ) {
-      setTarjetaId(
-        tarjetasDisponibles[0]
-          ?.id ?? "",
+  const seleccionarTipo =
+    (
+      nuevoTipo:
+        TipoMovimiento,
+    ) => {
+      setTipo(
+        nuevoTipo,
       );
-    }
-  };
+
+      setErrorLocal(
+        null,
+      );
+
+      if (
+        nuevoTipo ===
+          "pago" &&
+        !tarjetaId
+      ) {
+        setTarjetaId(
+          tarjetasDisponibles[0]
+            ?.id ??
+            "",
+        );
+      }
+
+      if (
+        nuevoTipo ===
+        "gasto"
+      ) {
+        setTarjetaId(
+          obtenerTarjetaPredeterminada(
+            categoriaSeleccionada
+              ?.categoriaPresupuesto ??
+              null,
+
+            tarjetasDisponibles,
+          ),
+        );
+      }
+    };
 
   const enviarFormulario =
     async (
@@ -239,22 +525,33 @@ export function VariableMovementForm({
         FormEvent<HTMLFormElement>,
     ) => {
       event.preventDefault();
-      setErrorLocal(null);
+
+      setErrorLocal(
+        null,
+      );
 
       const montoValidado =
-        montoSeguro(monto);
+        montoSeguro(
+          monto,
+        );
 
-      if (!concepto.trim()) {
+      if (
+        !concepto.trim()
+      ) {
         setErrorLocal(
           "Escribe una descripción para el movimiento.",
         );
+
         return;
       }
 
-      if (!montoValidado) {
+      if (
+        !montoValidado
+      ) {
         setErrorLocal(
           "Ingresa un monto mayor que cero.",
         );
+
         return;
       }
 
@@ -262,52 +559,104 @@ export function VariableMovementForm({
         setErrorLocal(
           "Selecciona la fecha del movimiento.",
         );
+
         return;
       }
 
       if (
-        tipo === "pago" &&
+        tipo ===
+          "gasto" &&
+        !categoriaSeleccionada
+      ) {
+        setErrorLocal(
+          "Selecciona una categoría para el gasto.",
+        );
+
+        return;
+      }
+
+      if (
+        tipo ===
+          "gasto" &&
+        categoriaSeleccionada
+          ?.requiereComentario &&
+        !comentario.trim()
+      ) {
+        setErrorLocal(
+          `Escribe un comentario para ${categoriaSeleccionada.nombre}.`,
+        );
+
+        return;
+      }
+
+      if (
+        tipo ===
+          "pago" &&
         !tarjetaId
       ) {
         setErrorLocal(
           "Selecciona la tarjeta que estás pagando.",
         );
+
         return;
       }
 
-      /**
-       * TARJETAS - 3. Guarda tarjetaId en cada gasto
-       * o pago, permitiendo cambiar la tarjeta sugerida.
-       */
       const movimiento:
         NuevoMovimiento =
-        tipo === "gasto"
+        tipo ===
+          "gasto" &&
+        categoriaSeleccionada
           ? {
-              tipo: "gasto",
+              tipo:
+                "gasto",
+
               concepto:
                 concepto.trim(),
+
               monto:
                 montoValidado,
+
               categoria:
-                categoriaGasto,
+                categoriaSeleccionada
+                  .categoriaPresupuesto,
+
+              categoriaTarjetaId:
+                categoriaSeleccionada
+                  .id,
+
+              categoriaTarjetaNombre:
+                categoriaSeleccionada
+                  .nombre,
+
+              comentario:
+                comentario.trim(),
+
               fecha,
+
               metodoPago:
                 tarjetaId
                   ? "tarjeta_credito"
                   : "debito",
+
               tarjetaId:
                 tarjetaId ||
                 null,
             }
           : {
-              tipo: "pago",
+              tipo:
+                "pago",
+
               concepto:
                 concepto.trim(),
+
               monto:
                 montoValidado,
+
               categoria:
                 categoriaPago,
+
               fecha,
+
               tarjetaId,
             };
 
@@ -320,24 +669,44 @@ export function VariableMovementForm({
         return;
       }
 
-      setConcepto("");
-      setMonto("");
-      setErrorLocal(null);
+      setConcepto(
+        "",
+      );
+
+      setMonto(
+        "",
+      );
+
+      setComentario(
+        "",
+      );
+
+      setErrorLocal(
+        null,
+      );
 
       if (
-        tipo === "gasto"
+        tipo ===
+        "gasto"
       ) {
         setTarjetaId(
           obtenerTarjetaPredeterminada(
-            categoriaGasto,
+            categoriaSeleccionada
+              ?.categoriaPresupuesto ??
+              null,
+
             tarjetasDisponibles,
           ),
         );
       }
     };
 
-  const esGasto =
-    tipo === "gasto";
+  const comentarioRequerido =
+    esGasto &&
+    Boolean(
+      categoriaSeleccionada
+        ?.requiereComentario,
+    );
 
   return (
     <section
@@ -353,7 +722,7 @@ export function VariableMovementForm({
           id="variable-form-title"
           className="mt-1 text-lg font-black text-slate-900"
         >
-          Registrar Comida o Gas
+          Registrar gasto o pago
         </h2>
       </div>
 
@@ -361,7 +730,8 @@ export function VariableMovementForm({
         <TypeButton
           tipo="gasto"
           seleccionado={
-            tipo === "gasto"
+            tipo ===
+            "gasto"
           }
           onSelect={
             seleccionarTipo
@@ -371,7 +741,8 @@ export function VariableMovementForm({
         <TypeButton
           tipo="pago"
           seleccionado={
-            tipo === "pago"
+            tipo ===
+            "pago"
           }
           onSelect={
             seleccionarTipo
@@ -396,7 +767,9 @@ export function VariableMovementForm({
           <input
             id="movimiento-concepto"
             type="text"
-            value={concepto}
+            value={
+              concepto
+            }
             onChange={(event) =>
               setConcepto(
                 event.target.value,
@@ -404,10 +777,20 @@ export function VariableMovementForm({
             }
             placeholder={
               esGasto
-                ? "Ej. Supermercado o combustible"
+                ? categoriaSeleccionada
+                    ?.categoriaPresupuesto ===
+                    "comida"
+                  ? "Ej. Walmart o Publix"
+                  : categoriaSeleccionada
+                        ?.categoriaPresupuesto ===
+                      "gas"
+                    ? "Ej. Costco Gas"
+                    : "Ej. Amazon, farmacia o ropa"
                 : "Ej. Pago tarjeta Walmart"
             }
-            disabled={guardando}
+            disabled={
+              guardando
+            }
             className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
           />
         </div>
@@ -427,14 +810,18 @@ export function VariableMovementForm({
               inputMode="decimal"
               min="0.01"
               step="0.01"
-              value={monto}
+              value={
+                monto
+              }
               onChange={(event) =>
                 setMonto(
                   event.target.value,
                 )
               }
               placeholder="0.00"
-              disabled={guardando}
+              disabled={
+                guardando
+              }
               className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
@@ -450,13 +837,17 @@ export function VariableMovementForm({
             <input
               id="movimiento-fecha"
               type="date"
-              value={fecha}
+              value={
+                fecha
+              }
               onChange={(event) =>
                 setFecha(
                   event.target.value,
                 )
               }
-              disabled={guardando}
+              disabled={
+                guardando
+              }
               className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
@@ -464,55 +855,106 @@ export function VariableMovementForm({
 
         {esGasto ? (
           <fieldset>
-            <legend className="mb-2 text-xs font-black text-slate-700">
-              Categoría del gasto
+            <legend className="text-xs font-black text-slate-700">
+              Tipo de compra
             </legend>
 
-            <div className="grid grid-cols-2 gap-2">
-              {CATEGORIA_KEYS.map(
-                (key) => {
-                  const configuracion =
-                    CATEGORIAS_VARIABLES[
-                      key
-                    ];
+            <div className="mb-2 mt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() =>
+                  setAdministradorCategoriasAbierto(
+                    true,
+                  )
+                }
+                disabled={
+                  guardando ||
+                  cargandoCategorias
+                }
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-slate-100 px-3 text-[10px] font-black text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-50"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
 
-                  const Icono =
-                    configuracion.icon;
-
-                  const seleccionada =
-                    categoriaGasto ===
-                    key;
-
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() =>
-                        seleccionarCategoria(
-                          key,
-                        )
-                      }
-                      disabled={
-                        guardando
-                      }
-                      aria-pressed={
-                        seleccionada
-                      }
-                      className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-black transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
-                        seleccionada
-                          ? `${configuracion.color} border-transparent text-white shadow-sm`
-                          : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      <Icono className="h-4 w-4" />
-                      {
-                        configuracion.label
-                      }
-                    </button>
-                  );
-                },
-              )}
+                Administrar categorías
+              </button>
             </div>
+
+            {cargandoCategorias ? (
+              <div className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-500">
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+
+                Cargando categorías...
+              </div>
+            ) : categoriasDisponibles.length ===
+              0 ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-800">
+                No hay categorías de gasto activas.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {categoriasDisponibles.map(
+                  (
+                    categoria,
+                  ) => {
+                    const Icono =
+                      iconoCategoria(
+                        categoria,
+                      );
+
+                    const seleccionada =
+                      categoriaTarjetaId ===
+                      categoria.id;
+
+                    return (
+                      <button
+                        key={
+                          categoria.id
+                        }
+                        type="button"
+                        onClick={() =>
+                          seleccionarCategoria(
+                            categoria,
+                          )
+                        }
+                        disabled={
+                          guardando
+                        }
+                        aria-pressed={
+                          seleccionada
+                        }
+                        className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-black transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+                          seleccionada
+                            ? "border-transparent bg-indigo-600 text-white shadow-sm"
+                            : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        <Icono className="h-4 w-4" />
+
+                        <span className="truncate">
+                          {
+                            categoria.nombre
+                          }
+                        </span>
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+            )}
+
+            {categoriaSeleccionada && (
+              <p className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">
+                {categoriaSeleccionada
+                  .categoriaPresupuesto ===
+                "comida"
+                  ? "Esta compra consume el presupuesto de Comida."
+                  : categoriaSeleccionada
+                        .categoriaPresupuesto ===
+                      "gas"
+                    ? "Esta compra consume el presupuesto de Gas."
+                    : "Esta compra no consume el presupuesto de Comida ni Gas."}
+              </p>
+            )}
           </fieldset>
         ) : (
           <div>
@@ -534,7 +976,9 @@ export function VariableMovementForm({
                     .value as CategoriaPago,
                 )
               }
-              disabled={guardando}
+              disabled={
+                guardando
+              }
               className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="general">
@@ -542,10 +986,16 @@ export function VariableMovementForm({
               </option>
 
               {CATEGORIA_KEYS.map(
-                (key) => (
+                (
+                  key,
+                ) => (
                   <option
-                    key={key}
-                    value={key}
+                    key={
+                      key
+                    }
+                    value={
+                      key
+                    }
                   >
                     {
                       CATEGORIAS_VARIABLES[
@@ -556,6 +1006,59 @@ export function VariableMovementForm({
                 ),
               )}
             </select>
+          </div>
+        )}
+
+        {comentarioRequerido && (
+          <div>
+            <label
+              htmlFor="movimiento-comentario"
+              className="mb-1.5 block text-xs font-black text-slate-700"
+            >
+              Detalle / comentario
+
+              <span className="ml-1 text-rose-600">
+                *
+              </span>
+            </label>
+
+            <textarea
+              id="movimiento-comentario"
+              value={
+                comentario
+              }
+              onChange={(event) =>
+                setComentario(
+                  event.target.value,
+                )
+              }
+              maxLength={
+                500
+              }
+              rows={
+                3
+              }
+              required
+              aria-required="true"
+              placeholder="Describe qué compraste o para qué fue el gasto."
+              disabled={
+                guardando
+              }
+              className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+
+            <div className="mt-1 flex justify-between gap-3 text-[10px] font-semibold text-slate-400">
+              <span>
+                Requerido para esta categoría
+              </span>
+
+              <span>
+                {
+                  comentario.length
+                }
+                /500
+              </span>
+            </div>
           </div>
         )}
 
@@ -573,7 +1076,9 @@ export function VariableMovementForm({
 
           <select
             id="movimiento-tarjeta"
-            value={tarjetaId}
+            value={
+              tarjetaId
+            }
             onChange={(event) =>
               setTarjetaId(
                 event.target.value,
@@ -582,7 +1087,8 @@ export function VariableMovementForm({
             disabled={
               guardando ||
               tarjetasDisponibles
-                .length === 0
+                .length ===
+                0
             }
             className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -594,17 +1100,24 @@ export function VariableMovementForm({
 
             {!esGasto &&
               tarjetasDisponibles
-                .length === 0 && (
+                .length ===
+                0 && (
                 <option value="">
                   No hay tarjetas activas
                 </option>
               )}
 
             {tarjetasDisponibles.map(
-              (tarjeta) => (
+              (
+                tarjeta,
+              ) => (
                 <option
-                  key={tarjeta.id}
-                  value={tarjeta.id}
+                  key={
+                    tarjeta.id
+                  }
+                  value={
+                    tarjeta.id
+                  }
                 >
                   {etiquetaTarjeta(
                     tarjeta,
@@ -616,7 +1129,15 @@ export function VariableMovementForm({
 
           <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-slate-500">
             {esGasto
-              ? "Comida selecciona Walmart y Gas selecciona Costco automáticamente. Puedes cambiarla antes de guardar."
+              ? categoriaSeleccionada
+                    ?.categoriaPresupuesto ===
+                  "comida"
+                ? "Las compras de Supermercado sugieren Walmart. Puedes cambiar la tarjeta antes de guardar."
+                : categoriaSeleccionada
+                      ?.categoriaPresupuesto ===
+                    "gas"
+                  ? "Las compras de Gas sugieren Costco. Puedes cambiar la tarjeta antes de guardar."
+                  : "Selecciona la tarjeta utilizada o deja Sin tarjeta para efectivo o débito."
               : "Selecciona la tarjeta cuyo saldo disminuirá con este pago."}
           </p>
         </div>
@@ -626,13 +1147,24 @@ export function VariableMovementForm({
             role="alert"
             className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-700"
           >
-            {errorLocal}
+            {
+              errorLocal
+            }
           </p>
         )}
 
         <button
           type="submit"
-          disabled={guardando}
+          disabled={
+            guardando ||
+            (
+              esGasto &&
+              (
+                cargandoCategorias ||
+                !categoriaSeleccionada
+              )
+            )
+          }
           className={`flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
             esGasto
               ? "bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700"
@@ -652,13 +1184,51 @@ export function VariableMovementForm({
               : "Registrar pago"}
         </button>
       </form>
+
+      <CardCategoriesManager
+        abierto={
+          administradorCategoriasAbierto
+        }
+        categorias={
+          categoriasTarjeta
+        }
+        guardando={
+          guardandoCategoria
+        }
+        actualizandoId={
+          actualizandoCategoriaId
+        }
+        reordenando={
+          reordenandoCategorias
+        }
+        onCerrar={() =>
+          setAdministradorCategoriasAbierto(
+            false,
+          )
+        }
+        onCrear={
+          onCrearCategoria
+        }
+        onActualizar={
+          onActualizarCategoria
+        }
+        onCambiarEstado={
+          onCambiarEstadoCategoria
+        }
+        onMover={
+          onMoverCategoria
+        }
+      />
     </section>
   );
 }
 
 interface TypeButtonProps {
-  tipo: TipoMovimiento;
-  seleccionado: boolean;
+  tipo:
+    TipoMovimiento;
+
+  seleccionado:
+    boolean;
 
   onSelect: (
     tipo:
@@ -672,7 +1242,8 @@ function TypeButton({
   onSelect,
 }: TypeButtonProps) {
   const esGasto =
-    tipo === "gasto";
+    tipo ===
+    "gasto";
 
   const Icono =
     esGasto
@@ -683,7 +1254,9 @@ function TypeButton({
     <button
       type="button"
       onClick={() =>
-        onSelect(tipo)
+        onSelect(
+          tipo,
+        )
       }
       aria-pressed={
         seleccionado

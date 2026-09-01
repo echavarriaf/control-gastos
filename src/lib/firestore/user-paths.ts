@@ -6,14 +6,30 @@ import {
   type DocumentReference,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import {
+  db,
+} from "@/lib/firebase";
 
+/**
+ * ============================================================
+ * COLECCIONES PRIVADAS POR USUARIO
+ * ============================================================
+ *
+ * Todas las colecciones financieras y de configuración
+ * pertenecen exclusivamente a:
+ *
+ * users/{uid}/...
+ *
+ * Mantener los nombres dentro de este union evita que los
+ * componentes y hooks construyan rutas privadas manualmente.
+ */
 export type UserCollectionName =
   | "gastos"
   | "pagosTarjeta"
   | "pagosFijos"
   | "compromisosFijos"
   | "tarjetasCredito"
+  | "categoriasTarjeta"
   | "ingresos"
   | "notificationDevices";
 
@@ -22,9 +38,13 @@ export type UserConfigDocumentId =
   | "ingresoPrincipal";
 
 /**
- * Devuelve la referencia al documento raíz del usuario:
+ * Devuelve la referencia raíz del usuario.
  *
  * users/{uid}
+ *
+ * La aplicación financiera nunca debe construir rutas privadas
+ * concatenando strings manualmente. Todas las referencias deben
+ * pasar por estas funciones para mantener el aislamiento por UID.
  */
 export function getUserRootDocument(
   uid: string,
@@ -43,6 +63,12 @@ export function getUserRootDocument(
  * Devuelve una colección privada del usuario:
  *
  * users/{uid}/{collectionName}
+ *
+ * Ejemplos:
+ *
+ * users/{uid}/gastos
+ * users/{uid}/tarjetasCredito
+ * users/{uid}/categoriasTarjeta
  */
 export function getUserCollection(
   uid: string,
@@ -85,7 +111,7 @@ export function getUserDocument(
 }
 
 /**
- * Devuelve un documento privado de configuración:
+ * Devuelve un documento de configuración privado:
  *
  * users/{uid}/configuracion/{documentId}
  */
@@ -106,8 +132,15 @@ export function getUserConfigDocument(
 }
 
 /**
- * Evita construir accidentalmente rutas Firestore inválidas
- * mediante segmentos vacíos o valores que contengan "/".
+ * Valida un segmento individual de una ruta de Firestore.
+ *
+ * No acepta:
+ *
+ * - valores vacíos;
+ * - segmentos que contengan "/".
+ *
+ * Esto evita construir accidentalmente rutas que escapen
+ * del namespace esperado.
  */
 function validarSegmento(
   value: string,
@@ -123,7 +156,9 @@ function validarSegmento(
   }
 
   if (
-    normalized.includes("/")
+    normalized.includes(
+      "/",
+    )
   ) {
     throw new Error(
       `${label} no puede contener '/'.`,

@@ -13,8 +13,9 @@
  *
  * Los pagos de tarjetas se conservan en el historial, pero no
  * reducen nuevamente el gasto de Comida o Gas. Una compra consume
- * el presupuesto de su categoría y el pago solamente reduce la
- * deuda de la tarjeta.
+ * el presupuesto únicamente cuando tiene categoría presupuestaria;
+ * categorías como "Otro" quedan fuera de esos límites y del carry-over.
+ * El pago de tarjeta solamente reduce la deuda de la tarjeta.
  *
  * El presupuesto quincenal aplica carry-over continuo por categoría:
  * cualquier exceso de una quincena reduce el disponible de la
@@ -194,8 +195,15 @@ export function useBudgetSummary({
        * Pagar una tarjeta no devuelve dinero al presupuesto
        * de la categoría donde se realizó la compra.
        */
+      const gastosPresupuestadosMes =
+        gastosMes.filter(
+          (gasto) =>
+            gasto.categoria !==
+            null,
+        );
+
       const saldoVariableMes =
-        gastosMes.reduce(
+        gastosPresupuestadosMes.reduce(
           (
             total,
             gasto,
@@ -238,7 +246,9 @@ export function useBudgetSummary({
 
             if (
               !periodo ||
-              !quincena
+              !quincena ||
+              gasto.categoria ===
+                null
             ) {
               return [];
             }
@@ -247,12 +257,9 @@ export function useBudgetSummary({
               {
                 categoria:
                   gasto.categoria,
-
                 monto:
                   gasto.monto,
-
                 periodo,
-
                 quincena,
               },
             ];
@@ -263,12 +270,9 @@ export function useBudgetSummary({
         calcularCarryOverQuincenal({
           movimientos:
             movimientosCarryOver,
-
           limites,
-
           periodoObjetivo:
             mesSeleccionado,
-
           quincenaObjetivo:
             quincenaSeleccionada,
         });
@@ -498,7 +502,6 @@ export function useBudgetSummary({
           ...gastosMes.map(
             (gasto) => ({
               ...gasto,
-
               tipo:
                 "gasto" as const,
             }),
@@ -507,7 +510,6 @@ export function useBudgetSummary({
           ...pagosMes.map(
             (pago) => ({
               ...pago,
-
               tipo:
                 "pago" as const,
             }),
@@ -569,41 +571,25 @@ export function useBudgetSummary({
 
       return {
         totalFijo,
-
         limiteVariableMensual,
-
         limiteVariableQuincenal,
-
         totalPlanMensual,
-
         saldoVariableMes,
-
         disponibleVariableMes,
-
         porcentajeVariableMes,
 
         saldoVariableQuincena,
-
         excedenteVariableAnterior,
-
         limiteVariableQuincenalEfectivo,
-
         disponibleVariableQuincena,
-
         excedenteVariableSiguiente,
 
         totalPagadoFijoMes,
-
         totalPendienteFijoMes,
-
         porcentajeFijoPagado,
-
         totalPagadoFijoQuincena,
-
         resumenCategorias,
-
         resumenFijos,
-
         movimientos,
 
         mesesDisponibles:

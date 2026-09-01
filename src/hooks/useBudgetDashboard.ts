@@ -8,9 +8,10 @@
  *
  * Descripción:
  * Reúne los hooks de datos, periodos, ingresos, gastos fijos,
- * tarjetas y notificaciones. Expone un solo controlador para que
- * los componentes puedan leer estados y ejecutar acciones sin
- * conocer cómo se administra cada fuente de datos internamente.
+ * tarjetas, categorías de tarjeta y notificaciones.
+ *
+ * También centraliza el estado de los modales y el flujo seguro
+ * de confirmación para eliminar pagos fijos.
  */
 
 import {
@@ -18,16 +19,49 @@ import {
   useState,
 } from "react";
 
-import { useBudgetData } from "@/hooks/useBudgetData";
-import { useBudgetPeriod } from "@/hooks/useBudgetPeriod";
-import { useBudgetSummary } from "@/hooks/useBudgetSummary";
-import { useCreditCards } from "@/hooks/useCreditCards";
-import { useCreditCardSummaries } from "@/hooks/useCreditCardSummaries";
-import { useBudgetVisualAlerts } from "@/hooks/useBudgetVisualAlerts";
-import { useFixedCommitments } from "@/hooks/useFixedCommitments";
-import { useIncomeData } from "@/hooks/useIncomeData";
-import { useIncomeTransactions } from "@/hooks/useIncomeTransactions";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+import {
+  useBudgetData,
+} from "@/hooks/useBudgetData";
+
+import {
+  useBudgetPeriod,
+} from "@/hooks/useBudgetPeriod";
+
+import {
+  useBudgetSummary,
+} from "@/hooks/useBudgetSummary";
+
+import {
+  useBudgetVisualAlerts,
+} from "@/hooks/useBudgetVisualAlerts";
+
+import {
+  useCardCategories,
+} from "@/hooks/useCardCategories";
+
+import {
+  useCreditCards,
+} from "@/hooks/useCreditCards";
+
+import {
+  useCreditCardSummaries,
+} from "@/hooks/useCreditCardSummaries";
+
+import {
+  useFixedCommitments,
+} from "@/hooks/useFixedCommitments";
+
+import {
+  useIncomeData,
+} from "@/hooks/useIncomeData";
+
+import {
+  useIncomeTransactions,
+} from "@/hooks/useIncomeTransactions";
+
+import {
+  usePushNotifications,
+} from "@/hooks/usePushNotifications";
 
 import type {
   CicloPago,
@@ -38,13 +72,15 @@ import type {
 } from "@/lib/budget/types";
 
 /**
- * Construye el controlador completo de la pantalla principal.
- *
- * Inicializa cada hook especializado, combina sus datos derivados
- * y devuelve estados, resultados y acciones en una estructura que
- * BudgetDashboard y sus componentes pueden consumir directamente.
+ * Controlador principal de la pantalla del presupuesto.
  */
 export function useBudgetDashboard() {
+  /**
+   * ============================================================
+   * FUENTES DE DATOS
+   * ============================================================
+   */
+
   const period =
     useBudgetPeriod();
 
@@ -57,9 +93,28 @@ export function useBudgetDashboard() {
   const creditCards =
     useCreditCards();
 
-  /*
-   * Calcula el saldo actual de cada tarjeta usando las tarjetas
-   * configuradas, las compras y los pagos cargados desde Firestore.
+  /**
+   * Categorías configurables para compras con tarjeta.
+   *
+   * La colección correspondiente es:
+   *
+   * users/{uid}/categoriasTarjeta
+   *
+   * El hook garantiza las categorías base:
+   *
+   * - Supermercado
+   * - Gas
+   * - Otro
+   */
+  const cardCategories =
+    useCardCategories();
+
+  /**
+   * Calcula el saldo actual de cada tarjeta utilizando:
+   *
+   * - saldo inicial;
+   * - compras;
+   * - pagos.
    */
   const creditCardSummaries =
     useCreditCardSummaries({
@@ -82,6 +137,12 @@ export function useBudgetDashboard() {
   const push =
     usePushNotifications();
 
+  /**
+   * ============================================================
+   * NAVEGACIÓN PRINCIPAL
+   * ============================================================
+   */
+
   const [
     view,
     setView,
@@ -90,52 +151,63 @@ export function useBudgetDashboard() {
       "fijos",
     );
 
+  /**
+   * ============================================================
+   * MODALES DE CONFIGURACIÓN
+   * ============================================================
+   */
+
   const [
     budgetSettingsOpen,
     setBudgetSettingsOpen,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     incomeSettingsOpen,
     setIncomeSettingsOpen,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     fixedCommitmentsOpen,
     setFixedCommitmentsOpen,
   ] =
-    useState(false);
-
-  const [
-    pagoFijoPendienteEliminar,
-    setPagoFijoPendienteEliminar,
-  ] = useState<PagoFijo | null>(
-    null,
-  );
+    useState(
+      false,
+    );
 
   /**
-   * Mantiene la visibilidad del historial centralizado de pagos fijos.
-   *
-   * El booleano permite que cualquier botón conectado al controlador
-   * abra o cierre la ventana sin duplicar estado entre componentes.
+   * Historial centralizado de pagos fijos.
    */
   const [
     fixedPaymentsHistoryOpen,
     setFixedPaymentsHistoryOpen,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
-  /*
-   * Mantiene la visibilidad del modal usado para crear,
-   * editar, activar o desactivar tarjetas.
+  /**
+   * Administrador de tarjetas.
    */
   const [
     creditCardsOpen,
     setCreditCardsOpen,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
+
+  /**
+   * ============================================================
+   * SELECCIONES
+   * ============================================================
+   */
 
   const [
     selectedFixedCommitment,
@@ -152,6 +224,114 @@ export function useBudgetDashboard() {
     useState<CicloPago | null>(
       null,
     );
+
+  /**
+   * ============================================================
+   * ELIMINACIÓN SEGURA DE PAGOS FIJOS
+   * ============================================================
+   *
+   * No utilizamos window.confirm().
+   *
+   * Flujo:
+   *
+   * FixedPaymentsSection
+   *      ↓
+   * solicitarEliminarPagoFijo(pago)
+   *      ↓
+   * pagoFijoPendienteEliminar
+   *      ↓
+   * BudgetModals / ConfirmDialog
+   *      ↓
+   * confirmarEliminarPagoFijo()
+   *      ↓
+   * budget.eliminarPagoFijo(pago)
+   */
+
+  const [
+    pagoFijoPendienteEliminar,
+    setPagoFijoPendienteEliminar,
+  ] =
+    useState<PagoFijo | null>(
+      null,
+    );
+
+  /**
+   * Abre la confirmación de eliminación.
+   *
+   * Todavía NO toca Firestore.
+   */
+  const solicitarEliminarPagoFijo =
+    useCallback(
+      (
+        pago:
+          PagoFijo,
+      ) => {
+        setPagoFijoPendienteEliminar(
+          pago,
+        );
+      },
+      [],
+    );
+
+  /**
+   * Cancela la operación y cierra el diálogo.
+   */
+  const cancelarEliminarPagoFijo =
+    useCallback(
+      () => {
+        setPagoFijoPendienteEliminar(
+          null,
+        );
+      },
+      [],
+    );
+
+  /**
+   * Ejecuta realmente la eliminación después de que
+   * el usuario haya confirmado desde ConfirmDialog.
+   *
+   * IMPORTANTE:
+   * ConfirmDialog espera una función cuyo retorno sea
+   * void o Promise<void>.
+   *
+   * useBudgetData.eliminarPagoFijo() sí devuelve boolean,
+   * pero ese valor se utiliza únicamente de forma interna
+   * para decidir si cerramos el diálogo.
+   */
+  const confirmarEliminarPagoFijo =
+    useCallback(
+      async (): Promise<void> => {
+        if (
+          !pagoFijoPendienteEliminar
+        ) {
+          return;
+        }
+
+        const eliminado =
+          await budget
+            .eliminarPagoFijo(
+              pagoFijoPendienteEliminar,
+            );
+
+        if (
+          eliminado
+        ) {
+          setPagoFijoPendienteEliminar(
+            null,
+          );
+        }
+      },
+      [
+        budget,
+        pagoFijoPendienteEliminar,
+      ],
+    );
+
+  /**
+   * ============================================================
+   * RESUMEN FINANCIERO
+   * ============================================================
+   */
 
   const summary =
     useBudgetSummary({
@@ -182,6 +362,12 @@ export function useBudgetDashboard() {
         period.periodoActual,
     });
 
+  /**
+   * ============================================================
+   * ALERTAS VISUALES
+   * ============================================================
+   */
+
   const visualAlerts =
     useBudgetVisualAlerts({
       resumenCategorias:
@@ -195,41 +381,56 @@ export function useBudgetDashboard() {
           .quincenaSeleccionada,
     });
 
+  /**
+   * ============================================================
+   * INGRESO DEL CICLO ACTUAL
+   * ============================================================
+   */
+
   const currentCycleIncome:
     Ingreso | null =
-    income.cicloActual
-      ? incomeTransactions
-        .ingresosPorCiclo
-        .get(
-          income.cicloActual.id,
-        ) ?? null
-      : null;
+      income.cicloActual
+        ? incomeTransactions
+            .ingresosPorCiclo
+            .get(
+              income.cicloActual.id,
+            ) ??
+          null
+        : null;
 
+  /**
+   * Ingreso correspondiente al ciclo abierto en el modal.
+   */
   const selectedCycleIncome:
     Ingreso | null =
-    selectedIncomeCycle
-      ? incomeTransactions
-        .ingresosPorCiclo
-        .get(
-          selectedIncomeCycle.id,
-        ) ?? null
-      : null;
+      selectedIncomeCycle
+        ? incomeTransactions
+            .ingresosPorCiclo
+            .get(
+              selectedIncomeCycle.id,
+            ) ??
+          null
+        : null;
 
-  /*
-   * Combina los errores de los distintos controladores para que
-   * la interfaz muestre un único mensaje de retroalimentación.
+  /**
+   * ============================================================
+   * ERRORES
+   * ============================================================
    */
+
   const feedbackError =
     budget.error ??
     fixedCommitments.error ??
     creditCards.error ??
+    cardCategories.error ??
     income.error ??
     incomeTransactions.error;
 
   const clearErrors =
     useCallback(
       () => {
-        budget.limpiarError();
+        budget
+          .limpiarError();
 
         fixedCommitments
           .limpiarError();
@@ -237,7 +438,11 @@ export function useBudgetDashboard() {
         creditCards
           .limpiarError();
 
-        income.limpiarError();
+        cardCategories
+          .limpiarError();
+
+        income
+          .limpiarError();
 
         incomeTransactions
           .limpiarError();
@@ -246,10 +451,17 @@ export function useBudgetDashboard() {
         budget,
         fixedCommitments,
         creditCards,
+        cardCategories,
         income,
         incomeTransactions,
       ],
     );
+
+  /**
+   * ============================================================
+   * INGRESOS
+   * ============================================================
+   */
 
   const openCurrentIncomeReceipt =
     useCallback(
@@ -282,64 +494,100 @@ export function useBudgetDashboard() {
       ],
     );
 
-  const confirmarEliminarPagoFijo =
-    useCallback(async () => {
-      if (
-        !pagoFijoPendienteEliminar
-      ) {
-        return;
-      }
-
-      const eliminado =
-        await budget.eliminarPagoFijo(
-          pagoFijoPendienteEliminar,
-        );
-
-      if (eliminado) {
-        setPagoFijoPendienteEliminar(
-          null,
-        );
-      }
-    }, [
-      budget,
-      pagoFijoPendienteEliminar,
-    ]);
+  /**
+   * ============================================================
+   * API DEL CONTROLADOR
+   * ============================================================
+   */
 
   return {
+    /**
+     * Datos.
+     */
     period,
     budget,
     fixedCommitments,
 
+    /**
+     * Tarjetas.
+     */
     creditCards,
+    cardCategories,
     creditCardSummaries,
 
+    /**
+     * Resúmenes.
+     */
     summary,
+
+    /**
+     * Ingresos.
+     */
     income,
     incomeTransactions,
+
+    /**
+     * Notificaciones.
+     */
     push,
+
+    /**
+     * Alertas.
+     */
     visualAlerts,
+
+    /**
+     * Error combinado.
+     */
     feedbackError,
+
+    /**
+     * Datos derivados de ingresos.
+     */
     currentCycleIncome,
     selectedCycleIncome,
 
+    /**
+     * ========================================================
+     * ESTADO DE INTERFAZ
+     * ========================================================
+     */
     ui: {
       view,
+
       budgetSettingsOpen,
+
       incomeSettingsOpen,
+
       fixedCommitmentsOpen,
+
       fixedPaymentsHistoryOpen,
 
       creditCardsOpen,
 
       selectedFixedCommitment,
+
       selectedIncomeCycle,
+
+      /**
+       * Pago mostrado actualmente en ConfirmDialog.
+       */
       pagoFijoPendienteEliminar,
     },
 
+    /**
+     * ========================================================
+     * ACCIONES
+     * ========================================================
+     */
     actions: {
       setView,
+
       clearErrors,
 
+      /**
+       * Presupuesto.
+       */
       openBudgetSettings:
         () =>
           setBudgetSettingsOpen(
@@ -352,6 +600,9 @@ export function useBudgetDashboard() {
             false,
           ),
 
+      /**
+       * Ingreso.
+       */
       openIncomeSettings:
         () =>
           setIncomeSettingsOpen(
@@ -364,6 +615,9 @@ export function useBudgetDashboard() {
             false,
           ),
 
+      /**
+       * Compromisos fijos.
+       */
       openFixedCommitments:
         () =>
           setFixedCommitmentsOpen(
@@ -377,10 +631,7 @@ export function useBudgetDashboard() {
           ),
 
       /**
-       * Abre el historial centralizado de pagos fijos.
-       *
-       * Cambia únicamente el estado del modal; los movimientos siguen
-       * viniendo de budget.pagosFijos como fuente de verdad.
+       * Historial de pagos fijos.
        */
       openFixedPaymentsHistory:
         () =>
@@ -388,18 +639,15 @@ export function useBudgetDashboard() {
             true,
           ),
 
-      /**
-       * Cierra el historial centralizado de pagos fijos.
-       *
-       * Restablece el booleano de visibilidad sin modificar filtros,
-       * pagos ni datos almacenados en Firestore.
-       */
       closeFixedPaymentsHistory:
         () =>
           setFixedPaymentsHistoryOpen(
             false,
           ),
 
+      /**
+       * Tarjetas.
+       */
       openCreditCards:
         () =>
           setCreditCardsOpen(
@@ -412,6 +660,9 @@ export function useBudgetDashboard() {
             false,
           ),
 
+      /**
+       * Registrar pago fijo.
+       */
       openFixedPayment:
         setSelectedFixedCommitment,
 
@@ -421,23 +672,21 @@ export function useBudgetDashboard() {
             null,
           ),
 
-      openCurrentIncomeReceipt,
-      closeIncomeReceipt,
+      /**
+       * Eliminar pago fijo.
+       */
+      solicitarEliminarPagoFijo,
 
-      solicitarEliminarPagoFijo:
-        setPagoFijoPendienteEliminar,
-
-      cancelarEliminarPagoFijo: () => {
-        if (
-          !budget.eliminandoPagoFijoId
-        ) {
-          setPagoFijoPendienteEliminar(
-            null,
-          );
-        }
-      },
+      cancelarEliminarPagoFijo,
 
       confirmarEliminarPagoFijo,
+
+      /**
+       * Ingresos.
+       */
+      openCurrentIncomeReceipt,
+
+      closeIncomeReceipt,
     },
   };
 }
