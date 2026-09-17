@@ -16,17 +16,22 @@
  * - monto;
  * - tarjeta o método utilizado.
  *
- * También permite filtrar los movimientos por tarjeta.
+ * Permite filtrar los movimientos por:
+ * - tarjeta utilizada;
+ * - fecha exacta;
+ * - ambos criterios simultáneamente.
  */
 
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  CalendarDays,
   CreditCard,
   Filter,
   LoaderCircle,
   ReceiptText,
   Trash2,
+  X,
 } from "lucide-react";
 
 import {
@@ -93,6 +98,16 @@ const FILTRO_TODAS =
 
 const FILTRO_SIN_TARJETA =
   "__sin_tarjeta__";
+
+function obtenerFechaCalendario(
+  fecha: string,
+): string {
+  return fecha
+    .slice(
+      0,
+      10,
+    );
+}
 
 /**
  * Devuelve el nombre que debe aparecer para la tarjeta
@@ -202,9 +217,6 @@ function obtenerEtiquetaCategoria(
   ].label;
 }
 
-/**
- * Etiqueta corta para el selector de tarjetas.
- */
 function etiquetaTarjetaFiltro(
   tarjeta:
     TarjetaCredito,
@@ -215,12 +227,6 @@ function etiquetaTarjetaFiltro(
     : tarjeta.nombre;
 }
 
-/**
- * Sección completa del historial mensual.
- *
- * El filtro utiliza tarjetaId en lugar del nombre de la tarjeta.
- * De esta forma, renombrar una tarjeta no rompe el historial.
- */
 export function VariableMovementsSection({
   movimientos,
   tarjetas,
@@ -234,6 +240,14 @@ export function VariableMovementsSection({
   ] =
     useState(
       FILTRO_TODAS,
+    );
+
+  const [
+    filtroFecha,
+    setFiltroFecha,
+  ] =
+    useState(
+      "",
     );
 
   const tarjetasPorId =
@@ -255,8 +269,8 @@ export function VariableMovementsSection({
     );
 
   /**
-   * IDs de tarjetas realmente presentes en los movimientos
-   * del mes.
+   * Solo muestra en el selector tarjetas que realmente
+   * tengan movimientos dentro del periodo recibido.
    */
   const tarjetasUsadasIds =
     useMemo(
@@ -285,13 +299,6 @@ export function VariableMovementsSection({
       ],
     );
 
-  /**
-   * Solo mostramos en el filtro las tarjetas que participan
-   * en algún movimiento del periodo actual.
-   *
-   * Una tarjeta inactiva también permanece disponible si existe
-   * un movimiento histórico asociado a ella.
-   */
   const tarjetasFiltro =
     useMemo(
       () =>
@@ -340,45 +347,66 @@ export function VariableMovementsSection({
     );
 
   /**
-   * Aplica únicamente un filtro visual.
+   * FILTROS COMBINADOS
    *
-   * No altera Firestore ni ninguno de los cálculos financieros.
+   * El movimiento debe cumplir:
+   *
+   * tarjeta seleccionada
+   * Y
+   * fecha seleccionada
+   *
+   * cuando ambos filtros están activos.
    */
   const movimientosFiltrados =
     useMemo(
-      () => {
-        if (
-          filtroTarjeta ===
-          FILTRO_TODAS
-        ) {
-          return movimientos;
-        }
-
-        if (
-          filtroTarjeta ===
-          FILTRO_SIN_TARJETA
-        ) {
-          return movimientos.filter(
-            (
-              movimiento,
-            ) =>
-              !movimiento
-                .tarjetaId,
-          );
-        }
-
-        return movimientos.filter(
+      () =>
+        movimientos.filter(
           (
             movimiento,
-          ) =>
-            movimiento
-              .tarjetaId ===
-            filtroTarjeta,
-        );
-      },
+          ) => {
+            let coincideTarjeta =
+              true;
+
+            let coincideFecha =
+              true;
+
+            if (
+              filtroTarjeta ===
+              FILTRO_SIN_TARJETA
+            ) {
+              coincideTarjeta =
+                !movimiento
+                  .tarjetaId;
+            } else if (
+              filtroTarjeta !==
+              FILTRO_TODAS
+            ) {
+              coincideTarjeta =
+                movimiento
+                  .tarjetaId ===
+                filtroTarjeta;
+            }
+
+            if (
+              filtroFecha
+            ) {
+              coincideFecha =
+                obtenerFechaCalendario(
+                  movimiento.fecha,
+                ) ===
+                filtroFecha;
+            }
+
+            return (
+              coincideTarjeta &&
+              coincideFecha
+            );
+          },
+        ),
       [
         movimientos,
         filtroTarjeta,
+        filtroFecha,
       ],
     );
 
@@ -400,7 +428,20 @@ export function VariableMovementsSection({
       ],
     );
 
-  const nombreFiltroActual =
+  const hayFiltroTarjeta =
+    filtroTarjeta !==
+    FILTRO_TODAS;
+
+  const hayFiltroFecha =
+    Boolean(
+      filtroFecha,
+    );
+
+  const hayFiltros =
+    hayFiltroTarjeta ||
+    hayFiltroFecha;
+
+  const nombreFiltroTarjeta =
     useMemo(
       () => {
         if (
@@ -429,6 +470,17 @@ export function VariableMovementsSection({
         tarjetasPorId,
       ],
     );
+
+  const limpiarFiltros =
+    () => {
+      setFiltroTarjeta(
+        FILTRO_TODAS,
+      );
+
+      setFiltroFecha(
+        "",
+      );
+    };
 
   return (
     <section
@@ -466,25 +518,53 @@ export function VariableMovementsSection({
         </div>
       </div>
 
-      {/*
-       * =====================================================
-       * FILTRO POR TARJETA
-       * =====================================================
-       */}
       {movimientos.length >
         0 && (
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm">
-              <Filter className="h-4 w-4" />
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm">
+                <Filter className="h-4 w-4" />
+              </div>
+
+              <div>
+                <p className="text-xs font-black text-slate-700">
+                  Filtrar movimientos
+                </p>
+
+                <p className="text-[10px] font-semibold text-slate-400">
+                  Combina tarjeta y fecha
+                </p>
+              </div>
             </div>
 
-            <div className="min-w-0 flex-1">
+            {hayFiltros && (
+              <button
+                type="button"
+                onClick={
+                  limpiarFiltros
+                }
+                className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-[10px] font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50"
+              >
+                <X className="h-3.5 w-3.5" />
+
+                Limpiar
+              </button>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/*
+             * FILTRO POR TARJETA
+             */}
+            <div>
               <label
                 htmlFor="filtro-tarjeta-movimientos"
-                className="block text-[9px] font-black uppercase tracking-[0.14em] text-slate-500"
+                className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500"
               >
-                Filtrar por tarjeta
+                <CreditCard className="h-3.5 w-3.5" />
+
+                Tarjeta
               </label>
 
               <select
@@ -501,7 +581,7 @@ export function VariableMovementsSection({
                       .value,
                   )
                 }
-                className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               >
                 <option
                   value={
@@ -541,37 +621,76 @@ export function VariableMovementsSection({
                 )}
               </select>
             </div>
-          </div>
 
-          {filtroTarjeta !==
-            FILTRO_TODAS && (
-            <div className="mt-2 flex items-center justify-between gap-3 px-1">
-              <p className="text-[10px] font-semibold text-slate-500">
-                Mostrando{" "}
-                <span className="font-black text-slate-700">
-                  {
-                    movimientosFiltrados
-                      .length
-                  }
-                </span>{" "}
-                de{" "}
-                {
-                  movimientos.length
-                }{" "}
-                movimientos
-              </p>
+            {/*
+             * FILTRO POR FECHA
+             */}
+            <div>
+              <label
+                htmlFor="filtro-fecha-movimientos"
+                className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500"
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
 
-              <button
-                type="button"
-                onClick={() =>
-                  setFiltroTarjeta(
-                    FILTRO_TODAS,
+                Fecha
+              </label>
+
+              <input
+                id="filtro-fecha-movimientos"
+                type="date"
+                value={
+                  filtroFecha
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setFiltroFecha(
+                    event
+                      .target
+                      .value,
                   )
                 }
-                className="text-[10px] font-black text-indigo-600 transition hover:text-indigo-800"
-              >
-                Limpiar filtro
-              </button>
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              />
+            </div>
+          </div>
+
+          {hayFiltros && (
+            <div className="mt-3 border-t border-slate-200 pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold text-slate-500">
+                  Mostrando{" "}
+                  <span className="font-black text-slate-800">
+                    {
+                      movimientosFiltrados
+                        .length
+                    }
+                  </span>{" "}
+                  de{" "}
+                  {
+                    movimientos.length
+                  }{" "}
+                  movimientos
+                </p>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {hayFiltroTarjeta && (
+                    <span className="rounded-full bg-indigo-100 px-2 py-1 text-[9px] font-black text-indigo-700">
+                      {
+                        nombreFiltroTarjeta
+                      }
+                    </span>
+                  )}
+
+                  {hayFiltroFecha && (
+                    <span className="rounded-full bg-sky-100 px-2 py-1 text-[9px] font-black text-sky-700">
+                      {fechaCorta(
+                        `${filtroFecha}T12:00:00`,
+                      )}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -584,13 +703,8 @@ export function VariableMovementsSection({
           .length ===
         0 ? (
         <EmptyFilterState
-          nombreFiltro={
-            nombreFiltroActual
-          }
-          onLimpiar={() =>
-            setFiltroTarjeta(
-              FILTRO_TODAS,
-            )
+          onLimpiar={
+            limpiarFiltros
           }
         />
       ) : (
@@ -623,9 +737,6 @@ export function VariableMovementsSection({
   );
 }
 
-/**
- * Fila individual del historial.
- */
 function MovementRow({
   movimiento,
   tarjetasPorId,
@@ -768,12 +879,8 @@ function MovementRow({
 }
 
 function EmptyFilterState({
-  nombreFiltro,
   onLimpiar,
 }: {
-  nombreFiltro:
-    string;
-
   onLimpiar:
     () => void;
 }) {
@@ -784,12 +891,11 @@ function EmptyFilterState({
       </div>
 
       <h3 className="mt-3 text-sm font-black text-slate-800">
-        No hay movimientos para{" "}
-        {nombreFiltro}
+        No hay movimientos
       </h3>
 
       <p className="mt-1 max-w-xs text-xs font-medium leading-relaxed text-slate-500">
-        No existen movimientos asociados a este filtro durante el periodo mostrado.
+        Ningún movimiento coincide con la tarjeta y fecha seleccionadas.
       </p>
 
       <button
@@ -797,17 +903,16 @@ function EmptyFilterState({
         onClick={
           onLimpiar
         }
-        className="mt-4 rounded-xl bg-white px-4 py-2 text-xs font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50"
+        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50"
       >
-        Mostrar todos
+        <X className="h-3.5 w-3.5" />
+
+        Limpiar filtros
       </button>
     </div>
   );
 }
 
-/**
- * Estado vacío cuando todavía no existen movimientos.
- */
 function EmptyState() {
   return (
     <div className="mt-4 flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
