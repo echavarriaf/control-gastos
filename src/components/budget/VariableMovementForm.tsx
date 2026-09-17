@@ -36,7 +36,6 @@ import type {
 
 import type {
   CategoriaPago,
-  CategoriaVariable,
   NuevoMovimiento,
   Quincena,
   TarjetaCredito,
@@ -120,44 +119,152 @@ interface VariableMovementFormProps {
   ) => Promise<boolean>;
 }
 
+function normalizarTextoComparacion(
+  value: string,
+): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      "",
+    );
+}
+
+function buscarTarjetaPorNombre(
+  tarjetas:
+    TarjetaCredito[],
+
+  nombre:
+    string,
+): TarjetaCredito | null {
+  const objetivo =
+    normalizarTextoComparacion(
+      nombre,
+    );
+
+  const coincidenciaExacta =
+    tarjetas.find(
+      (tarjeta) =>
+        normalizarTextoComparacion(
+          tarjeta.nombre,
+        ) ===
+        objetivo,
+    );
+
+  if (
+    coincidenciaExacta
+  ) {
+    return coincidenciaExacta;
+  }
+
+  const coincidenciaParcial =
+    tarjetas.find(
+      (tarjeta) =>
+        normalizarTextoComparacion(
+          tarjeta.nombre,
+        ).includes(
+          objetivo,
+        ),
+    );
+
+  return (
+    coincidenciaParcial ??
+    null
+  );
+}
+
+/**
+ * Sugiere una tarjeta según la categoría elegida.
+ *
+ * Reglas principales:
+ *
+ * - Comida / Supermercado → Walmart
+ * - Gas → Costco
+ * - Categorías sin presupuesto, como "Otro" → Apple
+ *
+ * La selección sigue siendo editable por el usuario antes
+ * de registrar el gasto.
+ */
 function obtenerTarjetaPredeterminada(
-  categoriaPresupuesto:
-    CategoriaVariable | null,
+  categoria:
+    CategoriaTarjeta | null,
 
   tarjetas:
     TarjetaCredito[],
 ): string {
   if (
-    categoriaPresupuesto ===
-    null
+    tarjetas.length ===
+    0
   ) {
     return "";
   }
 
-  const nombreBuscado =
+  const categoriaPresupuesto =
+    categoria
+      ?.categoriaPresupuesto ??
+    null;
+
+  if (
     categoriaPresupuesto ===
     "comida"
-      ? "walmart"
-      : "costco";
+  ) {
+    const walmart =
+      buscarTarjetaPorNombre(
+        tarjetas,
+        "Walmart",
+      );
 
-  const coincidencia =
-    tarjetas.find(
-      (
-        tarjeta,
-      ) =>
-        tarjeta.nombre
-          .trim()
-          .toLowerCase()
-          .includes(
-            nombreBuscado,
-          ),
+    return (
+      walmart?.id ??
+      tarjetas[0]?.id ??
+      ""
     );
+  }
 
-  return (
-    coincidencia?.id ??
-    tarjetas[0]?.id ??
-    ""
-  );
+  if (
+    categoriaPresupuesto ===
+    "gas"
+  ) {
+    const costco =
+      buscarTarjetaPorNombre(
+        tarjetas,
+        "Costco",
+      );
+
+    return (
+      costco?.id ??
+      tarjetas[0]?.id ??
+      ""
+    );
+  }
+
+  /**
+   * Una categoría sin presupuesto asociado representa normalmente
+   * "Otro". Para estos gastos usamos Apple como tarjeta sugerida.
+   *
+   * Si Apple no existe o está inactiva, dejamos la selección vacía
+   * para que el usuario decida explícitamente cómo pagó el gasto.
+   */
+  if (
+    categoria &&
+    categoriaPresupuesto ===
+      null
+  ) {
+    const apple =
+      buscarTarjetaPorNombre(
+        tarjetas,
+        "Apple",
+      );
+
+    return (
+      apple?.id ??
+      ""
+    );
+  }
+
+  return "";
 }
 
 function etiquetaTarjeta(
@@ -360,6 +467,23 @@ export function VariableMovementForm({
       ],
     );
 
+  const tarjetaSeleccionada =
+    useMemo(
+      () =>
+        tarjetasDisponibles.find(
+          (
+            tarjeta,
+          ) =>
+            tarjeta.id ===
+            tarjetaId,
+        ) ??
+        null,
+      [
+        tarjetasDisponibles,
+        tarjetaId,
+      ],
+    );
+
   useEffect(
     () => {
       setFecha(
@@ -409,9 +533,21 @@ export function VariableMovementForm({
     ],
   );
 
+  /**
+   * Si cambia la categoría o cambia el listado de tarjetas activas,
+   * conserva la selección actual si todavía es válida.
+   *
+   * Cuando no existe selección válida aplica:
+   *
+   * Supermercado → Walmart
+   * Gas          → Costco
+   * Otro         → Apple
+   */
   useEffect(
     () => {
-      if (!esGasto) {
+      if (
+        !esGasto
+      ) {
         return;
       }
 
@@ -435,10 +571,7 @@ export function VariableMovementForm({
           }
 
           return obtenerTarjetaPredeterminada(
-            categoriaSeleccionada
-              ?.categoriaPresupuesto ??
-              null,
-
+            categoriaSeleccionada,
             tarjetasDisponibles,
           );
         },
@@ -468,11 +601,16 @@ export function VariableMovementForm({
         null,
       );
 
+      /**
+       * Cada vez que el usuario cambia explícitamente la categoría,
+       * aplicamos inmediatamente la tarjeta predeterminada asociada.
+       *
+       * Esto evita conservar por accidente Walmart al pasar a Otro,
+       * por ejemplo.
+       */
       setTarjetaId(
         obtenerTarjetaPredeterminada(
-          categoria
-            .categoriaPresupuesto,
-
+          categoria,
           tarjetasDisponibles,
         ),
       );
@@ -509,10 +647,7 @@ export function VariableMovementForm({
       ) {
         setTarjetaId(
           obtenerTarjetaPredeterminada(
-            categoriaSeleccionada
-              ?.categoriaPresupuesto ??
-              null,
-
+            categoriaSeleccionada,
             tarjetasDisponibles,
           ),
         );
@@ -555,7 +690,9 @@ export function VariableMovementForm({
         return;
       }
 
-      if (!fecha) {
+      if (
+        !fecha
+      ) {
         setErrorLocal(
           "Selecciona la fecha del movimiento.",
         );
@@ -596,6 +733,27 @@ export function VariableMovementForm({
       ) {
         setErrorLocal(
           "Selecciona la tarjeta que estás pagando.",
+        );
+
+        return;
+      }
+
+      /**
+       * El resumen de tarjeta parte de fechaSaldoInicial.
+       *
+       * Evitamos guardar silenciosamente una compra con una fecha
+       * anterior al punto de partida financiero de la tarjeta.
+       */
+      if (
+        tipo ===
+          "gasto" &&
+        tarjetaSeleccionada &&
+        fecha <
+          tarjetaSeleccionada
+            .fechaSaldoInicial
+      ) {
+        setErrorLocal(
+          `La fecha del gasto es anterior al saldo inicial de ${tarjetaSeleccionada.nombre} (${tarjetaSeleccionada.fechaSaldoInicial}). Cambia la fecha del gasto o recalibra la tarjeta.`,
         );
 
         return;
@@ -665,7 +823,9 @@ export function VariableMovementForm({
           movimiento,
         );
 
-      if (!guardado) {
+      if (
+        !guardado
+      ) {
         return;
       }
 
@@ -685,16 +845,17 @@ export function VariableMovementForm({
         null,
       );
 
+      /**
+       * Después de guardar un gasto dejamos preparado el mismo
+       * comportamiento predeterminado para el próximo movimiento.
+       */
       if (
         tipo ===
         "gasto"
       ) {
         setTarjetaId(
           obtenerTarjetaPredeterminada(
-            categoriaSeleccionada
-              ?.categoriaPresupuesto ??
-              null,
-
+            categoriaSeleccionada,
             tarjetasDisponibles,
           ),
         );
@@ -770,9 +931,13 @@ export function VariableMovementForm({
             value={
               concepto
             }
-            onChange={(event) =>
+            onChange={(
+              event,
+            ) =>
               setConcepto(
-                event.target.value,
+                event
+                  .target
+                  .value,
               )
             }
             placeholder={
@@ -813,9 +978,13 @@ export function VariableMovementForm({
               value={
                 monto
               }
-              onChange={(event) =>
+              onChange={(
+                event,
+              ) =>
                 setMonto(
-                  event.target.value,
+                  event
+                    .target
+                    .value,
                 )
               }
               placeholder="0.00"
@@ -840,9 +1009,13 @@ export function VariableMovementForm({
               value={
                 fecha
               }
-              onChange={(event) =>
+              onChange={(
+                event,
+              ) =>
                 setFecha(
-                  event.target.value,
+                  event
+                    .target
+                    .value,
                 )
               }
               disabled={
@@ -932,7 +1105,8 @@ export function VariableMovementForm({
 
                         <span className="truncate">
                           {
-                            categoria.nombre
+                            categoria
+                              .nombre
                           }
                         </span>
                       </button>
@@ -970,9 +1144,12 @@ export function VariableMovementForm({
               value={
                 categoriaPago
               }
-              onChange={(event) =>
+              onChange={(
+                event,
+              ) =>
                 setCategoriaPago(
-                  event.target
+                  event
+                    .target
                     .value as CategoriaPago,
                 )
               }
@@ -1027,9 +1204,13 @@ export function VariableMovementForm({
               value={
                 comentario
               }
-              onChange={(event) =>
+              onChange={(
+                event,
+              ) =>
                 setComentario(
-                  event.target.value,
+                  event
+                    .target
+                    .value,
                 )
               }
               maxLength={
@@ -1054,7 +1235,8 @@ export function VariableMovementForm({
 
               <span>
                 {
-                  comentario.length
+                  comentario
+                    .length
                 }
                 /500
               </span>
@@ -1079,9 +1261,13 @@ export function VariableMovementForm({
             value={
               tarjetaId
             }
-            onChange={(event) =>
+            onChange={(
+              event,
+            ) =>
               setTarjetaId(
-                event.target.value,
+                event
+                  .target
+                  .value,
               )
             }
             disabled={
@@ -1137,7 +1323,9 @@ export function VariableMovementForm({
                       ?.categoriaPresupuesto ===
                     "gas"
                   ? "Las compras de Gas sugieren Costco. Puedes cambiar la tarjeta antes de guardar."
-                  : "Selecciona la tarjeta utilizada o deja Sin tarjeta para efectivo o débito."
+                  : tarjetaId
+                    ? "Los gastos de Otro sugieren Apple. Puedes cambiar la tarjeta antes de guardar."
+                    : "Apple no está disponible. Selecciona la tarjeta utilizada o deja Sin tarjeta para efectivo o débito."
               : "Selecciona la tarjeta cuyo saldo disminuirá con este pago."}
           </p>
         </div>
@@ -1280,3 +1468,5 @@ function TypeButton({
     </button>
   );
 }
+
+export default VariableMovementForm;

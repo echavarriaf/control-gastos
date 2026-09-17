@@ -4,42 +4,34 @@
  * Nombre: Sección de movimientos variables
  * Ruta: src/components/budget/VariableMovementsSection.tsx
  * Autor: Felix Echavarria
- * Fecha: 2026-09-01
+ * Fecha: 2026-08-02
  *
  * Descripción:
- * Muestra el historial mensual de gastos variables y pagos de tarjetas.
+ * Muestra el historial mensual de gastos y pagos variables.
  *
- * Los movimientos nuevos conservan un snapshot de la categoría utilizada
- * al momento de registrarse. Esto permite que el historial continúe siendo
- * legible aunque una categoría se renombre, edite o desactive después.
+ * Cada movimiento presenta:
+ * - categoría;
+ * - fecha;
+ * - quincena;
+ * - monto;
+ * - tarjeta o método utilizado.
  *
- * Para gastos muestra:
- *
- * - categoría de compra;
- * - descripción;
- * - comentario, cuando existe;
- * - impacto presupuestario;
- * - tarjeta o método de pago;
- * - fecha y quincena;
- * - monto.
- *
- * Los documentos antiguos que todavía no tienen categoriaTarjetaNombre
- * continúan funcionando mediante la categoría histórica comida/gas.
+ * También permite filtrar los movimientos por tarjeta.
  */
 
 import {
   ArrowDownCircle,
   ArrowUpCircle,
   CreditCard,
+  Filter,
   LoaderCircle,
-  MessageSquare,
   ReceiptText,
-  Tag,
   Trash2,
 } from "lucide-react";
 
 import {
   useMemo,
+  useState,
 } from "react";
 
 import {
@@ -96,27 +88,15 @@ interface MovementRowProps {
   ) => void | Promise<void>;
 }
 
-interface DetalleCategoriaMovimiento {
-  nombre:
-    string;
+const FILTRO_TODAS =
+  "__todas__";
 
-  presupuesto:
-    string;
-
-  tienePresupuesto:
-    boolean;
-}
+const FILTRO_SIN_TARJETA =
+  "__sin_tarjeta__";
 
 /**
- * ============================================================
- * MÉTODO DE PAGO / TARJETA
- * ============================================================
- *
- * Resuelve la etiqueta visual del medio utilizado.
- *
- * Los movimientos históricos pueden apuntar a una tarjeta que
- * posteriormente fue desactivada. Como BudgetContent entrega todas
- * las tarjetas, incluidas las inactivas, el nombre continúa visible.
+ * Devuelve el nombre que debe aparecer para la tarjeta
+ * o método usado en un movimiento.
  */
 function obtenerEtiquetaPago(
   movimiento:
@@ -133,14 +113,18 @@ function obtenerEtiquetaPago(
   ) {
     const tarjeta =
       tarjetasPorId.get(
-        movimiento.tarjetaId,
+        movimiento
+          .tarjetaId,
       );
 
-    if (!tarjeta) {
+    if (
+      !tarjeta
+    ) {
       return "Tarjeta no encontrada";
     }
 
-    return tarjeta.ultimosCuatro
+    return tarjeta
+      .ultimosCuatro
       ? `${tarjeta.nombre} · •••• ${tarjeta.ultimosCuatro}`
       : tarjeta.nombre;
   }
@@ -173,23 +157,15 @@ function obtenerEtiquetaPago(
 }
 
 /**
- * ============================================================
- * CATEGORÍA
- * ============================================================
+ * Obtiene una etiqueta segura para la categoría.
  *
- * Para gastos nuevos usamos categoriaTarjetaNombre.
- *
- * Ese campo es un snapshot del nombre visible de la categoría en
- * el momento de registrar la compra. No intentamos resolver el nombre
- * contra la colección actual de categorías, porque hacerlo cambiaría
- * retroactivamente el significado visual del historial.
- *
- * Para documentos antiguos usamos comida/gas como fallback.
+ * Un gasto de "Otro" puede tener categoria === null porque
+ * deliberadamente no consume Comida ni Gas.
  */
-function obtenerDetalleCategoria(
+function obtenerEtiquetaCategoria(
   movimiento:
     Movimiento,
-): DetalleCategoriaMovimiento {
+): string {
   if (
     movimiento.tipo ===
     "pago"
@@ -198,94 +174,53 @@ function obtenerDetalleCategoria(
       movimiento.categoria ===
       "general"
     ) {
-      return {
-        nombre:
-          "Pago general",
-
-        presupuesto:
-          "Pago de tarjeta",
-
-        tienePresupuesto:
-          false,
-      };
+      return "Pago general";
     }
 
-    return {
-      nombre:
-        CATEGORIAS_VARIABLES[
-          movimiento.categoria
-        ].label,
-
-      presupuesto:
-        "Pago de tarjeta",
-
-      tienePresupuesto:
-        false,
-    };
-  }
-
-  const nombreSnapshot =
-    movimiento
-      .categoriaTarjetaNombre
-      ?.trim();
-
-  const nombre =
-    nombreSnapshot ||
-    (
+    return CATEGORIAS_VARIABLES[
       movimiento.categoria
-        ? CATEGORIAS_VARIABLES[
-            movimiento.categoria
-          ].label
-        : "Otro"
+    ].label;
+  }
+
+  if (
+    movimiento.categoria ===
+    null
+  ) {
+    const nombre =
+      movimiento
+        .categoriaTarjetaNombre
+        ?.trim();
+
+    return (
+      nombre ||
+      "Otro"
     );
-
-  if (
-    movimiento.categoria ===
-    "comida"
-  ) {
-    return {
-      nombre,
-
-      presupuesto:
-        "Presupuesto · Comida",
-
-      tienePresupuesto:
-        true,
-    };
   }
 
-  if (
-    movimiento.categoria ===
-    "gas"
-  ) {
-    return {
-      nombre,
-
-      presupuesto:
-        "Presupuesto · Gas",
-
-      tienePresupuesto:
-        true,
-    };
-  }
-
-  return {
-    nombre,
-
-    presupuesto:
-      "Sin presupuesto",
-
-    tienePresupuesto:
-      false,
-  };
+  return CATEGORIAS_VARIABLES[
+    movimiento.categoria
+  ].label;
 }
 
 /**
- * ============================================================
- * SECCIÓN
- * ============================================================
+ * Etiqueta corta para el selector de tarjetas.
  */
+function etiquetaTarjetaFiltro(
+  tarjeta:
+    TarjetaCredito,
+): string {
+  return tarjeta
+    .ultimosCuatro
+    ? `${tarjeta.nombre} · •••• ${tarjeta.ultimosCuatro}`
+    : tarjeta.nombre;
+}
 
+/**
+ * Sección completa del historial mensual.
+ *
+ * El filtro utiliza tarjetaId en lugar del nombre de la tarjeta.
+ * De esta forma, renombrar una tarjeta no rompe el historial.
+ */
 export function VariableMovementsSection({
   movimientos,
   tarjetas,
@@ -293,26 +228,14 @@ export function VariableMovementsSection({
   eliminandoMovimientoId,
   onEliminar,
 }: VariableMovementsSectionProps) {
-  /**
-   * El contador superior sigue reflejando la quincena seleccionada,
-   * mientras el historial conserva todos los movimientos del mes.
-   */
-  const movimientosQuincena =
-    movimientos.filter(
-      (
-        movimiento,
-      ) =>
-        obtenerQuincenaDesdeISO(
-          movimiento.fecha,
-        ) ===
-        quincenaSeleccionada,
+  const [
+    filtroTarjeta,
+    setFiltroTarjeta,
+  ] =
+    useState(
+      FILTRO_TODAS,
     );
 
-  /**
-   * Lookup rápido tarjetaId -> tarjeta.
-   *
-   * Incluye tarjetas activas e inactivas para mantener el historial.
-   */
   const tarjetasPorId =
     useMemo(
       () =>
@@ -328,6 +251,182 @@ export function VariableMovementsSection({
         ),
       [
         tarjetas,
+      ],
+    );
+
+  /**
+   * IDs de tarjetas realmente presentes en los movimientos
+   * del mes.
+   */
+  const tarjetasUsadasIds =
+    useMemo(
+      () =>
+        new Set(
+          movimientos
+            .map(
+              (
+                movimiento,
+              ) =>
+                movimiento
+                  .tarjetaId,
+            )
+            .filter(
+              (
+                tarjetaId,
+              ): tarjetaId is string =>
+                typeof tarjetaId ===
+                  "string" &&
+                tarjetaId.length >
+                  0,
+            ),
+        ),
+      [
+        movimientos,
+      ],
+    );
+
+  /**
+   * Solo mostramos en el filtro las tarjetas que participan
+   * en algún movimiento del periodo actual.
+   *
+   * Una tarjeta inactiva también permanece disponible si existe
+   * un movimiento histórico asociado a ella.
+   */
+  const tarjetasFiltro =
+    useMemo(
+      () =>
+        tarjetas
+          .filter(
+            (
+              tarjeta,
+            ) =>
+              tarjetasUsadasIds.has(
+                tarjeta.id,
+              ),
+          )
+          .sort(
+            (
+              a,
+              b,
+            ) =>
+              a.nombre.localeCompare(
+                b.nombre,
+                "es",
+                {
+                  sensitivity:
+                    "base",
+                },
+              ),
+          ),
+      [
+        tarjetas,
+        tarjetasUsadasIds,
+      ],
+    );
+
+  const hayMovimientosSinTarjeta =
+    useMemo(
+      () =>
+        movimientos.some(
+          (
+            movimiento,
+          ) =>
+            !movimiento
+              .tarjetaId,
+        ),
+      [
+        movimientos,
+      ],
+    );
+
+  /**
+   * Aplica únicamente un filtro visual.
+   *
+   * No altera Firestore ni ninguno de los cálculos financieros.
+   */
+  const movimientosFiltrados =
+    useMemo(
+      () => {
+        if (
+          filtroTarjeta ===
+          FILTRO_TODAS
+        ) {
+          return movimientos;
+        }
+
+        if (
+          filtroTarjeta ===
+          FILTRO_SIN_TARJETA
+        ) {
+          return movimientos.filter(
+            (
+              movimiento,
+            ) =>
+              !movimiento
+                .tarjetaId,
+          );
+        }
+
+        return movimientos.filter(
+          (
+            movimiento,
+          ) =>
+            movimiento
+              .tarjetaId ===
+            filtroTarjeta,
+        );
+      },
+      [
+        movimientos,
+        filtroTarjeta,
+      ],
+    );
+
+  const movimientosQuincena =
+    useMemo(
+      () =>
+        movimientosFiltrados.filter(
+          (
+            movimiento,
+          ) =>
+            obtenerQuincenaDesdeISO(
+              movimiento.fecha,
+            ) ===
+            quincenaSeleccionada,
+        ),
+      [
+        movimientosFiltrados,
+        quincenaSeleccionada,
+      ],
+    );
+
+  const nombreFiltroActual =
+    useMemo(
+      () => {
+        if (
+          filtroTarjeta ===
+          FILTRO_TODAS
+        ) {
+          return "Todas";
+        }
+
+        if (
+          filtroTarjeta ===
+          FILTRO_SIN_TARJETA
+        ) {
+          return "Sin tarjeta";
+        }
+
+        return (
+          tarjetasPorId.get(
+            filtroTarjeta,
+          )?.nombre ??
+          "Tarjeta"
+        );
+      },
+      [
+        filtroTarjeta,
+        tarjetasPorId,
       ],
     );
 
@@ -348,13 +447,9 @@ export function VariableMovementsSection({
           >
             Movimientos variables
           </h2>
-
-          <p className="mt-1 text-[11px] font-medium leading-relaxed text-slate-500">
-            Compras y pagos registrados durante el mes seleccionado.
-          </p>
         </div>
 
-        <div className="shrink-0 rounded-2xl bg-slate-100 px-3 py-2 text-right">
+        <div className="rounded-2xl bg-slate-100 px-3 py-2 text-right">
           <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">
             Quincena{" "}
             {
@@ -371,12 +466,136 @@ export function VariableMovementsSection({
         </div>
       </div>
 
+      {/*
+       * =====================================================
+       * FILTRO POR TARJETA
+       * =====================================================
+       */}
+      {movimientos.length >
+        0 && (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm">
+              <Filter className="h-4 w-4" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <label
+                htmlFor="filtro-tarjeta-movimientos"
+                className="block text-[9px] font-black uppercase tracking-[0.14em] text-slate-500"
+              >
+                Filtrar por tarjeta
+              </label>
+
+              <select
+                id="filtro-tarjeta-movimientos"
+                value={
+                  filtroTarjeta
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setFiltroTarjeta(
+                    event
+                      .target
+                      .value,
+                  )
+                }
+                className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              >
+                <option
+                  value={
+                    FILTRO_TODAS
+                  }
+                >
+                  Todas las tarjetas
+                </option>
+
+                {tarjetasFiltro.map(
+                  (
+                    tarjeta,
+                  ) => (
+                    <option
+                      key={
+                        tarjeta.id
+                      }
+                      value={
+                        tarjeta.id
+                      }
+                    >
+                      {etiquetaTarjetaFiltro(
+                        tarjeta,
+                      )}
+                    </option>
+                  ),
+                )}
+
+                {hayMovimientosSinTarjeta && (
+                  <option
+                    value={
+                      FILTRO_SIN_TARJETA
+                    }
+                  >
+                    Sin tarjeta / débito / efectivo
+                  </option>
+                )}
+              </select>
+            </div>
+          </div>
+
+          {filtroTarjeta !==
+            FILTRO_TODAS && (
+            <div className="mt-2 flex items-center justify-between gap-3 px-1">
+              <p className="text-[10px] font-semibold text-slate-500">
+                Mostrando{" "}
+                <span className="font-black text-slate-700">
+                  {
+                    movimientosFiltrados
+                      .length
+                  }
+                </span>{" "}
+                de{" "}
+                {
+                  movimientos.length
+                }{" "}
+                movimientos
+              </p>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setFiltroTarjeta(
+                    FILTRO_TODAS,
+                  )
+                }
+                className="text-[10px] font-black text-indigo-600 transition hover:text-indigo-800"
+              >
+                Limpiar filtro
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {movimientos.length ===
       0 ? (
         <EmptyState />
+      ) : movimientosFiltrados
+          .length ===
+        0 ? (
+        <EmptyFilterState
+          nombreFiltro={
+            nombreFiltroActual
+          }
+          onLimpiar={() =>
+            setFiltroTarjeta(
+              FILTRO_TODAS,
+            )
+          }
+        />
       ) : (
-        <div className="mt-4 space-y-3">
-          {movimientos.map(
+        <div className="mt-4 space-y-2.5">
+          {movimientosFiltrados.map(
             (
               movimiento,
             ) => (
@@ -405,11 +624,8 @@ export function VariableMovementsSection({
 }
 
 /**
- * ============================================================
- * FILA DE MOVIMIENTO
- * ============================================================
+ * Fila individual del historial.
  */
-
 function MovementRow({
   movimiento,
   tarjetasPorId,
@@ -425,8 +641,8 @@ function MovementRow({
       movimiento.fecha,
     );
 
-  const detalleCategoria =
-    obtenerDetalleCategoria(
+  const categoriaLabel =
+    obtenerEtiquetaCategoria(
       movimiento,
     );
 
@@ -436,187 +652,162 @@ function MovementRow({
       tarjetasPorId,
     );
 
-  /**
-   * Solo los gastos tienen comentario de clasificación.
-   */
-  const comentario =
-    movimiento.tipo ===
-      "gasto" &&
-    movimiento.comentario
-      ?.trim()
-      ? movimiento.comentario
-          .trim()
-      : "";
-
   const Icono =
     esGasto
       ? ArrowDownCircle
       : ArrowUpCircle;
 
   return (
-    <article className="rounded-3xl border border-slate-100 bg-slate-50 p-3.5 transition hover:border-slate-200 hover:bg-white">
-      <div className="flex items-start gap-3">
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-            esGasto
-              ? "bg-rose-100 text-rose-600"
-              : "bg-emerald-100 text-emerald-600"
-          }`}
-        >
-          <Icono
-            aria-hidden="true"
-            className="h-5 w-5"
-          />
-        </div>
+    <article className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 transition hover:border-slate-200 hover:bg-white">
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+          esGasto
+            ? "bg-rose-100 text-rose-600"
+            : "bg-emerald-100 text-emerald-600"
+        }`}
+      >
+        <Icono
+          aria-hidden="true"
+          className="h-5 w-5"
+        />
+      </div>
 
-        <div className="min-w-0 flex-1">
-          {/*
-           * Categoría principal.
-           *
-           * Se coloca antes de la descripción para que al recorrer
-           * visualmente el historial sea fácil distinguir el tipo
-           * de gasto.
-           */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-black text-indigo-700">
-              <Tag
-                aria-hidden="true"
-                className="h-3 w-3 shrink-0"
-              />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-black text-slate-900">
+              {
+                movimiento
+                  .concepto
+              }
+            </h3>
 
-              <span className="truncate">
-                {
-                  detalleCategoria.nombre
-                }
-              </span>
-            </span>
-
-            <span className="text-[10px] font-bold text-slate-400">
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
+              {categoriaLabel}
+              {" · "}
               {fechaCorta(
                 movimiento.fecha,
               )}
-            </span>
-          </div>
-
-          <div className="mt-2 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="break-words text-sm font-black leading-5 text-slate-900">
-                {
-                  movimiento
-                    .concepto
-                }
-              </h3>
-            </div>
-
-            <p
-              className={`shrink-0 text-sm font-black ${
-                esGasto
-                  ? "text-rose-600"
-                  : "text-emerald-600"
-              }`}
-            >
-              {esGasto
-                ? "−"
-                : "+"}
-
-              {formatoMoneda.format(
-                movimiento.monto,
-              )}
             </p>
+
+            {esGasto &&
+              movimiento
+                .categoria ===
+                null &&
+              movimiento
+                .comentario && (
+                <p className="mt-1 line-clamp-2 text-[10px] font-medium leading-relaxed text-slate-400">
+                  {
+                    movimiento
+                      .comentario
+                  }
+                </p>
+              )}
           </div>
 
-          {/*
-           * Comentario guardado con la compra.
-           *
-           * En "Otro" y categorías configuradas con
-           * requiereComentario=true será particularmente importante.
-           */}
-          {comentario && (
-            <div className="mt-2 flex items-start gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5">
-              <MessageSquare
-                aria-hidden="true"
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400"
-              />
+          <p
+            className={`shrink-0 text-sm font-black ${
+              esGasto
+                ? "text-rose-600"
+                : "text-emerald-600"
+            }`}
+          >
+            {esGasto
+              ? "−"
+              : "+"}
 
-              <p className="break-words text-[11px] font-medium leading-5 text-slate-600">
-                {comentario}
-              </p>
-            </div>
-          )}
+            {formatoMoneda.format(
+              movimiento.monto,
+            )}
+          </p>
+        </div>
 
-          {/*
-           * Metadata financiera.
-           *
-           * Separamos explícitamente el presupuesto afectado de la
-           * tarjeta utilizada, porque representan conceptos distintos.
-           */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-2.5 py-1 text-[9px] font-black ${
-                detalleCategoria
-                  .tienePresupuesto
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-slate-200 text-slate-600"
-              }`}
-            >
-              {
-                detalleCategoria.presupuesto
-              }
-            </span>
-
-            <span className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-slate-500">
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black uppercase tracking-wider text-slate-500">
               Quincena{" "}
-              {
-                quincena
-              }
+              {quincena}
             </span>
 
-            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[9px] font-black text-indigo-700">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700">
               <CreditCard
                 aria-hidden="true"
                 className="h-3 w-3 shrink-0"
               />
 
               <span className="truncate">
-                {
-                  etiquetaPago
-                }
+                {etiquetaPago}
               </span>
             </span>
           </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            void onEliminar(
-              movimiento,
-            );
-          }}
-          disabled={
-            eliminando
-          }
-          aria-label={`Eliminar ${movimiento.concepto}`}
-          title="Eliminar movimiento"
-          className="shrink-0 rounded-xl p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {eliminando ? (
-            <LoaderCircle className="h-4 w-4 animate-spin" />
-          ) : (
-            <Trash2 className="h-4 w-4" />
-          )}
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              void onEliminar(
+                movimiento,
+              );
+            }}
+            disabled={
+              eliminando
+            }
+            aria-label={`Eliminar ${movimiento.concepto}`}
+            title="Eliminar movimiento"
+            className="shrink-0 rounded-xl p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {eliminando ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </button>
+        </div>
       </div>
     </article>
   );
 }
 
-/**
- * ============================================================
- * ESTADO VACÍO
- * ============================================================
- */
+function EmptyFilterState({
+  nombreFiltro,
+  onLimpiar,
+}: {
+  nombreFiltro:
+    string;
 
+  onLimpiar:
+    () => void;
+}) {
+  return (
+    <div className="mt-4 flex flex-col items-center justify-center rounded-3xl border border-dashed border-indigo-200 bg-indigo-50/40 px-6 py-8 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-indigo-400 shadow-sm">
+        <Filter className="h-6 w-6" />
+      </div>
+
+      <h3 className="mt-3 text-sm font-black text-slate-800">
+        No hay movimientos para{" "}
+        {nombreFiltro}
+      </h3>
+
+      <p className="mt-1 max-w-xs text-xs font-medium leading-relaxed text-slate-500">
+        No existen movimientos asociados a este filtro durante el periodo mostrado.
+      </p>
+
+      <button
+        type="button"
+        onClick={
+          onLimpiar
+        }
+        className="mt-4 rounded-xl bg-white px-4 py-2 text-xs font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50"
+      >
+        Mostrar todos
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Estado vacío cuando todavía no existen movimientos.
+ */
 function EmptyState() {
   return (
     <div className="mt-4 flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
@@ -634,3 +825,5 @@ function EmptyState() {
     </div>
   );
 }
+
+export default VariableMovementsSection;
