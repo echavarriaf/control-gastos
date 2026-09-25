@@ -1,5 +1,24 @@
 "use client";
 
+/*
+ * Nombre: Resumen de categorías variables
+ * Ruta: src/components/budget/CategorySummaryGrid.tsx
+ *
+ * Descripción:
+ * Muestra un resumen compacto de Comida y Gas.
+ *
+ * El detalle financiero completo de cada categoría permanece
+ * plegado por defecto para reducir la altura total del dashboard.
+ */
+
+import {
+  ChevronDown,
+} from "lucide-react";
+
+import {
+  useState,
+} from "react";
+
 import {
   CATEGORIAS_VARIABLES,
 } from "@/lib/budget/constants";
@@ -35,47 +54,209 @@ export function CategorySummaryGrid({
   limites,
   quincenaSeleccionada,
 }: CategorySummaryGridProps) {
+  const [
+    abierto,
+    setAbierto,
+  ] =
+    useState(
+      false,
+    );
+
   return (
     <section
       aria-labelledby="resumen-categorias-title"
-      className="space-y-3"
+      className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
     >
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-          Gastos variables
-        </p>
+      <div className="p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Gastos variables
+            </p>
 
-        <h2
-          id="resumen-categorias-title"
-          className="mt-1 text-lg font-black text-slate-900"
-        >
-          Comida y Gas
-        </h2>
-      </div>
+            <h2
+              id="resumen-categorias-title"
+              className="mt-0.5 text-base font-black text-slate-900"
+            >
+              Comida y Gas
+            </h2>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {resumenCategorias.map(
-          (
-            resumen,
-          ) => (
-            <CategoryCard
-              key={
-                resumen.key
-              }
-              resumen={
-                resumen
-              }
-              limiteMensual={
-                limites[
-                  resumen.key
-                ].mensual
-              }
-              quincenaSeleccionada={
+            <p className="mt-1 text-[10px] font-semibold text-slate-500">
+              Quincena{" "}
+              {
                 quincenaSeleccionada
               }
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              setAbierto(
+                (
+                  actual,
+                ) =>
+                  !actual,
+              )
+            }
+            aria-expanded={
+              abierto
+            }
+            aria-controls="category-summary-details"
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-slate-100 px-3 text-[10px] font-black text-slate-700 transition hover:bg-slate-200 active:scale-[0.98]"
+          >
+            {abierto
+              ? "Ocultar"
+              : "Detalles"}
+
+            <ChevronDown
+              className={`h-4 w-4 transition-transform duration-300 ${
+                abierto
+                  ? "rotate-180"
+                  : ""
+              }`}
             />
-          ),
-        )}
+          </button>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {resumenCategorias.map(
+            (
+              resumen,
+            ) => {
+              const configuracion =
+                CATEGORIAS_VARIABLES[
+                  resumen.key
+                ];
+
+              const Icono =
+                configuracion.icon;
+
+              return (
+                <div
+                  key={
+                    resumen.key
+                  }
+                  className={`rounded-2xl border p-3 ${configuracion.light} ${configuracion.border}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white ${configuracion.color}`}
+                    >
+                      <Icono className="h-4 w-4" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-black text-slate-900">
+                        {
+                          configuracion.label
+                        }
+                      </p>
+
+                      <p className="text-[8px] font-black uppercase tracking-wider text-slate-500">
+                        Disponible
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-end justify-between gap-2">
+                    <p
+                      className={`text-base font-black ${
+                        resumen
+                          .disponibleQuincena >=
+                        0
+                          ? "text-emerald-700"
+                          : "text-rose-700"
+                      }`}
+                    >
+                      {formatoMoneda.format(
+                        resumen
+                          .disponibleQuincena,
+                      )}
+                    </p>
+
+                    <span
+                      className={`rounded-full bg-white/80 px-2 py-1 text-[9px] font-black ${configuracion.text}`}
+                    >
+                      {resumen
+                        .porcentajeQuincena
+                        .toFixed(
+                          0,
+                        )}
+                      %
+                    </span>
+                  </div>
+
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/80">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${colorBarra(
+                        resumen
+                          .porcentajeQuincena,
+                      )}`}
+                      style={{
+                        width:
+                          `${anchoBarra(
+                            resumen
+                              .porcentajeQuincena,
+                          )}%`,
+                      }}
+                    />
+                  </div>
+
+                  {resumen
+                    .excedenteSiguiente >
+                    0 && (
+                    <p className="mt-2 truncate text-[9px] font-black text-rose-600">
+                      {formatoMoneda.format(
+                        resumen
+                          .excedenteSiguiente,
+                      )}{" "}
+                      de arrastre
+                    </p>
+                  )}
+                </div>
+              );
+            },
+          )}
+        </div>
+      </div>
+
+      <div
+        id="category-summary-details"
+        className={`grid transition-all duration-300 ease-out ${
+          abierto
+            ? "visible grid-rows-[1fr] opacity-100"
+            : "invisible grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="border-t border-slate-200 bg-slate-50/70 p-4 sm:p-5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {resumenCategorias.map(
+                (
+                  resumen,
+                ) => (
+                  <CategoryCard
+                    key={
+                      resumen.key
+                    }
+                    resumen={
+                      resumen
+                    }
+                    limiteMensual={
+                      limites[
+                        resumen.key
+                      ].mensual
+                    }
+                    quincenaSeleccionada={
+                      quincenaSeleccionada
+                    }
+                  />
+                ),
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -269,8 +450,7 @@ function CategoryCard({
             resumen
               .excedenteSiguiente,
           )}{" "}
-          pasarán a la próxima
-          quincena.
+          pasarán a la próxima quincena.
         </p>
       )}
     </article>
@@ -303,11 +483,9 @@ function Metric({
       <p
         className={`mt-1 text-base font-black ${valueClassName}`}
       >
-        {
-          formatoMoneda.format(
-            value,
-          )
-        }
+        {formatoMoneda.format(
+          value,
+        )}
       </p>
     </div>
   );

@@ -1,16 +1,29 @@
 "use client";
 
-import { CategorySummaryGrid } from "@/components/budget/CategorySummaryGrid";
-import { FeedbackBanners } from "@/components/budget/FeedbackBanners";
-import { IncomeCycleSummary } from "@/components/budget/IncomeCycleSummary";
+import {
+  CategorySummaryGrid,
+} from "@/components/budget/CategorySummaryGrid";
 
-import type { BudgetDashboardController } from "@/hooks/useBudgetDashboard";
+import {
+  FeedbackBanners,
+} from "@/components/budget/FeedbackBanners";
+
+import {
+  IncomeCycleSummary,
+} from "@/components/budget/IncomeCycleSummary";
+
+import type {
+  BudgetDashboardController,
+} from "@/hooks/useBudgetDashboard";
 
 interface BudgetOverviewProps {
-  dashboard: BudgetDashboardController;
+  dashboard:
+    BudgetDashboardController;
 }
 
-function BudgetOverview({ dashboard }: BudgetOverviewProps) {
+function BudgetOverview({
+  dashboard,
+}: BudgetOverviewProps) {
   const {
     actions,
     budget,
@@ -21,35 +34,78 @@ function BudgetOverview({ dashboard }: BudgetOverviewProps) {
     period,
     summary,
     visualAlerts,
-  } = dashboard;
+  } =
+    dashboard;
 
   return (
-    <>
+    <div className="space-y-3">
       <FeedbackBanners
-        error={feedbackError}
-        alertas={visualAlerts}
-        onCerrarError={actions.clearErrors}
+        error={
+          feedbackError
+        }
+        alertas={
+          visualAlerts
+        }
+        onCerrarError={
+          actions.clearErrors
+        }
       />
 
       <IncomeCycleSummary
-        montoEstimado={income.configuracion.montoEstimado}
-        cargando={income.cargando}
-        cicloActual={income.cicloActual}
-        proximoCiclo={income.proximoCiclo}
-        pagosMes={income.ciclosMesActual.length}
-        ingresoActual={currentCycleIncome}
-        cargandoIngreso={incomeTransactions.cargando}
-        guardandoIngreso={incomeTransactions.guardando}
-        onRegistrarDeposito={actions.openCurrentIncomeReceipt}
-        onConfigurar={actions.openIncomeSettings}
+        montoEstimado={
+          income
+            .configuracion
+            .montoEstimado
+        }
+        cargando={
+          income.cargando
+        }
+        cicloActual={
+          income.cicloActual
+        }
+        proximoCiclo={
+          income.proximoCiclo
+        }
+        pagosMes={
+          income
+            .ciclosMesActual
+            .length
+        }
+        ingresoActual={
+          currentCycleIncome
+        }
+        cargandoIngreso={
+          incomeTransactions
+            .cargando
+        }
+        guardandoIngreso={
+          incomeTransactions
+            .guardando
+        }
+        onRegistrarDeposito={
+          actions
+            .openCurrentIncomeReceipt
+        }
+        onConfigurar={
+          actions
+            .openIncomeSettings
+        }
       />
 
       <CategorySummaryGrid
-        resumenCategorias={summary.resumenCategorias}
-        limites={budget.limites}
-        quincenaSeleccionada={period.quincenaSeleccionada}
+        resumenCategorias={
+          summary
+            .resumenCategorias
+        }
+        limites={
+          budget.limites
+        }
+        quincenaSeleccionada={
+          period
+            .quincenaSeleccionada
+        }
       />
-    </>
+    </div>
   );
 }
 
