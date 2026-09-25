@@ -15,8 +15,8 @@
  * - fecha exacta;
  * - tarjeta + fecha simultáneamente.
  *
- * Conserva todas las tarjetas, incluso las inactivas, para
- * poder consultar correctamente movimientos históricos.
+ * Al cambiar filtros, los movimientos aparecen con una transición
+ * escalonada de opacidad y desplazamiento.
  */
 
 import {
@@ -89,6 +89,9 @@ interface MovementRowProps {
 
   eliminando:
     boolean;
+
+  indice:
+    number;
 
   onEliminar: (
     movimiento:
@@ -169,8 +172,6 @@ function obtenerEtiquetaPago(
 
 /**
  * Devuelve la categoría visible de un movimiento.
- *
- * Para gastos clasificados como "Otro", categoria puede ser null.
  */
 function obtenerCategoriaLabel(
   movimiento:
@@ -248,10 +249,6 @@ export function VariableMovementsSection({
       "",
     );
 
-  /**
-   * Conservamos también tarjetas inactivas porque pueden existir
-   * movimientos históricos asociados con ellas.
-   */
   const tarjetasOrdenadas =
     useMemo(
       () =>
@@ -302,10 +299,6 @@ export function VariableMovementsSection({
       ],
     );
 
-  /**
-   * Número total de movimientos pertenecientes a la quincena
-   * seleccionada antes de aplicar filtros secundarios.
-   */
   const movimientosQuincena =
     useMemo(
       () =>
@@ -324,9 +317,6 @@ export function VariableMovementsSection({
       ],
     );
 
-  /**
-   * Aplica tarjeta y fecha simultáneamente.
-   */
   const movimientosFiltrados =
     useMemo(
       () =>
@@ -379,6 +369,15 @@ export function VariableMovementsSection({
       filtroFecha,
     );
 
+  /**
+   * Esta llave cambia cada vez que cambia alguno de los filtros.
+   *
+   * React vuelve a montar únicamente la lista visual y permite
+   * reproducir la animación de entrada sin alterar los datos.
+   */
+  const claveAnimacion =
+    `${filtroTarjeta}-${filtroFecha}`;
+
   const limpiarFiltros =
     () => {
       setFiltroTarjeta(
@@ -391,235 +390,352 @@ export function VariableMovementsSection({
     };
 
   return (
-    <section
-      aria-labelledby="movimientos-title"
-      className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-            Historial mensual
-          </p>
+    <>
+      <section
+        aria-labelledby="movimientos-title"
+        className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+              Historial mensual
+            </p>
 
-          <h2
-            id="movimientos-title"
-            className="mt-1 text-lg font-black text-slate-900"
+            <h2
+              id="movimientos-title"
+              className="mt-1 text-lg font-black text-slate-900"
+            >
+              Movimientos variables
+            </h2>
+          </div>
+
+          <div
+            key={`contador-${claveAnimacion}`}
+            className="movimientos-contador rounded-2xl bg-slate-100 px-3 py-2 text-right"
           >
-            Movimientos variables
-          </h2>
+            <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">
+              {hayFiltros
+                ? "Mostrando"
+                : `Quincena ${quincenaSeleccionada}`}
+            </p>
+
+            <p className="mt-0.5 text-sm font-black text-slate-900">
+              {hayFiltros
+                ? movimientosFiltrados.length
+                : movimientosQuincena.length}
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl bg-slate-100 px-3 py-2 text-right">
-          <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">
-            {hayFiltros
-              ? "Mostrando"
-              : `Quincena ${quincenaSeleccionada}`}
-          </p>
+        {movimientos.length >
+          0 && (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-indigo-600" />
 
-          <p className="mt-0.5 text-sm font-black text-slate-900">
-            {hayFiltros
-              ? movimientosFiltrados.length
-              : movimientosQuincena.length}
-          </p>
-        </div>
-      </div>
+                <p className="text-xs font-black text-slate-700">
+                  Filtrar movimientos
+                </p>
+              </div>
 
-      {movimientos.length >
-        0 && (
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-indigo-600" />
+              {hayFiltros && (
+                <button
+                  type="button"
+                  onClick={
+                    limpiarFiltros
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-[10px] font-black text-indigo-600 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-50 active:translate-y-0 active:scale-[0.98]"
+                >
+                  <X className="h-3.5 w-3.5" />
 
-              <p className="text-xs font-black text-slate-700">
-                Filtrar movimientos
-              </p>
+                  Limpiar
+                </button>
+              )}
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                  <CreditCard className="h-3.5 w-3.5" />
+
+                  Tarjeta
+                </span>
+
+                <select
+                  value={
+                    filtroTarjeta
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setFiltroTarjeta(
+                      event
+                        .target
+                        .value,
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition duration-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option
+                    value={
+                      FILTRO_TODAS
+                    }
+                  >
+                    Todas las tarjetas
+                  </option>
+
+                  {tarjetasOrdenadas.map(
+                    (
+                      tarjeta,
+                    ) => (
+                      <option
+                        key={
+                          tarjeta.id
+                        }
+                        value={
+                          tarjeta.id
+                        }
+                      >
+                        {etiquetaTarjeta(
+                          tarjeta,
+                        )}
+                        {!tarjeta.activa
+                          ? " · Inactiva"
+                          : ""}
+                      </option>
+                    ),
+                  )}
+
+                  <option
+                    value={
+                      FILTRO_SIN_TARJETA
+                    }
+                  >
+                    Sin tarjeta / otros métodos
+                  </option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                  <CalendarDays className="h-3.5 w-3.5" />
+
+                  Fecha exacta
+                </span>
+
+                <input
+                  type="date"
+                  value={
+                    filtroFecha
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setFiltroFecha(
+                      event
+                        .target
+                        .value,
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition duration-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                />
+              </label>
             </div>
 
             {hayFiltros && (
-              <button
-                type="button"
-                onClick={
-                  limpiarFiltros
-                }
-                className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-[10px] font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50 active:scale-[0.98]"
+              <div
+                key={`chips-${claveAnimacion}`}
+                className="movimientos-filtros mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3"
               >
-                <X className="h-3.5 w-3.5" />
-
-                Limpiar
-              </button>
-            )}
-          </div>
-
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
-                <CreditCard className="h-3.5 w-3.5" />
-
-                Tarjeta
-              </span>
-
-              <select
-                value={
-                  filtroTarjeta
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setFiltroTarjeta(
-                    event
-                      .target
-                      .value,
-                  )
-                }
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              >
-                <option
-                  value={
-                    FILTRO_TODAS
-                  }
-                >
-                  Todas las tarjetas
-                </option>
-
-                {tarjetasOrdenadas.map(
-                  (
-                    tarjeta,
-                  ) => (
-                    <option
-                      key={
-                        tarjeta.id
-                      }
-                      value={
-                        tarjeta.id
-                      }
-                    >
-                      {etiquetaTarjeta(
-                        tarjeta,
-                      )}
-                      {!tarjeta.activa
-                        ? " · Inactiva"
-                        : ""}
-                    </option>
-                  ),
+                {filtroTarjeta !==
+                  FILTRO_TODAS && (
+                  <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black text-indigo-700">
+                    {filtroTarjeta ===
+                    FILTRO_SIN_TARJETA
+                      ? "Sin tarjeta"
+                      : tarjetasPorId.get(
+                            filtroTarjeta,
+                          )
+                        ? etiquetaTarjeta(
+                            tarjetasPorId.get(
+                              filtroTarjeta,
+                            )!,
+                          )
+                        : "Tarjeta"}
+                  </span>
                 )}
 
-                <option
-                  value={
-                    FILTRO_SIN_TARJETA
-                  }
-                >
-                  Sin tarjeta / otros métodos
-                </option>
-              </select>
-            </label>
+                {filtroFecha && (
+                  <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[9px] font-black text-sky-700">
+                    {fechaCorta(
+                      filtroFecha,
+                    )}
+                  </span>
+                )}
 
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
-                <CalendarDays className="h-3.5 w-3.5" />
-
-                Fecha exacta
-              </span>
-
-              <input
-                type="date"
-                value={
-                  filtroFecha
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setFiltroFecha(
-                    event
-                      .target
-                      .value,
-                  )
-                }
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              />
-            </label>
+                <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[9px] font-black text-slate-600">
+                  {
+                    movimientosFiltrados.length
+                  }{" "}
+                  {movimientosFiltrados.length ===
+                  1
+                    ? "movimiento"
+                    : "movimientos"}
+                </span>
+              </div>
+            )}
           </div>
+        )}
 
-          {hayFiltros && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
-              {filtroTarjeta !==
-                FILTRO_TODAS && (
-                <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black text-indigo-700">
-                  {filtroTarjeta ===
-                  FILTRO_SIN_TARJETA
-                    ? "Sin tarjeta"
-                    : tarjetasPorId.get(
-                          filtroTarjeta,
-                        )
-                      ? etiquetaTarjeta(
-                          tarjetasPorId.get(
-                            filtroTarjeta,
-                          )!,
-                        )
-                      : "Tarjeta"}
-                </span>
-              )}
-
-              {filtroFecha && (
-                <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[9px] font-black text-sky-700">
-                  {fechaCorta(
-                    filtroFecha,
-                  )}
-                </span>
-              )}
-
-              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[9px] font-black text-slate-600">
-                {
-                  movimientosFiltrados.length
-                }{" "}
-                {movimientosFiltrados.length ===
-                1
-                  ? "movimiento"
-                  : "movimientos"}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {movimientos.length ===
-      0 ? (
-        <EmptyState />
-      ) : movimientosFiltrados
-          .length ===
+        {movimientos.length ===
         0 ? (
-        <FilteredEmptyState
-          onLimpiar={
-            limpiarFiltros
+          <EmptyState />
+        ) : movimientosFiltrados
+            .length ===
+          0 ? (
+          <div
+            key={`vacio-${claveAnimacion}`}
+            className="movimientos-vacio"
+          >
+            <FilteredEmptyState
+              onLimpiar={
+                limpiarFiltros
+              }
+            />
+          </div>
+        ) : (
+          <div
+            key={
+              claveAnimacion
+            }
+            className="mt-4 space-y-2.5"
+          >
+            {movimientosFiltrados.map(
+              (
+                movimiento,
+                indice,
+              ) => (
+                <MovementRow
+                  key={`${movimiento.tipo}-${movimiento.id}`}
+                  movimiento={
+                    movimiento
+                  }
+                  indice={
+                    indice
+                  }
+                  tarjetasPorId={
+                    tarjetasPorId
+                  }
+                  eliminando={
+                    eliminandoMovimientoId ===
+                    `${movimiento.tipo}-${movimiento.id}`
+                  }
+                  onEliminar={
+                    onEliminar
+                  }
+                />
+              ),
+            )}
+          </div>
+        )}
+      </section>
+
+      <style jsx global>{`
+        @keyframes movimientoEntrada {
+          0% {
+            opacity: 0;
+            transform: translateY(12px) scale(0.985);
           }
-        />
-      ) : (
-        <div className="mt-4 space-y-2.5">
-          {movimientosFiltrados.map(
-            (
-              movimiento,
-            ) => (
-              <MovementRow
-                key={`${movimiento.tipo}-${movimiento.id}`}
-                movimiento={
-                  movimiento
-                }
-                tarjetasPorId={
-                  tarjetasPorId
-                }
-                eliminando={
-                  eliminandoMovimientoId ===
-                  `${movimiento.tipo}-${movimiento.id}`
-                }
-                onEliminar={
-                  onEliminar
-                }
-              />
-            ),
-          )}
-        </div>
-      )}
-    </section>
+
+          60% {
+            opacity: 1;
+          }
+
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        @keyframes movimientoContador {
+          0% {
+            opacity: 0.35;
+            transform: scale(0.94);
+          }
+
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+
+        @keyframes movimientoFiltro {
+          0% {
+            opacity: 0;
+            transform: translateY(-4px);
+          }
+
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes movimientoVacio {
+          0% {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .movimiento-fila {
+          opacity: 0;
+          animation-name: movimientoEntrada;
+          animation-duration: 360ms;
+          animation-timing-function: cubic-bezier(
+            0.22,
+            1,
+            0.36,
+            1
+          );
+          animation-fill-mode: forwards;
+          will-change: opacity, transform;
+        }
+
+        .movimientos-contador {
+          animation: movimientoContador 260ms
+            cubic-bezier(0.22, 1, 0.36, 1)
+            both;
+        }
+
+        .movimientos-filtros {
+          animation: movimientoFiltro 240ms ease-out
+            both;
+        }
+
+        .movimientos-vacio {
+          animation: movimientoVacio 280ms ease-out
+            both;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .movimiento-fila,
+          .movimientos-contador,
+          .movimientos-filtros,
+          .movimientos-vacio {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+          }
+        }
+      `}</style>
+    </>
   );
 }
 
@@ -630,6 +746,7 @@ function MovementRow({
   movimiento,
   tarjetasPorId,
   eliminando,
+  indice,
   onEliminar,
 }: MovementRowProps) {
   const esGasto =
@@ -663,10 +780,26 @@ function MovementRow({
         ""
       : "";
 
+  /**
+   * Máximo 8 pasos de delay para evitar que listas grandes
+   * tarden demasiado en terminar de aparecer.
+   */
+  const retraso =
+    Math.min(
+      indice,
+      8,
+    ) * 42;
+
   return (
-    <article className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 transition hover:border-slate-200 hover:bg-white">
+    <article
+      className="movimiento-fila flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 transition duration-200 hover:-translate-y-0.5 hover:border-slate-200 hover:bg-white hover:shadow-sm"
+      style={{
+        animationDelay:
+          `${retraso}ms`,
+      }}
+    >
       <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl transition-transform duration-200 ${
           esGasto
             ? "bg-rose-100 text-rose-600"
             : "bg-emerald-100 text-emerald-600"
@@ -759,7 +892,7 @@ function MovementRow({
             }
             aria-label={`Eliminar ${movimiento.concepto}`}
             title="Eliminar movimiento"
-            className="shrink-0 rounded-xl p-2 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 rounded-xl p-2 text-slate-400 transition duration-200 hover:bg-rose-50 hover:text-rose-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {eliminando ? (
               <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -823,7 +956,7 @@ function FilteredEmptyState({
         onClick={
           onLimpiar
         }
-        className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50"
+        className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-indigo-600 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-50"
       >
         <X className="h-3.5 w-3.5" />
 
