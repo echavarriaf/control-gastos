@@ -4,22 +4,19 @@
  * Nombre: Sección de movimientos variables
  * Ruta: src/components/budget/VariableMovementsSection.tsx
  * Autor: Felix Echavarria
- * Fecha: 2026-08-02
  *
  * Descripción:
  * Muestra el historial mensual de gastos y pagos variables.
  *
- * Cada movimiento presenta:
- * - categoría;
- * - fecha;
- * - quincena;
- * - monto;
- * - tarjeta o método utilizado.
- *
  * Permite filtrar los movimientos por:
+ *
  * - tarjeta utilizada;
+ * - movimientos sin tarjeta;
  * - fecha exacta;
- * - ambos criterios simultáneamente.
+ * - tarjeta + fecha simultáneamente.
+ *
+ * Conserva todas las tarjetas, incluso las inactivas, para
+ * poder consultar correctamente movimientos históricos.
  */
 
 import {
@@ -54,6 +51,12 @@ import {
   formatoMoneda,
   obtenerQuincenaDesdeISO,
 } from "@/lib/budget/utils";
+
+const FILTRO_TODAS =
+  "__todas__";
+
+const FILTRO_SIN_TARJETA =
+  "__sin_tarjeta__";
 
 interface VariableMovementsSectionProps {
   movimientos:
@@ -93,25 +96,20 @@ interface MovementRowProps {
   ) => void | Promise<void>;
 }
 
-const FILTRO_TODAS =
-  "__todas__";
-
-const FILTRO_SIN_TARJETA =
-  "__sin_tarjeta__";
-
-function obtenerFechaCalendario(
-  fecha: string,
+/**
+ * Construye la etiqueta visible de una tarjeta.
+ */
+function etiquetaTarjeta(
+  tarjeta:
+    TarjetaCredito,
 ): string {
-  return fecha
-    .slice(
-      0,
-      10,
-    );
+  return tarjeta.ultimosCuatro
+    ? `${tarjeta.nombre} · •••• ${tarjeta.ultimosCuatro}`
+    : tarjeta.nombre;
 }
 
 /**
- * Devuelve el nombre que debe aparecer para la tarjeta
- * o método usado en un movimiento.
+ * Devuelve el nombre de la tarjeta o método utilizado.
  */
 function obtenerEtiquetaPago(
   movimiento:
@@ -128,8 +126,7 @@ function obtenerEtiquetaPago(
   ) {
     const tarjeta =
       tarjetasPorId.get(
-        movimiento
-          .tarjetaId,
+        movimiento.tarjetaId,
       );
 
     if (
@@ -138,10 +135,9 @@ function obtenerEtiquetaPago(
       return "Tarjeta no encontrada";
     }
 
-    return tarjeta
-      .ultimosCuatro
-      ? `${tarjeta.nombre} · •••• ${tarjeta.ultimosCuatro}`
-      : tarjeta.nombre;
+    return etiquetaTarjeta(
+      tarjeta,
+    );
   }
 
   if (
@@ -172,12 +168,11 @@ function obtenerEtiquetaPago(
 }
 
 /**
- * Obtiene una etiqueta segura para la categoría.
+ * Devuelve la categoría visible de un movimiento.
  *
- * Un gasto de "Otro" puede tener categoria === null porque
- * deliberadamente no consume Comida ni Gas.
+ * Para gastos clasificados como "Otro", categoria puede ser null.
  */
-function obtenerEtiquetaCategoria(
+function obtenerCategoriaLabel(
   movimiento:
     Movimiento,
 ): string {
@@ -201,13 +196,9 @@ function obtenerEtiquetaCategoria(
     movimiento.categoria ===
     null
   ) {
-    const nombre =
-      movimiento
-        .categoriaTarjetaNombre
-        ?.trim();
-
     return (
-      nombre ||
+      movimiento
+        .categoriaTarjetaNombre ||
       "Otro"
     );
   }
@@ -217,16 +208,23 @@ function obtenerEtiquetaCategoria(
   ].label;
 }
 
-function etiquetaTarjetaFiltro(
-  tarjeta:
-    TarjetaCredito,
+/**
+ * Obtiene YYYY-MM-DD desde la fecha del movimiento.
+ */
+function obtenerFechaMovimiento(
+  movimiento:
+    Movimiento,
 ): string {
-  return tarjeta
-    .ultimosCuatro
-    ? `${tarjeta.nombre} · •••• ${tarjeta.ultimosCuatro}`
-    : tarjeta.nombre;
+  return movimiento.fecha
+    .slice(
+      0,
+      10,
+    );
 }
 
+/**
+ * Historial completo de movimientos variables.
+ */
 export function VariableMovementsSection({
   movimientos,
   tarjetas,
@@ -250,6 +248,42 @@ export function VariableMovementsSection({
       "",
     );
 
+  /**
+   * Conservamos también tarjetas inactivas porque pueden existir
+   * movimientos históricos asociados con ellas.
+   */
+  const tarjetasOrdenadas =
+    useMemo(
+      () =>
+        [...tarjetas].sort(
+          (
+            a,
+            b,
+          ) => {
+            if (
+              a.activa !==
+              b.activa
+            ) {
+              return a.activa
+                ? -1
+                : 1;
+            }
+
+            return a.nombre.localeCompare(
+              b.nombre,
+              "es",
+              {
+                sensitivity:
+                  "base",
+              },
+            );
+          },
+        ),
+      [
+        tarjetas,
+      ],
+    );
+
   const tarjetasPorId =
     useMemo(
       () =>
@@ -269,93 +303,29 @@ export function VariableMovementsSection({
     );
 
   /**
-   * Solo muestra en el selector tarjetas que realmente
-   * tengan movimientos dentro del periodo recibido.
+   * Número total de movimientos pertenecientes a la quincena
+   * seleccionada antes de aplicar filtros secundarios.
    */
-  const tarjetasUsadasIds =
+  const movimientosQuincena =
     useMemo(
       () =>
-        new Set(
-          movimientos
-            .map(
-              (
-                movimiento,
-              ) =>
-                movimiento
-                  .tarjetaId,
-            )
-            .filter(
-              (
-                tarjetaId,
-              ): tarjetaId is string =>
-                typeof tarjetaId ===
-                  "string" &&
-                tarjetaId.length >
-                  0,
-            ),
-        ),
-      [
-        movimientos,
-      ],
-    );
-
-  const tarjetasFiltro =
-    useMemo(
-      () =>
-        tarjetas
-          .filter(
-            (
-              tarjeta,
-            ) =>
-              tarjetasUsadasIds.has(
-                tarjeta.id,
-              ),
-          )
-          .sort(
-            (
-              a,
-              b,
-            ) =>
-              a.nombre.localeCompare(
-                b.nombre,
-                "es",
-                {
-                  sensitivity:
-                    "base",
-                },
-              ),
-          ),
-      [
-        tarjetas,
-        tarjetasUsadasIds,
-      ],
-    );
-
-  const hayMovimientosSinTarjeta =
-    useMemo(
-      () =>
-        movimientos.some(
+        movimientos.filter(
           (
             movimiento,
           ) =>
-            !movimiento
-              .tarjetaId,
+            obtenerQuincenaDesdeISO(
+              movimiento.fecha,
+            ) ===
+            quincenaSeleccionada,
         ),
       [
         movimientos,
+        quincenaSeleccionada,
       ],
     );
 
   /**
-   * FILTROS COMBINADOS
-   *
-   * El movimiento debe cumplir:
-   *
-   * tarjeta seleccionada
-   * Y
-   * fecha seleccionada
-   *
-   * cuando ambos filtros están activos.
+   * Aplica tarjeta y fecha simultáneamente.
    */
   const movimientosFiltrados =
     useMemo(
@@ -367,35 +337,27 @@ export function VariableMovementsSection({
             let coincideTarjeta =
               true;
 
-            let coincideFecha =
-              true;
-
             if (
               filtroTarjeta ===
               FILTRO_SIN_TARJETA
             ) {
               coincideTarjeta =
-                !movimiento
-                  .tarjetaId;
+                !movimiento.tarjetaId;
             } else if (
               filtroTarjeta !==
               FILTRO_TODAS
             ) {
               coincideTarjeta =
-                movimiento
-                  .tarjetaId ===
+                movimiento.tarjetaId ===
                 filtroTarjeta;
             }
 
-            if (
-              filtroFecha
-            ) {
-              coincideFecha =
-                obtenerFechaCalendario(
-                  movimiento.fecha,
-                ) ===
+            const coincideFecha =
+              !filtroFecha ||
+              obtenerFechaMovimiento(
+                movimiento,
+              ) ===
                 filtroFecha;
-            }
 
             return (
               coincideTarjeta &&
@@ -410,65 +372,11 @@ export function VariableMovementsSection({
       ],
     );
 
-  const movimientosQuincena =
-    useMemo(
-      () =>
-        movimientosFiltrados.filter(
-          (
-            movimiento,
-          ) =>
-            obtenerQuincenaDesdeISO(
-              movimiento.fecha,
-            ) ===
-            quincenaSeleccionada,
-        ),
-      [
-        movimientosFiltrados,
-        quincenaSeleccionada,
-      ],
-    );
-
-  const hayFiltroTarjeta =
+  const hayFiltros =
     filtroTarjeta !==
-    FILTRO_TODAS;
-
-  const hayFiltroFecha =
+      FILTRO_TODAS ||
     Boolean(
       filtroFecha,
-    );
-
-  const hayFiltros =
-    hayFiltroTarjeta ||
-    hayFiltroFecha;
-
-  const nombreFiltroTarjeta =
-    useMemo(
-      () => {
-        if (
-          filtroTarjeta ===
-          FILTRO_TODAS
-        ) {
-          return "Todas";
-        }
-
-        if (
-          filtroTarjeta ===
-          FILTRO_SIN_TARJETA
-        ) {
-          return "Sin tarjeta";
-        }
-
-        return (
-          tarjetasPorId.get(
-            filtroTarjeta,
-          )?.nombre ??
-          "Tarjeta"
-        );
-      },
-      [
-        filtroTarjeta,
-        tarjetasPorId,
-      ],
     );
 
   const limpiarFiltros =
@@ -503,17 +411,15 @@ export function VariableMovementsSection({
 
         <div className="rounded-2xl bg-slate-100 px-3 py-2 text-right">
           <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">
-            Quincena{" "}
-            {
-              quincenaSeleccionada
-            }
+            {hayFiltros
+              ? "Mostrando"
+              : `Quincena ${quincenaSeleccionada}`}
           </p>
 
           <p className="mt-0.5 text-sm font-black text-slate-900">
-            {
-              movimientosQuincena
-                .length
-            }
+            {hayFiltros
+              ? movimientosFiltrados.length
+              : movimientosQuincena.length}
           </p>
         </div>
       </div>
@@ -521,21 +427,13 @@ export function VariableMovementsSection({
       {movimientos.length >
         0 && (
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm">
-                <Filter className="h-4 w-4" />
-              </div>
+              <Filter className="h-4 w-4 text-indigo-600" />
 
-              <div>
-                <p className="text-xs font-black text-slate-700">
-                  Filtrar movimientos
-                </p>
-
-                <p className="text-[10px] font-semibold text-slate-400">
-                  Combina tarjeta y fecha
-                </p>
-              </div>
+              <p className="text-xs font-black text-slate-700">
+                Filtrar movimientos
+              </p>
             </div>
 
             {hayFiltros && (
@@ -544,7 +442,7 @@ export function VariableMovementsSection({
                 onClick={
                   limpiarFiltros
                 }
-                className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-[10px] font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-[10px] font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50 active:scale-[0.98]"
               >
                 <X className="h-3.5 w-3.5" />
 
@@ -553,22 +451,15 @@ export function VariableMovementsSection({
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {/*
-             * FILTRO POR TARJETA
-             */}
-            <div>
-              <label
-                htmlFor="filtro-tarjeta-movimientos"
-                className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500"
-              >
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
                 <CreditCard className="h-3.5 w-3.5" />
 
                 Tarjeta
-              </label>
+              </span>
 
               <select
-                id="filtro-tarjeta-movimientos"
                 value={
                   filtroTarjeta
                 }
@@ -591,7 +482,7 @@ export function VariableMovementsSection({
                   Todas las tarjetas
                 </option>
 
-                {tarjetasFiltro.map(
+                {tarjetasOrdenadas.map(
                   (
                     tarjeta,
                   ) => (
@@ -603,40 +494,34 @@ export function VariableMovementsSection({
                         tarjeta.id
                       }
                     >
-                      {etiquetaTarjetaFiltro(
+                      {etiquetaTarjeta(
                         tarjeta,
                       )}
+                      {!tarjeta.activa
+                        ? " · Inactiva"
+                        : ""}
                     </option>
                   ),
                 )}
 
-                {hayMovimientosSinTarjeta && (
-                  <option
-                    value={
-                      FILTRO_SIN_TARJETA
-                    }
-                  >
-                    Sin tarjeta / débito / efectivo
-                  </option>
-                )}
+                <option
+                  value={
+                    FILTRO_SIN_TARJETA
+                  }
+                >
+                  Sin tarjeta / otros métodos
+                </option>
               </select>
-            </div>
+            </label>
 
-            {/*
-             * FILTRO POR FECHA
-             */}
-            <div>
-              <label
-                htmlFor="filtro-fecha-movimientos"
-                className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500"
-              >
+            <label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
                 <CalendarDays className="h-3.5 w-3.5" />
 
-                Fecha
-              </label>
+                Fecha exacta
+              </span>
 
               <input
-                id="filtro-fecha-movimientos"
                 type="date"
                 value={
                   filtroFecha
@@ -652,45 +537,46 @@ export function VariableMovementsSection({
                 }
                 className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               />
-            </div>
+            </label>
           </div>
 
           {hayFiltros && (
-            <div className="mt-3 border-t border-slate-200 pt-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[10px] font-semibold text-slate-500">
-                  Mostrando{" "}
-                  <span className="font-black text-slate-800">
-                    {
-                      movimientosFiltrados
-                        .length
-                    }
-                  </span>{" "}
-                  de{" "}
-                  {
-                    movimientos.length
-                  }{" "}
-                  movimientos
-                </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+              {filtroTarjeta !==
+                FILTRO_TODAS && (
+                <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-[9px] font-black text-indigo-700">
+                  {filtroTarjeta ===
+                  FILTRO_SIN_TARJETA
+                    ? "Sin tarjeta"
+                    : tarjetasPorId.get(
+                          filtroTarjeta,
+                        )
+                      ? etiquetaTarjeta(
+                          tarjetasPorId.get(
+                            filtroTarjeta,
+                          )!,
+                        )
+                      : "Tarjeta"}
+                </span>
+              )}
 
-                <div className="flex flex-wrap gap-1.5">
-                  {hayFiltroTarjeta && (
-                    <span className="rounded-full bg-indigo-100 px-2 py-1 text-[9px] font-black text-indigo-700">
-                      {
-                        nombreFiltroTarjeta
-                      }
-                    </span>
+              {filtroFecha && (
+                <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[9px] font-black text-sky-700">
+                  {fechaCorta(
+                    filtroFecha,
                   )}
+                </span>
+              )}
 
-                  {hayFiltroFecha && (
-                    <span className="rounded-full bg-sky-100 px-2 py-1 text-[9px] font-black text-sky-700">
-                      {fechaCorta(
-                        `${filtroFecha}T12:00:00`,
-                      )}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-[9px] font-black text-slate-600">
+                {
+                  movimientosFiltrados.length
+                }{" "}
+                {movimientosFiltrados.length ===
+                1
+                  ? "movimiento"
+                  : "movimientos"}
+              </span>
             </div>
           )}
         </div>
@@ -702,7 +588,7 @@ export function VariableMovementsSection({
       ) : movimientosFiltrados
           .length ===
         0 ? (
-        <EmptyFilterState
+        <FilteredEmptyState
           onLimpiar={
             limpiarFiltros
           }
@@ -737,6 +623,9 @@ export function VariableMovementsSection({
   );
 }
 
+/**
+ * Fila individual del historial.
+ */
 function MovementRow({
   movimiento,
   tarjetasPorId,
@@ -753,7 +642,7 @@ function MovementRow({
     );
 
   const categoriaLabel =
-    obtenerEtiquetaCategoria(
+    obtenerCategoriaLabel(
       movimiento,
     );
 
@@ -767,6 +656,12 @@ function MovementRow({
     esGasto
       ? ArrowDownCircle
       : ArrowUpCircle;
+
+  const comentario =
+    esGasto
+      ? movimiento.comentario?.trim() ??
+        ""
+      : "";
 
   return (
     <article className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 transition hover:border-slate-200 hover:bg-white">
@@ -794,26 +689,22 @@ function MovementRow({
             </h3>
 
             <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-              {categoriaLabel}
+              {
+                categoriaLabel
+              }
               {" · "}
               {fechaCorta(
                 movimiento.fecha,
               )}
             </p>
 
-            {esGasto &&
-              movimiento
-                .categoria ===
-                null &&
-              movimiento
-                .comentario && (
-                <p className="mt-1 line-clamp-2 text-[10px] font-medium leading-relaxed text-slate-400">
-                  {
-                    movimiento
-                      .comentario
-                  }
-                </p>
-              )}
+            {comentario && (
+              <p className="mt-1 line-clamp-2 text-[10px] font-medium leading-relaxed text-slate-400">
+                {
+                  comentario
+                }
+              </p>
+            )}
           </div>
 
           <p
@@ -837,7 +728,9 @@ function MovementRow({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black uppercase tracking-wider text-slate-500">
               Quincena{" "}
-              {quincena}
+              {
+                quincena
+              }
             </span>
 
             <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-black text-indigo-700">
@@ -847,7 +740,9 @@ function MovementRow({
               />
 
               <span className="truncate">
-                {etiquetaPago}
+                {
+                  etiquetaPago
+                }
               </span>
             </span>
           </div>
@@ -878,41 +773,9 @@ function MovementRow({
   );
 }
 
-function EmptyFilterState({
-  onLimpiar,
-}: {
-  onLimpiar:
-    () => void;
-}) {
-  return (
-    <div className="mt-4 flex flex-col items-center justify-center rounded-3xl border border-dashed border-indigo-200 bg-indigo-50/40 px-6 py-8 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-indigo-400 shadow-sm">
-        <Filter className="h-6 w-6" />
-      </div>
-
-      <h3 className="mt-3 text-sm font-black text-slate-800">
-        No hay movimientos
-      </h3>
-
-      <p className="mt-1 max-w-xs text-xs font-medium leading-relaxed text-slate-500">
-        Ningún movimiento coincide con la tarjeta y fecha seleccionadas.
-      </p>
-
-      <button
-        type="button"
-        onClick={
-          onLimpiar
-        }
-        className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50"
-      >
-        <X className="h-3.5 w-3.5" />
-
-        Limpiar filtros
-      </button>
-    </div>
-  );
-}
-
+/**
+ * Estado vacío cuando el mes no contiene movimientos.
+ */
 function EmptyState() {
   return (
     <div className="mt-4 flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
@@ -931,4 +794,41 @@ function EmptyState() {
   );
 }
 
-export default VariableMovementsSection;
+/**
+ * Estado vacío cuando existen movimientos pero ninguno coincide
+ * con los filtros seleccionados.
+ */
+function FilteredEmptyState({
+  onLimpiar,
+}: {
+  onLimpiar:
+    () => void;
+}) {
+  return (
+    <div className="mt-4 flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm">
+        <Filter className="h-6 w-6" />
+      </div>
+
+      <h3 className="mt-3 text-sm font-black text-slate-800">
+        No hay coincidencias
+      </h3>
+
+      <p className="mt-1 max-w-xs text-xs font-medium leading-relaxed text-slate-500">
+        No existen movimientos que coincidan con la tarjeta y fecha seleccionadas.
+      </p>
+
+      <button
+        type="button"
+        onClick={
+          onLimpiar
+        }
+        className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-indigo-600 shadow-sm transition hover:bg-indigo-50"
+      >
+        <X className="h-3.5 w-3.5" />
+
+        Limpiar filtros
+      </button>
+    </div>
+  );
+}
