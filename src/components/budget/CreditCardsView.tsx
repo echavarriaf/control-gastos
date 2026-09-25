@@ -1,5 +1,4 @@
 "use client";
-
 /*
  * Nombre: Vista financiera de tarjetas
  * Ruta: src/components/budget/CreditCardsView.tsx
@@ -33,12 +32,12 @@
  * y muestra un PAGO ADICIONAL cuando queda deuda
  * nueva antes del corte.
  */
-
 import {
   AlertTriangle,
   CalendarCheck2,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   CircleDollarSign,
   Clock3,
   CreditCard,
@@ -249,22 +248,6 @@ export function CreditCardsView({
   const fechaReferencia =
     useFechaReferenciaActual();
 
-  /**
-   * ============================================================
-   * 1C.2E + 1C.2G
-   * ALERTAS ACTIVAS
-   * ============================================================
-   *
-   * Cada tarjeta puede tener:
-   *
-   * - pago principal pendiente;
-   *
-   * o
-   *
-   * - pago principal cubierto + pago adicional pendiente.
-   *
-   * Nunca mostramos ambos al mismo tiempo.
-   */
   const alertasPago =
     useMemo(
       () =>
@@ -287,11 +270,6 @@ export function CreditCardsView({
                 fechaReferencia,
               );
 
-            /**
-             * ==================================================
-             * PAGO PRINCIPAL
-             * ==================================================
-             */
             if (
               !corteCubierto
             ) {
@@ -337,12 +315,6 @@ export function CreditCardsView({
               return [];
             }
 
-            /**
-             * ==================================================
-             * 1C.2G
-             * PAGO ADICIONAL
-             * ==================================================
-             */
             if (
               !requierePagoAdicionalAntesCorte ||
               saldoAdicionalAntesCorte <=
@@ -563,11 +535,6 @@ export function CreditCardsView({
   );
 }
 
-/**
- * ============================================================
- * RESUMEN GENERAL DE ALERTAS
- * ============================================================
- */
 function ResumenAlertasPago({
   alertas,
   total,
@@ -868,9 +835,6 @@ function EstadoVentanaPago({
   }
 }
 
-/**
- * 1C.2F
- */
 function EstadoCoberturaCorte({
   resumen,
 }: {
@@ -949,12 +913,6 @@ function EstadoCoberturaCorte({
   );
 }
 
-/**
- * ============================================================
- * 1C.2G
- * ACTIVIDAD POSTERIOR
- * ============================================================
- */
 function ActividadPosteriorCobertura({
   resumen,
 }: {
@@ -1079,31 +1037,27 @@ function CreditCardSummaryCard({
   resumen,
   fechaReferencia,
 }: CreditCardSummaryCardProps) {
+  const [
+    abierta,
+    setAbierta,
+  ] =
+    useState(
+      false,
+    );
+
   const {
     tarjeta,
-
     comprasDesdeSaldo,
-
     pagosDesdeSaldo,
-
     saldoActual,
-
     creditoAFavor,
-
     montoPagoTotal,
-
     creditoDisponible,
-
     porcentajeUtilizado,
-
     saldoAlInicioVentana,
-
     montoObjetivoVentana,
-
     corteCubierto,
-
     saldoAdicionalAntesCorte,
-
     requierePagoAdicionalAntesCorte,
   } =
     resumen;
@@ -1117,9 +1071,7 @@ function CreditCardSummaryCard({
   const evaluacionVentana =
     evaluarVentanaPagoTarjeta({
       calendario,
-
       montoPagoTotal,
-
       activa:
         tarjeta.activa,
     });
@@ -1127,10 +1079,8 @@ function CreditCardSummaryCard({
   const evaluacionAdicional =
     evaluarVentanaPagoTarjeta({
       calendario,
-
       montoPagoTotal:
         saldoAdicionalAntesCorte,
-
       activa:
         tarjeta.activa,
     });
@@ -1201,548 +1151,605 @@ function CreditCardSummaryCard({
                 : "border-slate-200 opacity-65"
       }`}
     >
-      <div className="bg-gradient-to-br from-slate-900 to-indigo-950 p-5 text-white">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-lg font-black">
-                {
-                  tarjeta.nombre
-                }
-              </h3>
-
-              <span
-                className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${
-                  tarjeta.activa
-                    ? "bg-emerald-400/20 text-emerald-200"
-                    : "bg-white/10 text-slate-300"
-                }`}
-              >
-                {tarjeta.activa
-                  ? "Activa"
-                  : "Inactiva"}
-              </span>
-
-              {corteCubierto && (
-                <span className="rounded-full bg-emerald-400 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-950">
-                  Principal cubierto
-                </span>
-              )}
-
-              {debePagarPrincipal && (
-                <span
-                  className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${
-                    corteHoyPrincipal
-                      ? "bg-rose-500 text-white"
-                      : "bg-amber-400 text-slate-950"
-                  }`}
-                >
-                  {corteHoyPrincipal
-                    ? "Pagar hoy"
-                    : "Pagar ahora"}
-                </span>
-              )}
-
-              {debePagarAdicional && (
-                <span
-                  className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-wider ${
-                    corteHoyAdicional
-                      ? "bg-rose-500 text-white"
-                      : "bg-indigo-300 text-indigo-950"
-                  }`}
-                >
-                  Pago adicional
-                </span>
-              )}
+      <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white">
+        <button
+          type="button"
+          onClick={() =>
+            setAbierta(
+              (
+                actual,
+              ) =>
+                !actual,
+            )
+          }
+          aria-expanded={
+            abierta
+          }
+          aria-controls={`tarjeta-detalle-${tarjeta.id}`}
+          className="w-full p-4 text-left transition hover:bg-white/[0.03] active:bg-white/[0.05] sm:p-5"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+              <CreditCard className="h-5 w-5 text-indigo-200" />
             </div>
 
-            <p className="mt-1 text-xs font-semibold text-slate-300">
-              {tarjeta
-                .ultimosCuatro
-                ? `•••• ${tarjeta.ultimosCuatro}`
-                : "Número no registrado"}
-            </p>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="truncate text-base font-black sm:text-lg">
+                  {
+                    tarjeta.nombre
+                  }
+                </h3>
+
+                <span
+                  className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wider ${
+                    tarjeta.activa
+                      ? "bg-emerald-400/20 text-emerald-200"
+                      : "bg-white/10 text-slate-300"
+                  }`}
+                >
+                  {tarjeta.activa
+                    ? "Activa"
+                    : "Inactiva"}
+                </span>
+
+                {corteCubierto && (
+                  <span className="rounded-full bg-emerald-400 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-emerald-950">
+                    Principal cubierto
+                  </span>
+                )}
+
+                {debePagarPrincipal && (
+                  <span
+                    className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wider ${
+                      corteHoyPrincipal
+                        ? "bg-rose-500 text-white"
+                        : "bg-amber-400 text-slate-950"
+                    }`}
+                  >
+                    {corteHoyPrincipal
+                      ? "Pagar hoy"
+                      : "Pagar ahora"}
+                  </span>
+                )}
+
+                {debePagarAdicional && (
+                  <span
+                    className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wider ${
+                      corteHoyAdicional
+                        ? "bg-rose-500 text-white"
+                        : "bg-indigo-300 text-indigo-950"
+                    }`}
+                  >
+                    Pago adicional
+                  </span>
+                )}
+              </div>
+
+              <p className="mt-1 text-[10px] font-semibold text-slate-300">
+                {tarjeta
+                  .ultimosCuatro
+                  ? `•••• ${tarjeta.ultimosCuatro}`
+                  : "Número no registrado"}
+              </p>
+
+              <div className="mt-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+                <div>
+                  <p className="text-[8px] font-black uppercase tracking-[0.16em] text-indigo-300">
+                    Saldo actual
+                  </p>
+
+                  <p className="mt-0.5 text-2xl font-black tracking-tight">
+                    {formatoMoneda.format(
+                      saldoActual,
+                    )}
+                  </p>
+
+                  {creditoAFavor >
+                    0 && (
+                    <p className="mt-0.5 text-[10px] font-bold text-emerald-300">
+                      Crédito a favor:{" "}
+                      {formatoMoneda.format(
+                        creditoAFavor,
+                      )}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">
+                    Próximo corte
+                  </p>
+
+                  <p className="mt-0.5 text-xs font-black text-white">
+                    {formatearFechaTarjeta(
+                      calendario
+                        .fechaCorte,
+                    )}
+                  </p>
+
+                  <p className="mt-0.5 text-[9px] font-semibold text-slate-400">
+                    {calendario
+                      .diasHastaCorte ===
+                    0
+                      ? "Corte hoy"
+                      : `En ${calendario.diasHastaCorte} día${
+                          calendario.diasHastaCorte ===
+                          1
+                            ? ""
+                            : "s"
+                        }`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] font-semibold text-slate-400">
+                <span>
+                  Vence día{" "}
+                  {
+                    tarjeta.diaPago
+                  }
+                </span>
+
+                <span>
+                  {
+                    obtenerEtiquetaEstrategia(
+                      tarjeta
+                        .estrategiaPago,
+                    )
+                  }
+                </span>
+
+                {requiereAccion && (
+                  <span
+                    className={
+                      corteHoyPrincipal ||
+                      corteHoyAdicional
+                        ? "font-black text-rose-300"
+                        : "font-black text-amber-300"
+                    }
+                  >
+                    {debePagarAdicional
+                      ? `Adicional ${formatoMoneda.format(
+                          saldoAdicionalAntesCorte,
+                        )}`
+                      : `Pagar ${formatoMoneda.format(
+                          montoPagoTotal,
+                        )}`}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-indigo-100">
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-300 ${
+                  abierta
+                    ? "rotate-180"
+                    : ""
+                }`}
+              />
+            </div>
           </div>
-
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-            <CreditCard className="h-5 w-5 text-indigo-200" />
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-300">
-            Saldo actual
-          </p>
-
-          <p className="mt-1 text-3xl font-black tracking-tight">
-            {formatoMoneda.format(
-              saldoActual,
-            )}
-          </p>
-
-          {creditoAFavor >
-            0 && (
-            <p className="mt-1 text-xs font-bold text-emerald-300">
-              Crédito a favor:{" "}
-              {formatoMoneda.format(
-                creditoAFavor,
-              )}
-            </p>
-          )}
-        </div>
-
-        <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[11px] font-semibold text-slate-300">
-          <span>
-            Corte configurado: día{" "}
-            {
-              tarjeta.diaCorte
-            }
-          </span>
-
-          <span>
-            Vencimiento: día{" "}
-            {
-              tarjeta.diaPago
-            }
-          </span>
-
-          <span>
-            {
-              obtenerEtiquetaEstrategia(
-                tarjeta
-                  .estrategiaPago,
-              )
-            }
-          </span>
-        </div>
+        </button>
       </div>
 
-      <div className="p-5">
-        {/*
-         * ======================================================
-         * PAGO PRINCIPAL
-         * ======================================================
-         */}
-        {debePagarPrincipal && (
-          <div
-            aria-live="polite"
-            className={`mb-4 rounded-3xl border p-4 ${
-              corteHoyPrincipal
-                ? "border-rose-300 bg-rose-50"
-                : "border-amber-300 bg-amber-50"
-            }`}
-          >
-            <div className="flex items-start gap-3">
+      <div
+        id={`tarjeta-detalle-${tarjeta.id}`}
+        className={`grid transition-all duration-300 ease-out ${
+          abierta
+            ? "visible grid-rows-[1fr] opacity-100"
+            : "invisible grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="p-5">
+            {debePagarPrincipal && (
               <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                aria-live="polite"
+                className={`mb-4 rounded-3xl border p-4 ${
                   corteHoyPrincipal
-                    ? "bg-rose-600 text-white"
-                    : "bg-amber-400 text-slate-950"
+                    ? "border-rose-300 bg-rose-50"
+                    : "border-amber-300 bg-amber-50"
                 }`}
               >
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`text-[10px] font-black uppercase tracking-[0.18em] ${
-                    corteHoyPrincipal
-                      ? "text-rose-600"
-                      : "text-amber-700"
-                  }`}
-                >
-                  {corteHoyPrincipal
-                    ? "Pagar hoy"
-                    : "Pagar ahora"}
-                </p>
-
-                <p className="mt-1 text-3xl font-black text-slate-950">
-                  {formatoMoneda.format(
-                    montoPagoTotal,
-                  )}
-                </p>
-
-                <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-700">
-                  Paga el saldo principal antes del corte del{" "}
-                  {formatearFechaTarjeta(
-                    calendario
-                      .fechaCorte,
-                  )}
-                  .
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/*
-         * ======================================================
-         * 1C.2G
-         * ALERTA ADICIONAL
-         * ======================================================
-         */}
-        {debePagarAdicional && (
-          <div
-            aria-live="polite"
-            className={`mb-4 rounded-3xl border p-4 ${
-              corteHoyAdicional
-                ? "border-rose-300 bg-rose-50"
-                : "border-indigo-300 bg-indigo-50"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-                  corteHoyAdicional
-                    ? "bg-rose-600 text-white"
-                    : "bg-indigo-600 text-white"
-                }`}
-              >
-                <PlusCircle className="h-5 w-5" />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`text-[10px] font-black uppercase tracking-[0.18em] ${
-                    corteHoyAdicional
-                      ? "text-rose-600"
-                      : "text-indigo-700"
-                  }`}
-                >
-                  {corteHoyAdicional
-                    ? "Pago adicional hoy"
-                    : "Pago adicional antes del corte"}
-                </p>
-
-                <p className="mt-1 text-3xl font-black text-slate-950">
-                  {formatoMoneda.format(
-                    saldoAdicionalAntesCorte,
-                  )}
-                </p>
-
-                <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-700">
-                  El pago principal ya está cubierto. Este monto corresponde
-                  a compras posteriores y debe pagarse antes del corte del{" "}
-                  {formatearFechaTarjeta(
-                    calendario
-                      .fechaCorte,
-                  )}
-                  .
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/*
-         * ======================================================
-         * CALENDARIO
-         * ======================================================
-         */}
-        <div className="rounded-3xl border border-indigo-100 bg-indigo-50/70 p-4">
-          <div className="flex items-center gap-2">
-            <CalendarClock className="h-4 w-4 text-indigo-600" />
-
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">
-              Calendario de pago
-            </p>
-          </div>
-
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl bg-white p-3 shadow-sm">
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                Próximo corte
-              </p>
-
-              <p className="mt-1 text-sm font-black text-slate-900">
-                {formatearFechaTarjeta(
-                  calendario
-                    .fechaCorte,
-                )}
-              </p>
-
-              <p className="mt-1 text-[10px] font-semibold text-slate-500">
-                {calendario
-                  .diasHastaCorte ===
-                0
-                  ? "El corte es hoy"
-                  : `En ${calendario.diasHastaCorte} día${
-                      calendario.diasHastaCorte ===
-                      1
-                        ? ""
-                        : "s"
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                      corteHoyPrincipal
+                        ? "bg-rose-600 text-white"
+                        : "bg-amber-400 text-slate-950"
                     }`}
-              </p>
+                  >
+                    <AlertTriangle className="h-5 w-5" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`text-[10px] font-black uppercase tracking-[0.18em] ${
+                        corteHoyPrincipal
+                          ? "text-rose-600"
+                          : "text-amber-700"
+                      }`}
+                    >
+                      {corteHoyPrincipal
+                        ? "Pagar hoy"
+                        : "Pagar ahora"}
+                    </p>
+
+                    <p className="mt-1 text-3xl font-black text-slate-950">
+                      {formatoMoneda.format(
+                        montoPagoTotal,
+                      )}
+                    </p>
+
+                    <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-700">
+                      Paga el saldo principal antes del corte del{" "}
+                      {formatearFechaTarjeta(
+                        calendario
+                          .fechaCorte,
+                      )}
+                      .
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {debePagarAdicional && (
+              <div
+                aria-live="polite"
+                className={`mb-4 rounded-3xl border p-4 ${
+                  corteHoyAdicional
+                    ? "border-rose-300 bg-rose-50"
+                    : "border-indigo-300 bg-indigo-50"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                      corteHoyAdicional
+                        ? "bg-rose-600 text-white"
+                        : "bg-indigo-600 text-white"
+                    }`}
+                  >
+                    <PlusCircle className="h-5 w-5" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`text-[10px] font-black uppercase tracking-[0.18em] ${
+                        corteHoyAdicional
+                          ? "text-rose-600"
+                          : "text-indigo-700"
+                      }`}
+                    >
+                      {corteHoyAdicional
+                        ? "Pago adicional hoy"
+                        : "Pago adicional antes del corte"}
+                    </p>
+
+                    <p className="mt-1 text-3xl font-black text-slate-950">
+                      {formatoMoneda.format(
+                        saldoAdicionalAntesCorte,
+                      )}
+                    </p>
+
+                    <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-700">
+                      El pago principal ya está cubierto. Este monto corresponde
+                      a compras posteriores y debe pagarse antes del corte del{" "}
+                      {formatearFechaTarjeta(
+                        calendario
+                          .fechaCorte,
+                      )}
+                      .
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-3xl border border-indigo-100 bg-indigo-50/70 p-4">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-indigo-600" />
+
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-700">
+                  Calendario de pago
+                </p>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-white p-3 shadow-sm">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    Próximo corte
+                  </p>
+
+                  <p className="mt-1 text-sm font-black text-slate-900">
+                    {formatearFechaTarjeta(
+                      calendario
+                        .fechaCorte,
+                    )}
+                  </p>
+
+                  <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                    {calendario
+                      .diasHastaCorte ===
+                    0
+                      ? "El corte es hoy"
+                      : `En ${calendario.diasHastaCorte} día${
+                          calendario.diasHastaCorte ===
+                          1
+                            ? ""
+                            : "s"
+                        }`}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-indigo-200 bg-white p-3 shadow-sm">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-indigo-500">
+                    Pagar saldo
+                  </p>
+
+                  <p className="mt-1 text-sm font-black text-indigo-900">
+                    {formatearFechaTarjeta(
+                      calendario
+                        .fechaObjetivoPago,
+                    )}
+                  </p>
+
+                  <p className="mt-1 text-[10px] font-semibold text-indigo-600">
+                    {
+                      DIAS_ANTICIPACION_PAGO_TARJETA
+                    }{" "}
+                    días antes del corte
+                  </p>
+                </div>
+              </div>
+
+              {saldoAlInicioVentana !==
+                null && (
+                <div className="mt-3 rounded-2xl bg-white px-3 py-2.5">
+                  <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                    Saldo al abrir la ventana
+                  </p>
+
+                  <p className="mt-1 text-sm font-black text-slate-800">
+                    {formatoMoneda.format(
+                      montoObjetivoVentana ??
+                        0,
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {corteCubierto ? (
+                <EstadoCoberturaCorte
+                  resumen={
+                    resumen
+                  }
+                />
+              ) : (
+                <EstadoVentanaPago
+                  evaluacion={
+                    evaluacionVentana
+                  }
+                />
+              )}
+
+              {calendario
+                .ajustadoPorFinDeMes && (
+                <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-[10px] font-semibold leading-relaxed text-amber-700">
+                  El día de corte configurado es{" "}
+                  {
+                    calendario
+                      .diaCorteConfigurado
+                  }
+                  , pero este mes termina el día{" "}
+                  {
+                    calendario
+                      .diaCorteEfectivo
+                  }
+                  . Se utilizó automáticamente el último día disponible.
+                </p>
+              )}
             </div>
 
-            <div className="rounded-2xl border border-indigo-200 bg-white p-3 shadow-sm">
-              <p className="text-[9px] font-black uppercase tracking-wider text-indigo-500">
-                Pagar saldo
-              </p>
-
-              <p className="mt-1 text-sm font-black text-indigo-900">
-                {formatearFechaTarjeta(
-                  calendario
-                    .fechaObjetivoPago,
-                )}
-              </p>
-
-              <p className="mt-1 text-[10px] font-semibold text-indigo-600">
-                {
-                  DIAS_ANTICIPACION_PAGO_TARJETA
-                }{" "}
-                días antes del corte
-              </p>
-            </div>
-          </div>
-
-          {saldoAlInicioVentana !==
-            null && (
-            <div className="mt-3 rounded-2xl bg-white px-3 py-2.5">
-              <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                Saldo al abrir la ventana
-              </p>
-
-              <p className="mt-1 text-sm font-black text-slate-800">
-                {formatoMoneda.format(
-                  montoObjetivoVentana ??
-                    0,
-                )}
-              </p>
-            </div>
-          )}
-
-          {corteCubierto ? (
-            <EstadoCoberturaCorte
+            <ActividadPosteriorCobertura
               resumen={
                 resumen
               }
             />
-          ) : (
-            <EstadoVentanaPago
-              evaluacion={
-                evaluacionVentana
-              }
-            />
-          )}
 
-          {calendario
-            .ajustadoPorFinDeMes && (
-            <p className="mt-3 rounded-2xl bg-amber-50 px-3 py-2 text-[10px] font-semibold leading-relaxed text-amber-700">
-              El día de corte configurado es{" "}
-              {
-                calendario
-                  .diaCorteConfigurado
-              }
-              , pero este mes termina el día{" "}
-              {
-                calendario
-                  .diaCorteEfectivo
-              }
-              . Se utilizó automáticamente el último día disponible.
-            </p>
-          )}
-        </div>
+            <div
+              className={`mt-4 rounded-3xl border p-4 ${
+                montoPagoTotal >
+                0
+                  ? corteCubierto
+                    ? "border-indigo-200 bg-indigo-50"
+                    : "border-emerald-200 bg-emerald-50"
+                  : "border-slate-200 bg-slate-50"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+                      montoPagoTotal >
+                      0
+                        ? corteCubierto
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "bg-emerald-100 text-emerald-700"
+                        : "bg-white text-slate-400"
+                    }`}
+                  >
+                    <CircleDollarSign className="h-5 w-5" />
+                  </div>
 
-        <ActividadPosteriorCobertura
-          resumen={
-            resumen
-          }
-        />
+                  <div className="min-w-0">
+                    <p
+                      className={`text-[10px] font-black uppercase tracking-[0.14em] ${
+                        montoPagoTotal >
+                        0
+                          ? corteCubierto
+                            ? "text-indigo-700"
+                            : "text-emerald-700"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      {corteCubierto &&
+                      montoPagoTotal >
+                        0
+                        ? "Saldo actual posterior"
+                        : "Pago total calculado"}
+                    </p>
 
-        {/*
-         * ======================================================
-         * SALDO GENERAL
-         * ======================================================
-         */}
-        <div
-          className={`mt-4 rounded-3xl border p-4 ${
-            montoPagoTotal >
-            0
-              ? corteCubierto
-                ? "border-indigo-200 bg-indigo-50"
-                : "border-emerald-200 bg-emerald-50"
-              : "border-slate-200 bg-slate-50"
-          }`}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
-                  montoPagoTotal >
-                  0
-                    ? corteCubierto
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "bg-emerald-100 text-emerald-700"
-                    : "bg-white text-slate-400"
-                }`}
-              >
-                <CircleDollarSign className="h-5 w-5" />
+                    <p className="mt-1 text-2xl font-black text-slate-900">
+                      {formatoMoneda.format(
+                        montoPagoTotal,
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {montoPagoTotal <=
+                  0 && (
+                  <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-700">
+                    Sin saldo
+                  </span>
+                )}
               </div>
 
-              <div className="min-w-0">
-                <p
-                  className={`text-[10px] font-black uppercase tracking-[0.14em] ${
-                    montoPagoTotal >
-                    0
-                      ? corteCubierto
-                        ? "text-indigo-700"
-                        : "text-emerald-700"
-                      : "text-slate-500"
-                  }`}
-                >
-                  {corteCubierto &&
-                  montoPagoTotal >
-                    0
-                    ? "Saldo actual posterior"
-                    : "Pago total calculado"}
+              <p className="mt-3 text-[11px] font-semibold leading-5 text-slate-600">
+                {corteCubierto &&
+                montoPagoTotal >
+                  0
+                  ? "El pago principal ya está cubierto. Este saldo corresponde a actividad posterior."
+                  : montoPagoTotal >
+                      0
+                    ? "Este es el monto que llevaría la tarjeta a $0 con las compras y pagos registrados hasta ahora."
+                    : creditoAFavor >
+                        0
+                      ? `No necesitas realizar un pago. Existe un crédito a favor de ${formatoMoneda.format(
+                          creditoAFavor,
+                        )}.`
+                      : "No existe saldo pendiente para pagar."}
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-rose-50 p-3">
+                <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">
+                  Compras
                 </p>
 
-                <p className="mt-1 text-2xl font-black text-slate-900">
+                <p className="mt-1 text-sm font-black text-rose-800">
                   {formatoMoneda.format(
-                    montoPagoTotal,
+                    comprasDesdeSaldo,
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-emerald-50 p-3">
+                <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">
+                  Pagos
+                </p>
+
+                <p className="mt-1 text-sm font-black text-emerald-800">
+                  {formatoMoneda.format(
+                    pagosDesdeSaldo,
                   )}
                 </p>
               </div>
             </div>
 
-            {montoPagoTotal <=
-              0 && (
-              <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-700">
-                Sin saldo
-              </span>
+            {porcentajeUtilizado !==
+              null &&
+            estiloUtilizacion &&
+            creditoDisponible !==
+              null ? (
+              <div className="mt-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Utilización
+                  </p>
+
+                  <p
+                    className={`text-xs font-black ${estiloUtilizacion.texto}`}
+                  >
+                    {porcentajeUtilizado.toFixed(
+                      1,
+                    )}
+                    %
+                  </p>
+                </div>
+
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full transition-all ${estiloUtilizacion.barra}`}
+                    style={{
+                      width:
+                        `${anchoBarra}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-3 text-[11px] font-semibold text-slate-500">
+                  <span>
+                    Límite{" "}
+                    {formatoMoneda.format(
+                      tarjeta
+                        .limiteCredito ??
+                        0,
+                    )}
+                  </span>
+
+                  <span>
+                    Disponible{" "}
+                    {formatoMoneda.format(
+                      creditoDisponible,
+                    )}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl bg-slate-50 p-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                  Límite no configurado
+                </p>
+
+                <p className="mt-1 text-xs font-semibold text-slate-600">
+                  Agrega el límite para calcular crédito disponible
+                  y porcentaje utilizado.
+                </p>
+              </div>
             )}
-          </div>
 
-          <p className="mt-3 text-[11px] font-semibold leading-5 text-slate-600">
-            {corteCubierto &&
-            montoPagoTotal >
-              0
-              ? "El pago principal ya está cubierto. Este saldo corresponde a actividad posterior."
-              : montoPagoTotal >
-                  0
-                ? "Este es el monto que llevaría la tarjeta a $0 con las compras y pagos registrados hasta ahora."
-                : creditoAFavor >
-                    0
-                  ? `No necesitas realizar un pago. Existe un crédito a favor de ${formatoMoneda.format(
-                      creditoAFavor,
-                    )}.`
-                  : "No existe saldo pendiente para pagar."}
-          </p>
-        </div>
+            <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+              <CalendarClock className="h-4 w-4" />
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-rose-50 p-3">
-            <p className="text-[9px] font-black uppercase tracking-wider text-rose-600">
-              Compras
-            </p>
-
-            <p className="mt-1 text-sm font-black text-rose-800">
-              {formatoMoneda.format(
-                comprasDesdeSaldo,
-              )}
-            </p>
-          </div>
-
-          <div className="rounded-2xl bg-emerald-50 p-3">
-            <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">
-              Pagos
-            </p>
-
-            <p className="mt-1 text-sm font-black text-emerald-800">
-              {formatoMoneda.format(
-                pagosDesdeSaldo,
-              )}
-            </p>
-          </div>
-        </div>
-
-        {porcentajeUtilizado !==
-          null &&
-        estiloUtilizacion &&
-        creditoDisponible !==
-          null ? (
-          <div className="mt-5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                Utilización
-              </p>
-
-              <p
-                className={`text-xs font-black ${estiloUtilizacion.texto}`}
-              >
-                {porcentajeUtilizado.toFixed(
-                  1,
-                )}
-                %
-              </p>
-            </div>
-
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className={`h-full rounded-full transition-all ${estiloUtilizacion.barra}`}
-                style={{
-                  width:
-                    `${anchoBarra}%`,
-                }}
-              />
-            </div>
-
-            <div className="mt-2 flex items-center justify-between gap-3 text-[11px] font-semibold text-slate-500">
               <span>
-                Límite{" "}
+                Saldo inicial del{" "}
+                {
+                  tarjeta
+                    .fechaSaldoInicial
+                }
+                :{" "}
                 {formatoMoneda.format(
                   tarjeta
-                    .limiteCredito ??
-                    0,
-                )}
-              </span>
-
-              <span>
-                Disponible{" "}
-                {formatoMoneda.format(
-                  creditoDisponible,
+                    .saldoInicial,
                 )}
               </span>
             </div>
-          </div>
-        ) : (
-          <div className="mt-5 rounded-2xl bg-slate-50 p-3">
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-              Límite no configurado
-            </p>
 
-            <p className="mt-1 text-xs font-semibold text-slate-600">
-              Agrega el límite para calcular crédito disponible
-              y porcentaje utilizado.
-            </p>
-          </div>
-        )}
-
-        <div className="mt-4 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
-          <CalendarClock className="h-4 w-4" />
-
-          <span>
-            Saldo inicial del{" "}
-            {
-              tarjeta
-                .fechaSaldoInicial
-            }
-            :{" "}
-            {formatoMoneda.format(
-              tarjeta
-                .saldoInicial,
+            {tarjeta.notas && (
+              <p className="mt-3 rounded-2xl bg-indigo-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-indigo-700">
+                {
+                  tarjeta.notas
+                }
+              </p>
             )}
-          </span>
+          </div>
         </div>
-
-        {tarjeta.notas && (
-          <p className="mt-3 rounded-2xl bg-indigo-50 px-3 py-2 text-[11px] font-semibold leading-relaxed text-indigo-700">
-            {
-              tarjeta.notas
-            }
-          </p>
-        )}
       </div>
     </article>
   );
