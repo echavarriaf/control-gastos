@@ -463,6 +463,12 @@ export function ExpenseAccountCard({
     useState(false);
 
   const [
+    mostrandoDetalles,
+    setMostrandoDetalles,
+  ] =
+    useState(false);
+
+  const [
     mostrandoReservas,
     setMostrandoReservas,
   ] =
@@ -562,6 +568,28 @@ export function ExpenseAccountCard({
     cargandoIngresos ||
     cargandoPresupuesto ||
     cargandoCompromisos;
+
+  const alternarDetallesCuenta =
+    () => {
+      if (
+        mostrandoDetalles
+      ) {
+        setMostrandoReservas(
+          false,
+        );
+
+        setMostrandoMovimientos(
+          false,
+        );
+      }
+
+      setMostrandoDetalles(
+        (
+          actual,
+        ) =>
+          !actual,
+      );
+    };
 
   const comenzarEdicion =
     () => {
@@ -783,7 +811,7 @@ export function ExpenseAccountCard({
                    * =====================================================
                    */}
                   <div
-                    className={`rounded-2xl p-5 ${
+                    className={`rounded-2xl p-4 ${
                       resumen
                         .disponibleReal <
                       0
@@ -826,7 +854,7 @@ export function ExpenseAccountCard({
                         ) : (
                           <>
                             <p
-                              className={`mt-2 text-4xl font-black ${
+                              className={`mt-2 text-3xl font-black ${
                                 resumen
                                   .disponibleReal <
                                 0
@@ -871,7 +899,7 @@ export function ExpenseAccountCard({
                       />
                     </div>
 
-                    <div className="mt-5 grid grid-cols-2 gap-3 border-t border-black/5 pt-4">
+                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-black/5 pt-3">
                       <div>
                         <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
                           Saldo actual
@@ -909,7 +937,61 @@ export function ExpenseAccountCard({
                     </div>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={
+                      alternarDetallesCuenta
+                    }
+                    aria-expanded={
+                      mostrandoDetalles
+                    }
+                    aria-controls="expense-account-details"
+                    className="group flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/60"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+                        <WalletCards className="h-4 w-4" />
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-slate-800">
+                          Desglose de la cuenta
+                        </p>
+
+                        <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
+                          Depósitos, salidas, reservas e historial
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="hidden text-[10px] font-black text-emerald-700 sm:inline">
+                        {mostrandoDetalles
+                          ? "Ocultar"
+                          : "Ver detalles"}
+                      </span>
+
+                      <ChevronDown
+                        className={`h-4 w-4 text-emerald-600 transition-transform duration-300 ${
+                          mostrandoDetalles
+                            ? "rotate-180"
+                            : ""
+                        }`}
+                      />
+                    </div>
+                  </button>
+
+                  <div
+                    id="expense-account-details"
+                    className={`grid transition-all duration-300 ease-out ${
+                      mostrandoDetalles
+                        ? "visible grid-rows-[1fr] opacity-100"
+                        : "invisible grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <div className="min-h-0 overflow-hidden">
+                      <div className="space-y-3 pt-1">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="rounded-2xl bg-sky-50 p-4">
                       <div className="flex items-center gap-2">
                         <ArrowDownToLine className="h-4 w-4 text-sky-600" />
@@ -1249,20 +1331,23 @@ export function ExpenseAccountCard({
                     )}
                   </div>
 
-                  <div className="space-y-1 px-1">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
+                        <div className="space-y-1 px-1">
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
 
-                      Disponible real = saldo actual - dinero comprometido
+                            Disponible real = saldo actual - dinero comprometido
+                          </div>
+
+                          <p className="text-[10px] font-semibold text-slate-400">
+                            Un gasto fijo parcial mantiene reservado su monto completo hasta quedar totalmente pagado.
+                          </p>
+
+                          <p className="text-[10px] font-semibold text-slate-400">
+                            Los compromisos inactivos y los ya completados no consumen Disponible real.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-
-                    <p className="text-[10px] font-semibold text-slate-400">
-                      Un gasto fijo parcial mantiene reservado su monto completo hasta quedar totalmente pagado.
-                    </p>
-
-                    <p className="text-[10px] font-semibold text-slate-400">
-                      Los compromisos inactivos y los ya completados no consumen Disponible real.
-                    </p>
                   </div>
                 </div>
               )}
