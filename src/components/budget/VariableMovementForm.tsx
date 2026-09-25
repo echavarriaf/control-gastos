@@ -3,6 +3,7 @@
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  ChevronDown,
   CreditCard,
   Fuel,
   LoaderCircle,
@@ -396,6 +397,14 @@ export function VariableMovementForm({
   const [
     administradorCategoriasAbierto,
     setAdministradorCategoriasAbierto,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    formularioAbierto,
+    setFormularioAbierto,
   ] =
     useState(
       false,
@@ -860,6 +869,15 @@ export function VariableMovementForm({
           ),
         );
       }
+
+      /*
+       * Después de guardar correctamente cerramos el formulario.
+       * El movimiento recién creado queda visible en el historial
+       * sin mantener todos los campos ocupando espacio.
+       */
+      setFormularioAbierto(
+        false,
+      );
     };
 
   const comentarioRequerido =
@@ -872,506 +890,564 @@ export function VariableMovementForm({
   return (
     <section
       aria-labelledby="variable-form-title"
-      className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+      className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
     >
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-          Nuevo movimiento
-        </p>
+      <div className="flex items-center justify-between gap-3 p-4 sm:p-5">
+        <div className="min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
+            Nuevo movimiento
+          </p>
 
-        <h2
-          id="variable-form-title"
-          className="mt-1 text-lg font-black text-slate-900"
-        >
-          Registrar gasto o pago
-        </h2>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
-        <TypeButton
-          tipo="gasto"
-          seleccionado={
-            tipo ===
-            "gasto"
-          }
-          onSelect={
-            seleccionarTipo
-          }
-        />
-
-        <TypeButton
-          tipo="pago"
-          seleccionado={
-            tipo ===
-            "pago"
-          }
-          onSelect={
-            seleccionarTipo
-          }
-        />
-      </div>
-
-      <form
-        onSubmit={
-          enviarFormulario
-        }
-        className="mt-4 space-y-4"
-      >
-        <div>
-          <label
-            htmlFor="movimiento-concepto"
-            className="mb-1.5 block text-xs font-black text-slate-700"
+          <h2
+            id="variable-form-title"
+            className="mt-1 text-lg font-black text-slate-900"
           >
-            Descripción
-          </label>
+            Registrar gasto o pago
+          </h2>
 
-          <input
-            id="movimiento-concepto"
-            type="text"
-            value={
-              concepto
-            }
-            onChange={(
-              event,
-            ) =>
-              setConcepto(
-                event
-                  .target
-                  .value,
-              )
-            }
-            placeholder={
-              esGasto
-                ? categoriaSeleccionada
-                    ?.categoriaPresupuesto ===
-                    "comida"
-                  ? "Ej. Walmart o Publix"
-                  : categoriaSeleccionada
-                        ?.categoriaPresupuesto ===
-                      "gas"
-                    ? "Ej. Costco Gas"
-                    : "Ej. Amazon, farmacia o ropa"
-                : "Ej. Pago tarjeta Walmart"
-            }
-            disabled={
-              guardando
-            }
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-          />
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="movimiento-monto"
-              className="mb-1.5 block text-xs font-black text-slate-700"
-            >
-              Monto
-            </label>
-
-            <input
-              id="movimiento-monto"
-              type="number"
-              inputMode="decimal"
-              min="0.01"
-              step="0.01"
-              value={
-                monto
-              }
-              onChange={(
-                event,
-              ) =>
-                setMonto(
-                  event
-                    .target
-                    .value,
-                )
-              }
-              placeholder="0.00"
-              disabled={
-                guardando
-              }
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="movimiento-fecha"
-              className="mb-1.5 block text-xs font-black text-slate-700"
-            >
-              Fecha
-            </label>
-
-            <input
-              id="movimiento-fecha"
-              type="date"
-              value={
-                fecha
-              }
-              onChange={(
-                event,
-              ) =>
-                setFecha(
-                  event
-                    .target
-                    .value,
-                )
-              }
-              disabled={
-                guardando
-              }
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-          </div>
-        </div>
-
-        {esGasto ? (
-          <fieldset>
-            <legend className="text-xs font-black text-slate-700">
-              Tipo de compra
-            </legend>
-
-            <div className="mb-2 mt-1 flex justify-end">
-              <button
-                type="button"
-                onClick={() =>
-                  setAdministradorCategoriasAbierto(
-                    true,
-                  )
-                }
-                disabled={
-                  guardando ||
-                  cargandoCategorias
-                }
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-slate-100 px-3 text-[10px] font-black text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-50"
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-
-                Administrar categorías
-              </button>
-            </div>
-
-            {cargandoCategorias ? (
-              <div className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-500">
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-
-                Cargando categorías...
-              </div>
-            ) : categoriasDisponibles.length ===
-              0 ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-800">
-                No hay categorías de gasto activas.
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {categoriasDisponibles.map(
-                  (
-                    categoria,
-                  ) => {
-                    const Icono =
-                      iconoCategoria(
-                        categoria,
-                      );
-
-                    const seleccionada =
-                      categoriaTarjetaId ===
-                      categoria.id;
-
-                    return (
-                      <button
-                        key={
-                          categoria.id
-                        }
-                        type="button"
-                        onClick={() =>
-                          seleccionarCategoria(
-                            categoria,
-                          )
-                        }
-                        disabled={
-                          guardando
-                        }
-                        aria-pressed={
-                          seleccionada
-                        }
-                        className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-black transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
-                          seleccionada
-                            ? "border-transparent bg-indigo-600 text-white shadow-sm"
-                            : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                        }`}
-                      >
-                        <Icono className="h-4 w-4" />
-
-                        <span className="truncate">
-                          {
-                            categoria
-                              .nombre
-                          }
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
-              </div>
-            )}
-
-            {categoriaSeleccionada && (
-              <p className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">
-                {categoriaSeleccionada
-                  .categoriaPresupuesto ===
-                "comida"
-                  ? "Esta compra consume el presupuesto de Comida."
-                  : categoriaSeleccionada
-                        .categoriaPresupuesto ===
-                      "gas"
-                    ? "Esta compra consume el presupuesto de Gas."
-                    : "Esta compra no consume el presupuesto de Comida ni Gas."}
-              </p>
-            )}
-          </fieldset>
-        ) : (
-          <div>
-            <label
-              htmlFor="pago-categoria"
-              className="mb-1.5 block text-xs font-black text-slate-700"
-            >
-              Clasificación del pago
-            </label>
-
-            <select
-              id="pago-categoria"
-              value={
-                categoriaPago
-              }
-              onChange={(
-                event,
-              ) =>
-                setCategoriaPago(
-                  event
-                    .target
-                    .value as CategoriaPago,
-                )
-              }
-              disabled={
-                guardando
-              }
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <option value="general">
-                Pago general de tarjeta
-              </option>
-
-              {CATEGORIA_KEYS.map(
-                (
-                  key,
-                ) => (
-                  <option
-                    key={
-                      key
-                    }
-                    value={
-                      key
-                    }
-                  >
-                    {
-                      CATEGORIAS_VARIABLES[
-                        key
-                      ].label
-                    }
-                  </option>
-                ),
-              )}
-            </select>
-          </div>
-        )}
-
-        {comentarioRequerido && (
-          <div>
-            <label
-              htmlFor="movimiento-comentario"
-              className="mb-1.5 block text-xs font-black text-slate-700"
-            >
-              Detalle / comentario
-
-              <span className="ml-1 text-rose-600">
-                *
-              </span>
-            </label>
-
-            <textarea
-              id="movimiento-comentario"
-              value={
-                comentario
-              }
-              onChange={(
-                event,
-              ) =>
-                setComentario(
-                  event
-                    .target
-                    .value,
-                )
-              }
-              maxLength={
-                500
-              }
-              rows={
-                3
-              }
-              required
-              aria-required="true"
-              placeholder="Describe qué compraste o para qué fue el gasto."
-              disabled={
-                guardando
-              }
-              className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-
-            <div className="mt-1 flex justify-between gap-3 text-[10px] font-semibold text-slate-400">
-              <span>
-                Requerido para esta categoría
-              </span>
-
-              <span>
-                {
-                  comentario
-                    .length
-                }
-                /500
-              </span>
-            </div>
-          </div>
-        )}
-
-        <div>
-          <label
-            htmlFor="movimiento-tarjeta"
-            className="mb-1.5 flex items-center gap-2 text-xs font-black text-slate-700"
-          >
-            <CreditCard className="h-4 w-4 text-indigo-600" />
-
-            {esGasto
-              ? "Tarjeta utilizada"
-              : "Tarjeta pagada"}
-          </label>
-
-          <select
-            id="movimiento-tarjeta"
-            value={
-              tarjetaId
-            }
-            onChange={(
-              event,
-            ) =>
-              setTarjetaId(
-                event
-                  .target
-                  .value,
-              )
-            }
-            disabled={
-              guardando ||
-              tarjetasDisponibles
-                .length ===
-                0
-            }
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {esGasto && (
-              <option value="">
-                Sin tarjeta · efectivo o débito
-              </option>
-            )}
-
-            {!esGasto &&
-              tarjetasDisponibles
-                .length ===
-                0 && (
-                <option value="">
-                  No hay tarjetas activas
-                </option>
-              )}
-
-            {tarjetasDisponibles.map(
-              (
-                tarjeta,
-              ) => (
-                <option
-                  key={
-                    tarjeta.id
-                  }
-                  value={
-                    tarjeta.id
-                  }
-                >
-                  {etiquetaTarjeta(
-                    tarjeta,
-                  )}
-                </option>
-              ),
-            )}
-          </select>
-
-          <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-slate-500">
-            {esGasto
-              ? categoriaSeleccionada
-                    ?.categoriaPresupuesto ===
-                  "comida"
-                ? "Las compras de Supermercado sugieren Walmart. Puedes cambiar la tarjeta antes de guardar."
-                : categoriaSeleccionada
-                      ?.categoriaPresupuesto ===
-                    "gas"
-                  ? "Las compras de Gas sugieren Costco. Puedes cambiar la tarjeta antes de guardar."
-                  : tarjetaId
-                    ? "Los gastos de Otro sugieren Apple. Puedes cambiar la tarjeta antes de guardar."
-                    : "Apple no está disponible. Selecciona la tarjeta utilizada o deja Sin tarjeta para efectivo o débito."
-              : "Selecciona la tarjeta cuyo saldo disminuirá con este pago."}
+          <p className="mt-1 text-[11px] font-medium text-slate-500">
+            {formularioAbierto
+              ? esGasto
+                ? "Completa los datos del gasto."
+                : "Completa los datos del pago de tarjeta."
+              : "Abre el formulario solamente cuando necesites registrar un movimiento."}
           </p>
         </div>
-
-        {errorLocal && (
-          <p
-            role="alert"
-            className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-700"
-          >
-            {
-              errorLocal
-            }
-          </p>
-        )}
 
         <button
-          type="submit"
-          disabled={
-            guardando ||
-            (
-              esGasto &&
+          type="button"
+          onClick={() =>
+            setFormularioAbierto(
               (
-                cargandoCategorias ||
-                !categoriaSeleccionada
-              )
+                actual,
+              ) =>
+                !actual,
             )
           }
-          className={`flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
-            esGasto
-              ? "bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700"
-              : "bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700"
+          aria-expanded={
+            formularioAbierto
+          }
+          aria-controls="variable-movement-form-content"
+          className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-2xl px-3.5 text-xs font-black transition active:scale-[0.98] ${
+            formularioAbierto
+              ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              : "bg-indigo-600 text-white shadow-sm shadow-indigo-100 hover:bg-indigo-700"
           }`}
         >
-          {guardando ? (
-            <LoaderCircle className="h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
-
-          {guardando
-            ? "Guardando..."
+          {formularioAbierto
+            ? "Cerrar"
             : esGasto
               ? "Registrar gasto"
               : "Registrar pago"}
+
+          <ChevronDown
+            className={`h-4 w-4 transition-transform duration-300 ${
+              formularioAbierto
+                ? "rotate-180"
+                : ""
+            }`}
+          />
         </button>
-      </form>
+      </div>
+
+      <div
+        id="variable-movement-form-content"
+        className={`grid transition-all duration-300 ease-out ${
+          formularioAbierto
+            ? "visible grid-rows-[1fr] opacity-100"
+            : "invisible grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="border-t border-slate-100 bg-slate-50/40 p-4 sm:p-5">
+            <div className="grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+              <TypeButton
+                tipo="gasto"
+                seleccionado={
+                  tipo ===
+                  "gasto"
+                }
+                onSelect={
+                  seleccionarTipo
+                }
+              />
+
+              <TypeButton
+                tipo="pago"
+                seleccionado={
+                  tipo ===
+                  "pago"
+                }
+                onSelect={
+                  seleccionarTipo
+                }
+              />
+            </div>
+
+            <form
+              onSubmit={
+                enviarFormulario
+              }
+              className="mt-4 space-y-4"
+            >
+              <div>
+                <label
+                  htmlFor="movimiento-concepto"
+                  className="mb-1.5 block text-xs font-black text-slate-700"
+                >
+                  Descripción
+                </label>
+
+                <input
+                  id="movimiento-concepto"
+                  type="text"
+                  value={
+                    concepto
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setConcepto(
+                      event
+                        .target
+                        .value,
+                    )
+                  }
+                  placeholder={
+                    esGasto
+                      ? categoriaSeleccionada
+                          ?.categoriaPresupuesto ===
+                          "comida"
+                        ? "Ej. Walmart o Publix"
+                        : categoriaSeleccionada
+                              ?.categoriaPresupuesto ===
+                            "gas"
+                          ? "Ej. Costco Gas"
+                          : "Ej. Amazon, farmacia o ropa"
+                      : "Ej. Pago tarjeta Walmart"
+                  }
+                  disabled={
+                    guardando
+                  }
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="movimiento-monto"
+                    className="mb-1.5 block text-xs font-black text-slate-700"
+                  >
+                    Monto
+                  </label>
+
+                  <input
+                    id="movimiento-monto"
+                    type="number"
+                    inputMode="decimal"
+                    min="0.01"
+                    step="0.01"
+                    value={
+                      monto
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setMonto(
+                        event
+                          .target
+                          .value,
+                      )
+                    }
+                    placeholder="0.00"
+                    disabled={
+                      guardando
+                    }
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-black text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="movimiento-fecha"
+                    className="mb-1.5 block text-xs font-black text-slate-700"
+                  >
+                    Fecha
+                  </label>
+
+                  <input
+                    id="movimiento-fecha"
+                    type="date"
+                    value={
+                      fecha
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setFecha(
+                        event
+                          .target
+                          .value,
+                      )
+                    }
+                    disabled={
+                      guardando
+                    }
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              {esGasto ? (
+                <fieldset>
+                  <legend className="text-xs font-black text-slate-700">
+                    Tipo de compra
+                  </legend>
+
+                  <div className="mb-2 mt-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAdministradorCategoriasAbierto(
+                          true,
+                        )
+                      }
+                      disabled={
+                        guardando ||
+                        cargandoCategorias
+                      }
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-slate-100 px-3 text-[10px] font-black text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:opacity-50"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+
+                      Administrar categorías
+                    </button>
+                  </div>
+
+                  {cargandoCategorias ? (
+                    <div className="flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-500">
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+
+                      Cargando categorías...
+                    </div>
+                  ) : categoriasDisponibles.length ===
+                    0 ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-800">
+                      No hay categorías de gasto activas.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {categoriasDisponibles.map(
+                        (
+                          categoria,
+                        ) => {
+                          const Icono =
+                            iconoCategoria(
+                              categoria,
+                            );
+
+                          const seleccionada =
+                            categoriaTarjetaId ===
+                            categoria.id;
+
+                          return (
+                            <button
+                              key={
+                                categoria.id
+                              }
+                              type="button"
+                              onClick={() =>
+                                seleccionarCategoria(
+                                  categoria,
+                                )
+                              }
+                              disabled={
+                                guardando
+                              }
+                              aria-pressed={
+                                seleccionada
+                              }
+                              className={`flex min-h-14 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-black transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+                                seleccionada
+                                  ? "border-transparent bg-indigo-600 text-white shadow-sm"
+                                  : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                              }`}
+                            >
+                              <Icono className="h-4 w-4" />
+
+                              <span className="truncate">
+                                {
+                                  categoria
+                                    .nombre
+                                }
+                              </span>
+                            </button>
+                          );
+                        },
+                      )}
+                    </div>
+                  )}
+
+                  {categoriaSeleccionada && (
+                    <p className="mt-2 text-[11px] font-medium leading-relaxed text-slate-500">
+                      {categoriaSeleccionada
+                        .categoriaPresupuesto ===
+                      "comida"
+                        ? "Esta compra consume el presupuesto de Comida."
+                        : categoriaSeleccionada
+                              .categoriaPresupuesto ===
+                            "gas"
+                          ? "Esta compra consume el presupuesto de Gas."
+                          : "Esta compra no consume el presupuesto de Comida ni Gas."}
+                    </p>
+                  )}
+                </fieldset>
+              ) : (
+                <div>
+                  <label
+                    htmlFor="pago-categoria"
+                    className="mb-1.5 block text-xs font-black text-slate-700"
+                  >
+                    Clasificación del pago
+                  </label>
+
+                  <select
+                    id="pago-categoria"
+                    value={
+                      categoriaPago
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setCategoriaPago(
+                        event
+                          .target
+                          .value as CategoriaPago,
+                      )
+                    }
+                    disabled={
+                      guardando
+                    }
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="general">
+                      Pago general de tarjeta
+                    </option>
+
+                    {CATEGORIA_KEYS.map(
+                      (
+                        key,
+                      ) => (
+                        <option
+                          key={
+                            key
+                          }
+                          value={
+                            key
+                          }
+                        >
+                          {
+                            CATEGORIAS_VARIABLES[
+                              key
+                            ].label
+                          }
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </div>
+              )}
+
+              {comentarioRequerido && (
+                <div>
+                  <label
+                    htmlFor="movimiento-comentario"
+                    className="mb-1.5 block text-xs font-black text-slate-700"
+                  >
+                    Detalle / comentario
+
+                    <span className="ml-1 text-rose-600">
+                      *
+                    </span>
+                  </label>
+
+                  <textarea
+                    id="movimiento-comentario"
+                    value={
+                      comentario
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setComentario(
+                        event
+                          .target
+                          .value,
+                      )
+                    }
+                    maxLength={
+                      500
+                    }
+                    rows={
+                      3
+                    }
+                    required
+                    aria-required="true"
+                    placeholder="Describe qué compraste o para qué fue el gasto."
+                    disabled={
+                      guardando
+                    }
+                    className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+
+                  <div className="mt-1 flex justify-between gap-3 text-[10px] font-semibold text-slate-400">
+                    <span>
+                      Requerido para esta categoría
+                    </span>
+
+                    <span>
+                      {
+                        comentario
+                          .length
+                      }
+                      /500
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="movimiento-tarjeta"
+                  className="mb-1.5 flex items-center gap-2 text-xs font-black text-slate-700"
+                >
+                  <CreditCard className="h-4 w-4 text-indigo-600" />
+
+                  {esGasto
+                    ? "Tarjeta utilizada"
+                    : "Tarjeta pagada"}
+                </label>
+
+                <select
+                  id="movimiento-tarjeta"
+                  value={
+                    tarjetaId
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setTarjetaId(
+                      event
+                        .target
+                        .value,
+                    )
+                  }
+                  disabled={
+                    guardando ||
+                    tarjetasDisponibles
+                      .length ===
+                      0
+                  }
+                  className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {esGasto && (
+                    <option value="">
+                      Sin tarjeta · efectivo o débito
+                    </option>
+                  )}
+
+                  {!esGasto &&
+                    tarjetasDisponibles
+                      .length ===
+                      0 && (
+                      <option value="">
+                        No hay tarjetas activas
+                      </option>
+                    )}
+
+                  {tarjetasDisponibles.map(
+                    (
+                      tarjeta,
+                    ) => (
+                      <option
+                        key={
+                          tarjeta.id
+                        }
+                        value={
+                          tarjeta.id
+                        }
+                      >
+                        {etiquetaTarjeta(
+                          tarjeta,
+                        )}
+                      </option>
+                    ),
+                  )}
+                </select>
+
+                <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-slate-500">
+                  {esGasto
+                    ? categoriaSeleccionada
+                          ?.categoriaPresupuesto ===
+                        "comida"
+                      ? "Las compras de Supermercado sugieren Walmart. Puedes cambiar la tarjeta antes de guardar."
+                      : categoriaSeleccionada
+                            ?.categoriaPresupuesto ===
+                          "gas"
+                        ? "Las compras de Gas sugieren Costco. Puedes cambiar la tarjeta antes de guardar."
+                        : tarjetaId
+                          ? "Los gastos de Otro sugieren Apple. Puedes cambiar la tarjeta antes de guardar."
+                          : "Apple no está disponible. Selecciona la tarjeta utilizada o deja Sin tarjeta para efectivo o débito."
+                    : "Selecciona la tarjeta cuyo saldo disminuirá con este pago."}
+                </p>
+              </div>
+
+              {errorLocal && (
+                <p
+                  role="alert"
+                  className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-700"
+                >
+                  {
+                    errorLocal
+                  }
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={
+                  guardando ||
+                  (
+                    esGasto &&
+                    (
+                      cargandoCategorias ||
+                      !categoriaSeleccionada
+                    )
+                  )
+                }
+                className={`flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
+                  esGasto
+                    ? "bg-indigo-600 shadow-indigo-100 hover:bg-indigo-700"
+                    : "bg-emerald-600 shadow-emerald-100 hover:bg-emerald-700"
+                }`}
+              >
+                {guardando ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+
+                {guardando
+                  ? "Guardando..."
+                  : esGasto
+                    ? "Registrar gasto"
+                    : "Registrar pago"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
 
       <CardCategoriesManager
         abierto={
