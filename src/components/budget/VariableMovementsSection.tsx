@@ -15,6 +15,9 @@
  * - fecha exacta;
  * - tarjeta + fecha simultáneamente.
  *
+ * Para mantener la pantalla compacta, inicialmente presenta
+ * solamente los primeros movimientos del resultado filtrado.
+ *
  * Al cambiar filtros, los movimientos aparecen con una transición
  * escalonada de opacidad y desplazamiento.
  */
@@ -23,6 +26,7 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   CalendarDays,
+  ChevronDown,
   CreditCard,
   Filter,
   LoaderCircle,
@@ -57,6 +61,12 @@ const FILTRO_TODAS =
 
 const FILTRO_SIN_TARJETA =
   "__sin_tarjeta__";
+
+/**
+ * Cantidad inicial de movimientos visibles.
+ */
+const LIMITE_MOVIMIENTOS =
+  8;
 
 interface VariableMovementsSectionProps {
   movimientos:
@@ -216,11 +226,10 @@ function obtenerFechaMovimiento(
   movimiento:
     Movimiento,
 ): string {
-  return movimiento.fecha
-    .slice(
-      0,
-      10,
-    );
+  return movimiento.fecha.slice(
+    0,
+    10,
+  );
 }
 
 /**
@@ -247,6 +256,14 @@ export function VariableMovementsSection({
   ] =
     useState(
       "",
+    );
+
+  const [
+    mostrarTodos,
+    setMostrarTodos,
+  ] =
+    useState(
+      false,
     );
 
   const tarjetasOrdenadas =
@@ -317,6 +334,9 @@ export function VariableMovementsSection({
       ],
     );
 
+  /**
+   * Los filtros se aplican antes del límite de ocho movimientos.
+   */
   const movimientosFiltrados =
     useMemo(
       () =>
@@ -362,6 +382,36 @@ export function VariableMovementsSection({
       ],
     );
 
+  /**
+   * Solamente recorta el resultado visual.
+   * No altera los datos ni los cálculos del presupuesto.
+   */
+  const movimientosVisibles =
+    useMemo(
+      () =>
+        mostrarTodos
+          ? movimientosFiltrados
+          : movimientosFiltrados.slice(
+              0,
+              LIMITE_MOVIMIENTOS,
+            ),
+      [
+        movimientosFiltrados,
+        mostrarTodos,
+      ],
+    );
+
+  const cantidadRestante =
+    Math.max(
+      movimientosFiltrados.length -
+        LIMITE_MOVIMIENTOS,
+      0,
+    );
+
+  const puedeExpandir =
+    movimientosFiltrados.length >
+    LIMITE_MOVIMIENTOS;
+
   const hayFiltros =
     filtroTarjeta !==
       FILTRO_TODAS ||
@@ -370,13 +420,47 @@ export function VariableMovementsSection({
     );
 
   /**
-   * Esta llave cambia cada vez que cambia alguno de los filtros.
-   *
-   * React vuelve a montar únicamente la lista visual y permite
-   * reproducir la animación de entrada sin alterar los datos.
+   * La llave cambia cuando cambia un filtro o cuando se abre/cierra
+   * el historial. De esta manera se reproduce suavemente la
+   * animación visual.
    */
   const claveAnimacion =
-    `${filtroTarjeta}-${filtroFecha}`;
+    `${filtroTarjeta}-${filtroFecha}-${mostrarTodos ? "todos" : "limitados"}`;
+
+  /**
+   * Al seleccionar otra tarjeta volvemos automáticamente
+   * al modo compacto.
+   */
+  const cambiarFiltroTarjeta =
+    (
+      valor:
+        string,
+    ) => {
+      setFiltroTarjeta(
+        valor,
+      );
+
+      setMostrarTodos(
+        false,
+      );
+    };
+
+  /**
+   * La fecha también reinicia el historial a los primeros ocho.
+   */
+  const cambiarFiltroFecha =
+    (
+      valor:
+        string,
+    ) => {
+      setFiltroFecha(
+        valor,
+      );
+
+      setMostrarTodos(
+        false,
+      );
+    };
 
   const limpiarFiltros =
     () => {
@@ -386,6 +470,10 @@ export function VariableMovementsSection({
 
       setFiltroFecha(
         "",
+      );
+
+      setMostrarTodos(
+        false,
       );
     };
 
@@ -410,7 +498,7 @@ export function VariableMovementsSection({
           </div>
 
           <div
-            key={`contador-${claveAnimacion}`}
+            key={`contador-${filtroTarjeta}-${filtroFecha}`}
             className="movimientos-contador rounded-2xl bg-slate-100 px-3 py-2 text-right"
           >
             <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">
@@ -469,7 +557,7 @@ export function VariableMovementsSection({
                   onChange={(
                     event,
                   ) =>
-                    setFiltroTarjeta(
+                    cambiarFiltroTarjeta(
                       event
                         .target
                         .value,
@@ -532,7 +620,7 @@ export function VariableMovementsSection({
                   onChange={(
                     event,
                   ) =>
-                    setFiltroFecha(
+                    cambiarFiltroFecha(
                       event
                         .target
                         .value,
@@ -545,7 +633,7 @@ export function VariableMovementsSection({
 
             {hayFiltros && (
               <div
-                key={`chips-${claveAnimacion}`}
+                key={`chips-${filtroTarjeta}-${filtroFecha}`}
                 className="movimientos-filtros mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3"
               >
                 {filtroTarjeta !==
@@ -595,7 +683,7 @@ export function VariableMovementsSection({
             .length ===
           0 ? (
           <div
-            key={`vacio-${claveAnimacion}`}
+            key={`vacio-${filtroTarjeta}-${filtroFecha}`}
             className="movimientos-vacio"
           >
             <FilteredEmptyState
@@ -605,39 +693,91 @@ export function VariableMovementsSection({
             />
           </div>
         ) : (
-          <div
-            key={
-              claveAnimacion
-            }
-            className="mt-4 space-y-2.5"
-          >
-            {movimientosFiltrados.map(
-              (
-                movimiento,
-                indice,
-              ) => (
-                <MovementRow
-                  key={`${movimiento.tipo}-${movimiento.id}`}
-                  movimiento={
-                    movimiento
+          <>
+            <div
+              key={
+                claveAnimacion
+              }
+              className="mt-4 space-y-2.5"
+            >
+              {movimientosVisibles.map(
+                (
+                  movimiento,
+                  indice,
+                ) => (
+                  <MovementRow
+                    key={`${movimiento.tipo}-${movimiento.id}`}
+                    movimiento={
+                      movimiento
+                    }
+                    indice={
+                      indice
+                    }
+                    tarjetasPorId={
+                      tarjetasPorId
+                    }
+                    eliminando={
+                      eliminandoMovimientoId ===
+                      `${movimiento.tipo}-${movimiento.id}`
+                    }
+                    onEliminar={
+                      onEliminar
+                    }
+                  />
+                ),
+              )}
+            </div>
+
+            {puedeExpandir && (
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMostrarTodos(
+                      (
+                        actual,
+                      ) =>
+                        !actual,
+                    )
                   }
-                  indice={
-                    indice
+                  aria-expanded={
+                    mostrarTodos
                   }
-                  tarjetasPorId={
-                    tarjetasPorId
-                  }
-                  eliminando={
-                    eliminandoMovimientoId ===
-                    `${movimiento.tipo}-${movimiento.id}`
-                  }
-                  onEliminar={
-                    onEliminar
-                  }
-                />
-              ),
+                  className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-black text-slate-700 transition duration-200 hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 active:translate-y-0 active:scale-[0.99]"
+                >
+                  {mostrarTodos
+                    ? "Ver menos"
+                    : `Ver ${cantidadRestante} ${
+                        cantidadRestante ===
+                        1
+                          ? "movimiento"
+                          : "movimientos"
+                      } más`}
+
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform duration-300 ${
+                      mostrarTodos
+                        ? "rotate-180"
+                        : ""
+                    }`}
+                  />
+                </button>
+
+                {!mostrarTodos && (
+                  <p className="mt-2 text-center text-[9px] font-semibold text-slate-400">
+                    Mostrando los primeros{" "}
+                    {
+                      LIMITE_MOVIMIENTOS
+                    }{" "}
+                    de{" "}
+                    {
+                      movimientosFiltrados.length
+                    }
+                  </p>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </section>
 
@@ -781,8 +921,8 @@ function MovementRow({
       : "";
 
   /**
-   * Máximo 8 pasos de delay para evitar que listas grandes
-   * tarden demasiado en terminar de aparecer.
+   * Máximo ocho pasos de delay para evitar que una lista grande
+   * tarde demasiado en terminar de aparecer.
    */
   const retraso =
     Math.min(
