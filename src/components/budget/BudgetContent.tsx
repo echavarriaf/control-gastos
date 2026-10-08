@@ -86,13 +86,34 @@ export function BudgetContent({ dashboard }: BudgetContentProps) {
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
           <VariableMovementForm
-            tarjetasActivas={creditCards.tarjetasActivas}
+            /**
+             * 2B.2D
+             *
+             * Enviamos todas las tarjetas.
+             *
+             * VariableMovementForm seguirá mostrando solamente
+             * las activas para movimientos nuevos, pero podrá
+             * conservar una tarjeta inactiva cuando estemos
+             * editando un movimiento histórico que ya la utilizó.
+             */
+            tarjetasActivas={creditCards.tarjetas}
+            /**
+             * Movimiento seleccionado desde el botón Editar
+             * del historial.
+             *
+             * null = modo registro
+             * Movimiento = modo edición
+             */
+            movimientoEditando={ui.selectedMovement}
             /**
              * En 1C.1E enviamos TODAS las categorías.
              *
              * VariableMovementForm filtra las activas para registrar
              * compras y CardCategoriesManager utiliza también las
              * inactivas para poder reactivarlas.
+             *
+             * En modo edición también puede conservar la categoría
+             * histórica aunque actualmente esté inactiva.
              */
             categoriasTarjeta={cardCategories.categorias}
             cargandoCategorias={
@@ -103,8 +124,27 @@ export function BudgetContent({ dashboard }: BudgetContentProps) {
             reordenandoCategorias={cardCategories.reordenando}
             mesSeleccionado={period.mesSeleccionado}
             quincenaSeleccionada={period.quincenaSeleccionada}
-            guardando={budget.guardandoMovimiento}
+            /**
+             * El formulario queda bloqueado tanto durante
+             * un registro nuevo como durante un updateDoc.
+             */
+            guardando={
+              budget.guardandoMovimiento ||
+              budget.actualizandoMovimientoId !== null
+            }
             onRegistrar={budget.registrarMovimiento}
+            /**
+             * 2B.2D
+             *
+             * Edita el documento existente sin eliminarlo
+             * ni crear uno nuevo.
+             */
+            onActualizar={budget.actualizarMovimiento}
+            /**
+             * Limpia ui.selectedMovement y devuelve
+             * el formulario al modo de registro.
+             */
+            onCancelarEdicion={actions.cancelEditingMovement}
             onCrearCategoria={cardCategories.crearCategoria}
             onActualizarCategoria={cardCategories.actualizarCategoria}
             onCambiarEstadoCategoria={cardCategories.cambiarEstado}

@@ -8,6 +8,7 @@ import {
   Fuel,
   LoaderCircle,
   Plus,
+  Save,
   Settings2,
   ShoppingCart,
   Tag,
@@ -28,6 +29,7 @@ import type {
 import type {
   CategoriaPago,
   EstadoTransaccionTarjeta,
+  Movimiento,
   NuevoMovimiento,
   Quincena,
   TarjetaCredito,
@@ -44,6 +46,7 @@ interface VariableMovementFormProps {
   quincenaSeleccionada: Quincena;
 
   guardando: boolean;
+  movimientoEditando: Movimiento | null;
 
   tarjetasActivas: TarjetaCredito[];
 
@@ -64,6 +67,13 @@ interface VariableMovementFormProps {
   reordenandoCategorias: boolean;
 
   onRegistrar: (movimiento: NuevoMovimiento) => Promise<boolean>;
+
+  onActualizar: (
+    movimientoActual: Movimiento,
+    cambios: NuevoMovimiento,
+  ) => Promise<boolean>;
+
+  onCancelarEdicion: () => void;
 
   onCrearCategoria: (datos: NuevaCategoriaTarjeta) => Promise<boolean>;
 
@@ -189,6 +199,7 @@ export function VariableMovementForm({
   mesSeleccionado,
   quincenaSeleccionada,
   guardando,
+  movimientoEditando,
   tarjetasActivas,
   categoriasTarjeta,
   cargandoCategorias,
@@ -196,6 +207,8 @@ export function VariableMovementForm({
   actualizandoCategoriaId,
   reordenandoCategorias,
   onRegistrar,
+  onActualizar,
+  onCancelarEdicion,
   onCrearCategoria,
   onActualizarCategoria,
   onCambiarEstadoCategoria,
@@ -239,15 +252,28 @@ export function VariableMovementForm({
 
   const esGasto = tipo === "gasto";
 
+  const tarjetaEditandoId = movimientoEditando?.tarjetaId ?? null;
+
+  const categoriaEditandoId =
+    movimientoEditando?.tipo === "gasto"
+      ? movimientoEditando.categoriaTarjetaId
+      : null;
+
   const tarjetasDisponibles = useMemo(
-    () => tarjetasActivas.filter((tarjeta) => tarjeta.activa),
-    [tarjetasActivas],
+    () =>
+      tarjetasActivas.filter(
+        (tarjeta) => tarjeta.activa || tarjeta.id === tarjetaEditandoId,
+      ),
+    [tarjetasActivas, tarjetaEditandoId],
   );
 
   const categoriasDisponibles = useMemo(
     () =>
       categoriasTarjeta
-        .filter((categoria) => categoria.activa)
+        .filter(
+          (categoria) =>
+            categoria.activa || categoria.id === categoriaEditandoId,
+        )
         .sort(
           (a, b) =>
             a.orden - b.orden ||
@@ -255,7 +281,7 @@ export function VariableMovementForm({
               sensitivity: "base",
             }),
         ),
-    [categoriasTarjeta],
+    [categoriasTarjeta, categoriaEditandoId],
   );
 
   const categoriaSeleccionada = useMemo(
@@ -273,10 +299,18 @@ export function VariableMovementForm({
   );
 
   useEffect(() => {
+    if (movimientoEditando) {
+      return;
+    }
+
     setFecha(fechaParaPeriodo(mesSeleccionado, quincenaSeleccionada));
-  }, [mesSeleccionado, quincenaSeleccionada]);
+  }, [mesSeleccionado, quincenaSeleccionada, movimientoEditando]);
 
   useEffect(() => {
+    if (movimientoEditando) {
+      return;
+    }
+
     setCategoriaTarjetaId((seleccionActual) => {
       const seleccionValida = categoriasDisponibles.some(
         (categoria) => categoria.id === seleccionActual,
@@ -288,7 +322,7 @@ export function VariableMovementForm({
 
       return categoriasDisponibles[0]?.id ?? "";
     });
-  }, [categoriasDisponibles]);
+  }, [categoriasDisponibles, movimientoEditando]);
 
   /**
    * Si cambia la categoría o cambia el listado de tarjetas activas,
@@ -301,7 +335,7 @@ export function VariableMovementForm({
    * Otro         → Apple
    */
   useEffect(() => {
-    if (!esGasto) {
+    if (!esGasto || movimientoEditando) {
       return;
     }
 
@@ -319,7 +353,48 @@ export function VariableMovementForm({
         tarjetasDisponibles,
       );
     });
-  }, [categoriaSeleccionada, esGasto, tarjetasDisponibles]);
+  }, [categoriaSeleccionada, esGasto, tarjetasDisponibles, movimientoEditando]);
+
+  /**
+   * ============================================================
+   * 2B.2D — PRECARGAR MOVIMIENTO EN EDICIÓN
+   * ============================================================
+   */
+  useEffect(() => {
+    if (!movimientoEditando) {
+      return;
+    }
+
+    setTipo(movimientoEditando.tipo);
+
+    setConcepto(movimientoEditando.concepto);
+
+    setMonto(movimientoEditando.monto.toFixed(2));
+
+    setFecha(movimientoEditando.fecha.slice(0, 10));
+
+    setTarjetaId(movimientoEditando.tarjetaId ?? "");
+
+    setEstadoTarjeta(
+      movimientoEditando.tarjetaId
+        ? (movimientoEditando.estadoTarjeta ?? "contabilizada")
+        : "contabilizada",
+    );
+
+    if (movimientoEditando.tipo === "gasto") {
+      setCategoriaTarjetaId(movimientoEditando.categoriaTarjetaId ?? "");
+
+      setComentario(movimientoEditando.comentario ?? "");
+    } else {
+      setCategoriaPago(movimientoEditando.categoria);
+
+      setComentario("");
+    }
+
+    setErrorLocal(null);
+
+    setFormularioAbierto(true);
+  }, [movimientoEditando]);
 
   const seleccionarCategoria = (categoria: CategoriaTarjeta) => {
     setCategoriaTarjetaId(categoria.id);
@@ -339,6 +414,10 @@ export function VariableMovementForm({
   };
 
   const seleccionarTipo = (nuevoTipo: TipoMovimiento) => {
+    if (movimientoEditando) {
+      return;
+    }
+
     setTipo(nuevoTipo);
 
     setErrorLocal(null);
@@ -466,7 +545,9 @@ export function VariableMovementForm({
             estadoTarjeta,
           };
 
-    const guardado = await onRegistrar(movimiento);
+    const guardado = movimientoEditando
+      ? await onActualizar(movimientoEditando, movimiento)
+      : await onRegistrar(movimiento);
 
     if (!guardado) {
       return;
@@ -485,7 +566,7 @@ export function VariableMovementForm({
      * Después de guardar un gasto dejamos preparado el mismo
      * comportamiento predeterminado para el próximo movimiento.
      */
-    if (tipo === "gasto") {
+    if (!movimientoEditando && tipo === "gasto") {
       setTarjetaId(
         obtenerTarjetaPredeterminada(
           categoriaSeleccionada,
@@ -494,6 +575,9 @@ export function VariableMovementForm({
       );
     }
 
+    if (movimientoEditando) {
+      onCancelarEdicion();
+    }
     /*
      * Después de guardar correctamente cerramos el formulario.
      * El movimiento recién creado queda visible en el historial
@@ -513,28 +597,51 @@ export function VariableMovementForm({
       <div className="flex items-center justify-between gap-3 p-4 sm:p-5">
         <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">
-            Nuevo movimiento
+            {movimientoEditando ? "Editando movimiento" : "Nuevo movimiento"}
           </p>
 
           <h2
             id="variable-form-title"
             className="mt-1 text-lg font-black text-slate-900"
           >
-            Registrar gasto o pago
+            {movimientoEditando
+              ? esGasto
+                ? "Editar gasto"
+                : "Editar pago de tarjeta"
+              : "Registrar gasto o pago"}
           </h2>
 
           <p className="mt-1 text-[11px] font-medium text-slate-500">
-            {formularioAbierto
-              ? esGasto
-                ? "Completa los datos del gasto."
-                : "Completa los datos del pago de tarjeta."
-              : "Abre el formulario solamente cuando necesites registrar un movimiento."}
+            {movimientoEditando
+              ? "Modifica los datos necesarios y guarda los cambios."
+              : formularioAbierto
+                ? esGasto
+                  ? "Completa los datos del gasto."
+                  : "Completa los datos del pago de tarjeta."
+                : "Abre el formulario solamente cuando necesites registrar un movimiento."}
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setFormularioAbierto((actual) => !actual)}
+          onClick={() => {
+            if (movimientoEditando) {
+              onCancelarEdicion();
+
+              setFormularioAbierto(false);
+
+              setConcepto("");
+              setMonto("");
+              setComentario("");
+              setErrorLocal(null);
+
+              setEstadoTarjeta("contabilizada");
+
+              return;
+            }
+
+            setFormularioAbierto((actual) => !actual);
+          }}
           aria-expanded={formularioAbierto}
           aria-controls="variable-movement-form-content"
           className={`inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-2xl px-3.5 text-xs font-black transition active:scale-[0.98] ${
@@ -543,11 +650,13 @@ export function VariableMovementForm({
               : "bg-indigo-600 text-white shadow-sm shadow-indigo-100 hover:bg-indigo-700"
           }`}
         >
-          {formularioAbierto
-            ? "Cerrar"
-            : esGasto
-              ? "Registrar gasto"
-              : "Registrar pago"}
+          {movimientoEditando
+            ? "Cancelar"
+            : formularioAbierto
+              ? "Cerrar"
+              : esGasto
+                ? "Registrar gasto"
+                : "Registrar pago"}
 
           <ChevronDown
             className={`h-4 w-4 transition-transform duration-300 ${
@@ -886,15 +995,21 @@ export function VariableMovementForm({
               >
                 {guardando ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : movimientoEditando ? (
+                  <Save className="h-4 w-4" />
                 ) : (
                   <Plus className="h-4 w-4" />
                 )}
 
                 {guardando
-                  ? "Guardando..."
-                  : esGasto
-                    ? "Registrar gasto"
-                    : "Registrar pago"}
+                  ? movimientoEditando
+                    ? "Actualizando..."
+                    : "Guardando..."
+                  : movimientoEditando
+                    ? "Guardar cambios"
+                    : esGasto
+                      ? "Registrar gasto"
+                      : "Registrar pago"}
               </button>
             </form>
           </div>

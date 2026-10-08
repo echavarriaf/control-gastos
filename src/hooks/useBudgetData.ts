@@ -1056,6 +1056,8 @@ const actualizarMovimiento = async (
     setActualizandoMovimientoId(
       null,
     );
+
+    setGuardandoMovimiento(false);
   }
 };
 
@@ -1333,6 +1335,9 @@ const actualizarPagoFijo = async (
     guardandoMovimiento,
     guardandoPagoFijo,
     guardandoLimites,
+
+    actualizandoMovimientoId,
+    actualizandoPagoFijoId,
 
     eliminandoMovimientoId,
     eliminandoPagoFijoId,
