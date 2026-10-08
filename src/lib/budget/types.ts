@@ -63,6 +63,22 @@ export type MetodoPagoMovimiento =
   | "cuenta_bancaria"
   | "tarjeta_credito";
 
+/**
+ * 2B.2A
+ *
+ * Estado real de una transacción que afecta una tarjeta.
+ *
+ * pendiente:
+ * La institución todavía no ha contabilizado definitivamente
+ * el cargo o pago.
+ *
+ * contabilizada:
+ * La transacción ya forma parte del saldo oficial de la tarjeta.
+ */
+export type EstadoTransaccionTarjeta =
+  | "pendiente"
+  | "contabilizada";
+
 export type PrioridadPago =
   | 1
   | 2
@@ -376,6 +392,19 @@ export interface GastoVariable {
 
   tarjetaId?:
     string | null;
+  
+  /**
+ * 2B.2A
+ *
+ * Solo tiene sentido cuando el gasto fue realizado
+ * con tarjeta de crédito.
+ *
+ * Los documentos históricos pueden no contener este campo.
+ * En ese caso useBudgetData los interpretará como
+ * "contabilizada".
+ */
+estadoTarjeta?:
+  EstadoTransaccionTarjeta | null;
 
   /**
    * Identificador de la categoría configurable elegida al registrar
@@ -425,6 +454,15 @@ export interface PagoTarjeta {
 
   tarjetaId?:
     string | null;
+
+  /**
+ * 2B.2A
+ *
+ * Permite distinguir un pago enviado a la tarjeta
+ * de un pago que ya fue contabilizado.
+ */
+estadoTarjeta?:
+  EstadoTransaccionTarjeta | null;
 
   cicloPagoId?:
     string | null;
@@ -526,6 +564,15 @@ export interface PagoFijo {
 
   tarjetaId?:
     string | null;
+
+  /**
+ * 2B.2A
+ *
+ * Estado del cargo cuando este compromiso fijo
+ * fue pagado utilizando una tarjeta.
+ */
+estadoTarjeta?:
+  EstadoTransaccionTarjeta | null;
 }
 
 export type Movimiento =
@@ -556,6 +603,9 @@ export interface NuevoGastoVariable {
   tarjetaId?:
     string | null;
 
+    estadoTarjeta?:
+  EstadoTransaccionTarjeta | null;
+
   categoriaTarjetaId:
     string;
 
@@ -575,6 +625,9 @@ export interface NuevoPagoTarjeta {
 
   tarjetaId?:
     string | null;
+
+    estadoTarjeta?:
+  EstadoTransaccionTarjeta | null;
 
   cicloPagoId?:
     string | null;
@@ -615,6 +668,9 @@ export interface NuevoPagoFijo {
 
   tarjetaId?:
     string | null;
+
+    estadoTarjeta?:
+  EstadoTransaccionTarjeta | null;
 }
 
 export interface ResumenCategoria {

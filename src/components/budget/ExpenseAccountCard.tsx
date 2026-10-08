@@ -20,18 +20,14 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  type FormEvent,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import {
   calcularResumenCuentaGastos,
   EXPENSE_ACCOUNT_DEFAULT_NAME,
   type MovimientoCuentaGastos,
   type ReservaCompromisoCuenta,
+  type SaldoTarjetaCuenta,
 } from "@/lib/budget/expense-account";
 
 import type {
@@ -42,240 +38,131 @@ import type {
   PagoTarjeta,
 } from "@/lib/budget/types";
 
-import {
-  useExpenseAccount,
-} from "@/hooks/useExpenseAccount";
+import { useExpenseAccount } from "@/hooks/useExpenseAccount";
 
 interface ExpenseAccountCardProps {
-  ingresos:
-    Ingreso[];
+  ingresos: Ingreso[];
 
-  gastos:
-    GastoVariable[];
+  gastos: GastoVariable[];
 
-  pagosFijos:
-    PagoFijo[];
+  pagosFijos: PagoFijo[];
 
-  pagosTarjeta:
-    PagoTarjeta[];
+  pagosTarjeta: PagoTarjeta[];
 
-  compromisosFijos:
-    CompromisoFijo[];
+  saldosTarjetas: SaldoTarjetaCuenta[];
 
-  cargandoIngresos:
-    boolean;
+  compromisosFijos: CompromisoFijo[];
 
-  cargandoPresupuesto:
-    boolean;
+  cargandoIngresos: boolean;
 
-  cargandoCompromisos:
-    boolean;
+  cargandoPresupuesto: boolean;
+
+  cargandoCompromisos: boolean;
 }
 
-const formatoMoneda =
-  new Intl.NumberFormat(
-    "en-US",
-    {
-      style:
-        "currency",
+const formatoMoneda = new Intl.NumberFormat("en-US", {
+  style: "currency",
 
-      currency:
-        "USD",
+  currency: "USD",
 
-      minimumFractionDigits:
-        2,
+  minimumFractionDigits: 2,
 
-      maximumFractionDigits:
-        2,
-    },
-  );
+  maximumFractionDigits: 2,
+});
 
-function fechaHoyISO():
-string {
-  const fecha =
-    new Date();
+function fechaHoyISO(): string {
+  const fecha = new Date();
 
-  const year =
-    fecha.getFullYear();
+  const year = fecha.getFullYear();
 
-  const month =
-    String(
-      fecha.getMonth() + 1,
-    ).padStart(
-      2,
-      "0",
-    );
+  const month = String(fecha.getMonth() + 1).padStart(2, "0");
 
-  const day =
-    String(
-      fecha.getDate(),
-    ).padStart(
-      2,
-      "0",
-    );
+  const day = String(fecha.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
 }
 
-function etiquetaFecha(
-  fechaISO: string,
-): string {
-  const [
-    year,
-    month,
-    day,
-  ] =
-    fechaISO
-      .slice(
-        0,
-        10,
-      )
-      .split("-")
-      .map(Number);
+function etiquetaFecha(fechaISO: string): string {
+  const [year, month, day] = fechaISO.slice(0, 10).split("-").map(Number);
 
-  return new Intl.DateTimeFormat(
-    "es-US",
-    {
-      day:
-        "numeric",
+  return new Intl.DateTimeFormat("es-US", {
+    day: "numeric",
 
-      month:
-        "short",
+    month: "short",
 
-      year:
-        "numeric",
-    },
-  ).format(
-    new Date(
-      year,
-      month - 1,
-      day,
-      12,
-    ),
-  );
+    year: "numeric",
+  }).format(new Date(year, month - 1, day, 12));
 }
 
-function etiquetaPeriodo(
-  periodo: string,
-): string {
-  const [
-    year,
-    month,
-  ] =
-    periodo
-      .split("-")
-      .map(Number);
+function etiquetaPeriodo(periodo: string): string {
+  const [year, month] = periodo.split("-").map(Number);
 
-  if (
-    !Number.isFinite(
-      year,
-    ) ||
-    !Number.isFinite(
-      month,
-    )
-  ) {
+  if (!Number.isFinite(year) || !Number.isFinite(month)) {
     return periodo;
   }
 
-  return new Intl.DateTimeFormat(
-    "es-US",
-    {
-      month:
-        "long",
+  return new Intl.DateTimeFormat("es-US", {
+    month: "long",
 
-      year:
-        "numeric",
-    },
-  ).format(
-    new Date(
-      year,
-      month - 1,
-      1,
-      12,
-    ),
-  );
+    year: "numeric",
+  }).format(new Date(year, month - 1, 1, 12));
 }
 
-function configuracionMovimiento(
-  movimiento:
-    MovimientoCuentaGastos,
-) {
-  switch (
-    movimiento.tipo
-  ) {
+function configuracionMovimiento(movimiento: MovimientoCuentaGastos) {
+  switch (movimiento.tipo) {
     case "saldo_inicial":
       return {
-        icono:
-          Landmark,
+        icono: Landmark,
 
-        iconClass:
-          "bg-slate-100 text-slate-600",
+        iconClass: "bg-slate-100 text-slate-600",
 
-        montoClass:
-          "text-slate-700",
+        montoClass: "text-slate-700",
 
-        signo:
-          "",
+        signo: "",
       };
 
     case "deposito":
       return {
-        icono:
-          ArrowDownToLine,
+        icono: ArrowDownToLine,
 
-        iconClass:
-          "bg-emerald-100 text-emerald-700",
+        iconClass: "bg-emerald-100 text-emerald-700",
 
-        montoClass:
-          "text-emerald-700",
+        montoClass: "text-emerald-700",
 
-        signo:
-          "+",
+        signo: "+",
       };
 
     case "gasto_variable":
       return {
-        icono:
-          Banknote,
+        icono: Banknote,
 
-        iconClass:
-          "bg-rose-100 text-rose-700",
+        iconClass: "bg-rose-100 text-rose-700",
 
-        montoClass:
-          "text-rose-700",
+        montoClass: "text-rose-700",
 
-        signo:
-          "-",
+        signo: "-",
       };
 
     case "pago_fijo":
       return {
-        icono:
-          ReceiptText,
+        icono: ReceiptText,
 
-        iconClass:
-          "bg-amber-100 text-amber-700",
+        iconClass: "bg-amber-100 text-amber-700",
 
-        montoClass:
-          "text-amber-700",
+        montoClass: "text-amber-700",
 
-        signo:
-          "-",
+        signo: "-",
       };
 
     case "pago_tarjeta":
       return {
-        icono:
-          CreditCard,
+        icono: CreditCard,
 
-        iconClass:
-          "bg-violet-100 text-violet-700",
+        iconClass: "bg-violet-100 text-violet-700",
 
-        montoClass:
-          "text-violet-700",
+        montoClass: "text-violet-700",
 
-        signo:
-          "-",
+        signo: "-",
       };
   }
 }
@@ -283,16 +170,11 @@ function configuracionMovimiento(
 function FilaMovimientoCuenta({
   movimiento,
 }: {
-  movimiento:
-    MovimientoCuentaGastos;
+  movimiento: MovimientoCuentaGastos;
 }) {
-  const config =
-    configuracionMovimiento(
-      movimiento,
-    );
+  const config = configuracionMovimiento(movimiento);
 
-  const Icono =
-    config.icono;
+  const Icono = config.icono;
 
   return (
     <div className="flex gap-3 border-b border-slate-100 py-3 last:border-b-0">
@@ -314,20 +196,14 @@ function FilaMovimientoCuenta({
             </p>
 
             <p className="mt-1 text-[10px] font-bold text-slate-400">
-              {etiquetaFecha(
-                movimiento.fecha,
-              )}
+              {etiquetaFecha(movimiento.fecha)}
             </p>
           </div>
 
           <div className="shrink-0 text-right">
-            <p
-              className={`text-sm font-black ${config.montoClass}`}
-            >
+            <p className={`text-sm font-black ${config.montoClass}`}>
               {config.signo}
-              {formatoMoneda.format(
-                movimiento.monto,
-              )}
+              {formatoMoneda.format(movimiento.monto)}
             </p>
 
             <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
@@ -336,17 +212,10 @@ function FilaMovimientoCuenta({
 
             <p
               className={`text-xs font-black ${
-                movimiento
-                  .saldoDespues <
-                0
-                  ? "text-rose-600"
-                  : "text-slate-700"
+                movimiento.saldoDespues < 0 ? "text-rose-600" : "text-slate-700"
               }`}
             >
-              {formatoMoneda.format(
-                movimiento
-                  .saldoDespues,
-              )}
+              {formatoMoneda.format(movimiento.saldoDespues)}
             </p>
           </div>
         </div>
@@ -355,15 +224,8 @@ function FilaMovimientoCuenta({
   );
 }
 
-function FilaReserva({
-  reserva,
-}: {
-  reserva:
-    ReservaCompromisoCuenta;
-}) {
-  const esParcial =
-    reserva.estado ===
-    "parcial";
+function FilaReserva({ reserva }: { reserva: ReservaCompromisoCuenta }) {
+  const esParcial = reserva.estado === "parcial";
 
   return (
     <div className="flex gap-3 border-b border-slate-100 py-3 last:border-b-0">
@@ -385,26 +247,17 @@ function FilaReserva({
             </p>
 
             <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-              Vencimiento día{" "}
-              {reserva.diaVencimiento}
+              Vencimiento día {reserva.diaVencimiento}
               {" · "}
-              Prioridad{" "}
-              {reserva.prioridad}
+              Prioridad {reserva.prioridad}
             </p>
 
             {esParcial ? (
               <p className="mt-1 text-[10px] font-bold text-amber-600">
-                Registrado{" "}
-                {formatoMoneda.format(
-                  reserva
-                    .montoPagadoRegistrado,
-                )}
+                Registrado {formatoMoneda.format(reserva.montoPagadoRegistrado)}
                 {" · "}
                 pendiente{" "}
-                {formatoMoneda.format(
-                  reserva
-                    .montoPendienteRegistrado,
-                )}
+                {formatoMoneda.format(reserva.montoPendienteRegistrado)}
               </p>
             ) : (
               <p className="mt-1 text-[10px] font-semibold text-slate-400">
@@ -415,10 +268,7 @@ function FilaReserva({
 
           <div className="shrink-0 text-right">
             <p className="text-sm font-black text-indigo-700">
-              {formatoMoneda.format(
-                reserva
-                  .montoReservado,
-              )}
+              {formatoMoneda.format(reserva.montoReservado)}
             </p>
 
             <p className="mt-1 text-[9px] font-black uppercase tracking-[0.12em] text-indigo-400">
@@ -442,300 +292,154 @@ export function ExpenseAccountCard({
   gastos,
   pagosFijos,
   pagosTarjeta,
+  saldosTarjetas,
   compromisosFijos,
   cargandoIngresos,
   cargandoPresupuesto,
   cargandoCompromisos,
 }: ExpenseAccountCardProps) {
-  const account =
-    useExpenseAccount();
+  const account = useExpenseAccount();
 
-  const [
-    editando,
-    setEditando,
-  ] =
-    useState(false);
+  const [editando, setEditando] = useState(false);
 
-  const [
-    mostrandoMovimientos,
-    setMostrandoMovimientos,
-  ] =
-    useState(false);
+  const [mostrandoMovimientos, setMostrandoMovimientos] = useState(false);
 
-  const [
-    mostrandoDetalles,
-    setMostrandoDetalles,
-  ] =
-    useState(false);
+  const [mostrandoDetalles, setMostrandoDetalles] = useState(false);
 
-  const [
-    mostrandoReservas,
-    setMostrandoReservas,
-  ] =
-    useState(false);
+  const [mostrandoReservas, setMostrandoReservas] = useState(false);
 
-  const [
-    nombre,
-    setNombre,
-  ] =
-    useState(
-      EXPENSE_ACCOUNT_DEFAULT_NAME,
-    );
+  const [nombre, setNombre] = useState(EXPENSE_ACCOUNT_DEFAULT_NAME);
 
-  const [
-    saldoInicial,
-    setSaldoInicial,
-  ] =
-    useState(
-      "0",
-    );
+  const [saldoInicial, setSaldoInicial] = useState("0");
 
-  const [
-    fechaSaldoInicial,
-    setFechaSaldoInicial,
-  ] =
-    useState(
-      fechaHoyISO,
-    );
+  const [fechaSaldoInicial, setFechaSaldoInicial] = useState(fechaHoyISO);
 
-  const [
-    errorLocal,
-    setErrorLocal,
-  ] =
-    useState<
-      string | null
-    >(
-      null,
-    );
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
-  useEffect(
-    () => {
-      if (
-        !account.cuenta
-      ) {
-        return;
-      }
+  useEffect(() => {
+    if (!account.cuenta) {
+      return;
+    }
 
-      setNombre(
-        account
-          .cuenta
-          .nombre,
-      );
+    setNombre(account.cuenta.nombre);
 
-      setSaldoInicial(
-        String(
-          account
-            .cuenta
-            .saldoInicial,
-        ),
-      );
+    setSaldoInicial(String(account.cuenta.saldoInicial));
 
-      setFechaSaldoInicial(
-        account
-          .cuenta
-          .fechaSaldoInicial,
-      );
-    },
+    setFechaSaldoInicial(account.cuenta.fechaSaldoInicial);
+  }, [account.cuenta]);
+
+  const resumen = useMemo(
+    () =>
+      account.cuenta
+        ? calcularResumenCuentaGastos(
+            account.cuenta,
+            ingresos,
+            gastos,
+            pagosFijos,
+            compromisosFijos,
+            pagosTarjeta,
+            saldosTarjetas,
+          )
+        : null,
     [
       account.cuenta,
+      ingresos,
+      gastos,
+      pagosFijos,
+      compromisosFijos,
+      pagosTarjeta,
+      saldosTarjetas,
     ],
   );
 
-  const resumen =
-    useMemo(
-      () =>
-        account.cuenta
-          ? calcularResumenCuentaGastos(
-              account.cuenta,
-              ingresos,
-              gastos,
-              pagosFijos,
-              compromisosFijos,
-              pagosTarjeta,
-            )
-          : null,
-      [
-        account.cuenta,
-        ingresos,
-        gastos,
-        pagosFijos,
-        compromisosFijos,
-        pagosTarjeta,
-      ],
-    );
-
   const cargandoMovimientos =
-    cargandoIngresos ||
-    cargandoPresupuesto ||
-    cargandoCompromisos;
+    cargandoIngresos || cargandoPresupuesto || cargandoCompromisos;
 
-  const alternarDetallesCuenta =
-    () => {
-      if (
-        mostrandoDetalles
-      ) {
-        setMostrandoReservas(
-          false,
-        );
+  const alternarDetallesCuenta = () => {
+    if (mostrandoDetalles) {
+      setMostrandoReservas(false);
 
-        setMostrandoMovimientos(
-          false,
-        );
-      }
+      setMostrandoMovimientos(false);
+    }
 
-      setMostrandoDetalles(
-        (
-          actual,
-        ) =>
-          !actual,
-      );
-    };
+    setMostrandoDetalles((actual) => !actual);
+  };
 
-  const comenzarEdicion =
-    () => {
-      account
-        .limpiarError();
+  const comenzarEdicion = () => {
+    account.limpiarError();
 
-      setErrorLocal(
-        null,
+    setErrorLocal(null);
+
+    if (account.cuenta) {
+      setNombre(account.cuenta.nombre);
+
+      setSaldoInicial(
+        String(resumen?.saldoActual ?? account.cuenta.saldoInicial),
       );
 
-      if (
-        account.cuenta
-      ) {
-        setNombre(
-          account
-            .cuenta
-            .nombre,
-        );
+      setFechaSaldoInicial(fechaHoyISO());
+    } else {
+      setNombre(EXPENSE_ACCOUNT_DEFAULT_NAME);
 
-        setSaldoInicial(
-          String(
-            resumen
-              ?.saldoActual ??
-              account
-                .cuenta
-                .saldoInicial,
-          ),
-        );
+      setSaldoInicial("0");
 
-        setFechaSaldoInicial(
-          fechaHoyISO(),
-        );
-      } else {
-        setNombre(
-          EXPENSE_ACCOUNT_DEFAULT_NAME,
-        );
+      setFechaSaldoInicial(fechaHoyISO());
+    }
 
-        setSaldoInicial(
-          "0",
-        );
+    setEditando(true);
+  };
 
-        setFechaSaldoInicial(
-          fechaHoyISO(),
-        );
-      }
+  const cancelarEdicion = () => {
+    if (account.guardando) {
+      return;
+    }
 
-      setEditando(
-        true,
-      );
-    };
+    setErrorLocal(null);
 
-  const cancelarEdicion =
-    () => {
-      if (
-        account.guardando
-      ) {
-        return;
-      }
+    setEditando(false);
+  };
 
-      setErrorLocal(
-        null,
-      );
+  const guardar = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-      setEditando(
-        false,
-      );
-    };
+    setErrorLocal(null);
 
-  const guardar =
-    async (
-      event:
-        FormEvent<HTMLFormElement>,
-    ) => {
-      event
-        .preventDefault();
+    const monto = Number(saldoInicial);
 
-      setErrorLocal(
-        null,
-      );
+    if (!nombre.trim()) {
+      setErrorLocal("Escribe el nombre de la cuenta.");
 
-      const monto =
-        Number(
-          saldoInicial,
-        );
+      return;
+    }
 
-      if (
-        !nombre.trim()
-      ) {
-        setErrorLocal(
-          "Escribe el nombre de la cuenta.",
-        );
+    if (!Number.isFinite(monto)) {
+      setErrorLocal("Escribe un saldo inicial válido.");
 
-        return;
-      }
+      return;
+    }
 
-      if (
-        !Number.isFinite(
-          monto,
-        )
-      ) {
-        setErrorLocal(
-          "Escribe un saldo inicial válido.",
-        );
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaSaldoInicial)) {
+      setErrorLocal("Selecciona la fecha del saldo inicial.");
 
-        return;
-      }
+      return;
+    }
 
-      if (
-        !/^\d{4}-\d{2}-\d{2}$/.test(
-          fechaSaldoInicial,
-        )
-      ) {
-        setErrorLocal(
-          "Selecciona la fecha del saldo inicial.",
-        );
+    const guardado = await account.guardarCuenta({
+      nombre: nombre.trim(),
 
-        return;
-      }
+      saldoInicial: monto,
 
-      const guardado =
-        await account
-          .guardarCuenta({
-            nombre:
-              nombre.trim(),
+      fechaSaldoInicial,
 
-            saldoInicial:
-              monto,
+      activa: true,
+    });
 
-            fechaSaldoInicial,
+    if (guardado) {
+      setEditando(false);
+    }
+  };
 
-            activa:
-              true,
-          });
-
-      if (
-        guardado
-      ) {
-        setEditando(
-          false,
-        );
-      }
-    };
-
-  if (
-    account.cargando
-  ) {
+  if (account.cargando) {
     return (
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">
@@ -773,605 +477,578 @@ export function ExpenseAccountCard({
                 </p>
 
                 <h2 className="mt-1 text-lg font-black text-slate-900">
-                  {account
-                    .cuenta
-                    ?.nombre ??
-                    EXPENSE_ACCOUNT_DEFAULT_NAME}
+                  {account.cuenta?.nombre ?? EXPENSE_ACCOUNT_DEFAULT_NAME}
                 </h2>
 
                 <p className="mt-1 max-w-xl text-xs font-medium leading-5 text-slate-500">
-                  Controla cuánto dinero hay realmente en la cuenta y cuánto está libre después de reservar los compromisos.
+                  Controla cuánto dinero hay realmente en la cuenta y cuánto
+                  está libre después de reservar los compromisos.
                 </p>
               </div>
 
               {!editando && (
                 <button
                   type="button"
-                  onClick={
-                    comenzarEdicion
-                  }
+                  onClick={comenzarEdicion}
                   className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
                 >
                   <Pencil className="h-3.5 w-3.5" />
 
-                  {account.configurada
-                    ? "Recalibrar"
-                    : "Configurar"}
+                  {account.configurada ? "Recalibrar" : "Configurar"}
                 </button>
               )}
             </div>
 
-            {!editando &&
-              account.cuenta &&
-              resumen && (
-                <div className="mt-5 space-y-3">
-                  {/*
-                   * =====================================================
-                   * 2B — DISPONIBLE REAL
-                   * =====================================================
-                   */}
-                  <div
-                    className={`rounded-2xl p-4 ${
-                      resumen
-                        .disponibleReal <
-                      0
-                        ? "bg-rose-50"
-                        : "bg-emerald-50"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck
-                            className={`h-4 w-4 ${
-                              resumen
-                                .disponibleReal <
-                              0
-                                ? "text-rose-600"
-                                : "text-emerald-600"
-                            }`}
-                          />
-
-                          <p
-                            className={`text-[10px] font-black uppercase tracking-[0.14em] ${
-                              resumen
-                                .disponibleReal <
-                              0
-                                ? "text-rose-600"
-                                : "text-emerald-600"
-                            }`}
-                          >
-                            Disponible real
-                          </p>
-                        </div>
-
-                        {cargandoMovimientos ? (
-                          <div className="mt-3 flex items-center gap-2 text-sm font-bold text-slate-600">
-                            <LoaderCircle className="h-4 w-4 animate-spin" />
-
-                            Calculando disponibilidad...
-                          </div>
-                        ) : (
-                          <>
-                            <p
-                              className={`mt-2 text-3xl font-black ${
-                                resumen
-                                  .disponibleReal <
-                                0
-                                  ? "text-rose-700"
-                                  : "text-emerald-800"
-                              }`}
-                            >
-                              {formatoMoneda.format(
-                                resumen
-                                  .disponibleReal,
-                              )}
-                            </p>
-
-                            {resumen
-                              .disponibleReal <
-                            0 ? (
-                              <p className="mt-1 text-[11px] font-bold text-rose-600">
-                                Faltan{" "}
-                                {formatoMoneda.format(
-                                  resumen
-                                    .faltanteReal,
-                                )}{" "}
-                                para cubrir los compromisos reservados.
-                              </p>
-                            ) : (
-                              <p className="mt-1 text-[11px] font-semibold text-emerald-700/70">
-                                Este es el dinero que no está reservado actualmente.
-                              </p>
-                            )}
-                          </>
-                        )}
-                      </div>
-
-                      <ShieldCheck
-                        className={`h-7 w-7 ${
-                          resumen
-                            .disponibleReal <
-                          0
-                            ? "text-rose-300"
-                            : "text-emerald-300"
-                        }`}
-                      />
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-black/5 pt-3">
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                          Saldo actual
-                        </p>
+            {!editando && account.cuenta && resumen && (
+              <div className="mt-5 space-y-3">
+                {/*
+                 * =====================================================
+                 * 2B — DISPONIBLE REAL
+                 * =====================================================
+                 */}
+                <div
+                  className={`rounded-2xl p-4 ${
+                    resumen.disponibleReal < 0 ? "bg-rose-50" : "bg-emerald-50"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck
+                          className={`h-4 w-4 ${
+                            resumen.disponibleReal < 0
+                              ? "text-rose-600"
+                              : "text-emerald-600"
+                          }`}
+                        />
 
                         <p
-                          className={`mt-1 text-lg font-black ${
-                            resumen
-                              .saldoActual <
-                            0
-                              ? "text-rose-700"
-                              : "text-slate-800"
+                          className={`text-[10px] font-black uppercase tracking-[0.14em] ${
+                            resumen.disponibleReal < 0
+                              ? "text-rose-600"
+                              : "text-emerald-600"
                           }`}
                         >
-                          {formatoMoneda.format(
-                            resumen
-                              .saldoActual,
-                          )}
+                          Disponible real
                         </p>
                       </div>
 
-                      <div>
-                        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                          Comprometido
-                        </p>
+                      {cargandoMovimientos ? (
+                        <div className="mt-3 flex items-center gap-2 text-sm font-bold text-slate-600">
+                          <LoaderCircle className="h-4 w-4 animate-spin" />
+                          Calculando disponibilidad...
+                        </div>
+                      ) : (
+                        <>
+                          <p
+                            className={`mt-2 text-3xl font-black ${
+                              resumen.disponibleReal < 0
+                                ? "text-rose-700"
+                                : "text-emerald-800"
+                            }`}
+                          >
+                            {formatoMoneda.format(resumen.disponibleReal)}
+                          </p>
 
-                        <p className="mt-1 text-lg font-black text-indigo-700">
-                          -{" "}
-                          {formatoMoneda.format(
-                            resumen
-                              .totalComprometido,
+                          {resumen.disponibleReal < 0 ? (
+                            <p className="mt-1 text-[11px] font-bold text-rose-600">
+                              Faltan{" "}
+                              {formatoMoneda.format(resumen.faltanteReal)} para
+                              cubrir los compromisos reservados.
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-[11px] font-semibold text-emerald-700/70">
+                              Este es el dinero que no está reservado
+                              actualmente.
+                            </p>
                           )}
-                        </p>
-                      </div>
+                        </>
+                      )}
                     </div>
+
+                    <ShieldCheck
+                      className={`h-7 w-7 ${
+                        resumen.disponibleReal < 0
+                          ? "text-rose-300"
+                          : "text-emerald-300"
+                      }`}
+                    />
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={
-                      alternarDetallesCuenta
-                    }
-                    aria-expanded={
-                      mostrandoDetalles
-                    }
-                    aria-controls="expense-account-details"
-                    className="group flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/60"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
-                        <WalletCards className="h-4 w-4" />
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-slate-800">
-                          Desglose de la cuenta
-                        </p>
-
-                        <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
-                          Depósitos, salidas, reservas e historial
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="hidden text-[10px] font-black text-emerald-700 sm:inline">
-                        {mostrandoDetalles
-                          ? "Ocultar"
-                          : "Ver detalles"}
-                      </span>
-
-                      <ChevronDown
-                        className={`h-4 w-4 text-emerald-600 transition-transform duration-300 ${
-                          mostrandoDetalles
-                            ? "rotate-180"
-                            : ""
-                        }`}
-                      />
-                    </div>
-                  </button>
-
-                  <div
-                    id="expense-account-details"
-                    className={`grid transition-all duration-300 ease-out ${
-                      mostrandoDetalles
-                        ? "visible grid-rows-[1fr] opacity-100"
-                        : "invisible grid-rows-[0fr] opacity-0"
-                    }`}
-                  >
-                    <div className="min-h-0 overflow-hidden">
-                      <div className="space-y-3 pt-1">
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <div className="rounded-2xl bg-sky-50 p-4">
-                      <div className="flex items-center gap-2">
-                        <ArrowDownToLine className="h-4 w-4 text-sky-600" />
-
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-600">
-                          Depósitos
-                        </p>
-                      </div>
-
-                      <p className="mt-2 text-xl font-black text-sky-800">
-                        +{" "}
-                        {formatoMoneda.format(
-                          resumen
-                            .totalDepositosDesdeSaldoInicial,
-                        )}
-                      </p>
-
-                      <p className="mt-1 text-[10px] font-semibold text-sky-700/70">
-                        {resumen
-                          .cantidadDepositos ===
-                        1
-                          ? "1 depósito nuevo"
-                          : `${resumen.cantidadDepositos} depósitos nuevos`}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-rose-50 p-4">
-                      <div className="flex items-center gap-2">
-                        <ArrowUpFromLine className="h-4 w-4 text-rose-600" />
-
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-rose-600">
-                          Débito / banco
-                        </p>
-                      </div>
-
-                      <p className="mt-2 text-xl font-black text-rose-700">
-                        -{" "}
-                        {formatoMoneda.format(
-                          resumen
-                            .totalEgresosVariables,
-                        )}
-                      </p>
-
-                      <p className="mt-1 text-[10px] font-semibold text-rose-700/70">
-                        {resumen
-                          .cantidadEgresosVariables ===
-                        1
-                          ? "1 salida variable"
-                          : `${resumen.cantidadEgresosVariables} salidas variables`}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-amber-50 p-4">
-                      <div className="flex items-center gap-2">
-                        <ReceiptText className="h-4 w-4 text-amber-600" />
-
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-600">
-                          Fijos completos
-                        </p>
-                      </div>
-
-                      <p className="mt-2 text-xl font-black text-amber-800">
-                        -{" "}
-                        {formatoMoneda.format(
-                          resumen
-                            .totalEgresosFijos,
-                        )}
-                      </p>
-
-                      <p className="mt-1 text-[10px] font-semibold text-amber-700/70">
-                        {resumen
-                          .cantidadCompromisosFijosCompletos ===
-                        1
-                          ? "1 compromiso completo"
-                          : `${resumen.cantidadCompromisosFijosCompletos} compromisos completos`}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-violet-50 p-4">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-violet-600" />
-
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-600">
-                          Pagos de tarjetas
-                        </p>
-                      </div>
-
-                      <p className="mt-2 text-xl font-black text-violet-800">
-                        -{" "}
-                        {formatoMoneda.format(
-                          resumen
-                            .totalEgresosTarjetas,
-                        )}
-                      </p>
-
-                      <p className="mt-1 text-[10px] font-semibold text-violet-700/70">
-                        {resumen
-                          .cantidadPagosTarjeta ===
-                        1
-                          ? "1 pago realizado"
-                          : `${resumen.cantidadPagosTarjeta} pagos realizados`}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                        Total salidas
-                      </p>
-
-                      <p className="mt-2 text-xl font-black text-slate-800">
-                        -{" "}
-                        {formatoMoneda.format(
-                          resumen
-                            .totalEgresos,
-                        )}
-                      </p>
-
-                      <p className="mt-1 text-[10px] font-semibold text-slate-500">
-                        Variables + fijos + tarjetas
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                        Saldo base
+                  <div className="mt-4 grid grid-cols-2 gap-3 border-t border-black/5 pt-3">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                        Saldo actual
                       </p>
 
                       <p
-                        className={`mt-2 text-xl font-black ${
-                          resumen
-                            .saldoInicial <
-                          0
-                            ? "text-rose-600"
+                        className={`mt-1 text-lg font-black ${
+                          resumen.saldoActual < 0
+                            ? "text-rose-700"
                             : "text-slate-800"
                         }`}
                       >
-                        {formatoMoneda.format(
-                          resumen
-                            .saldoInicial,
-                        )}
+                        {formatoMoneda.format(resumen.saldoActual)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                        Comprometido
                       </p>
 
-                      <div className="mt-2 flex items-center gap-2 text-[10px] font-bold text-slate-500">
-                        <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                      <p className="mt-1 text-lg font-black text-indigo-700">
+                        - {formatoMoneda.format(resumen.totalComprometido)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-                        {etiquetaFecha(
-                          account
-                            .cuenta
-                            .fechaSaldoInicial,
-                        )}
-                      </div>
+                <button
+                  type="button"
+                  onClick={alternarDetallesCuenta}
+                  aria-expanded={mostrandoDetalles}
+                  aria-controls="expense-account-details"
+                  className="group flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-emerald-200 hover:bg-emerald-50/60"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+                      <WalletCards className="h-4 w-4" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-slate-800">
+                        Desglose de la cuenta
+                      </p>
+
+                      <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
+                        Depósitos, salidas, reservas e historial
+                      </p>
                     </div>
                   </div>
 
-                  {/*
-                   * =====================================================
-                   * DETALLE DEL DINERO COMPROMETIDO
-                   * =====================================================
-                   */}
-                  <div className="overflow-hidden rounded-2xl border border-indigo-100">
-                    <button
-                      type="button"
-                      onClick={
-                        () =>
-                          setMostrandoReservas(
-                            (
-                              actual,
-                            ) =>
-                              !actual,
-                          )
-                      }
-                      className="flex w-full items-center justify-between gap-3 bg-indigo-50/70 px-4 py-3 text-left transition hover:bg-indigo-50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm">
-                          <LockKeyhole className="h-4 w-4" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="hidden text-[10px] font-black text-emerald-700 sm:inline">
+                      {mostrandoDetalles ? "Ocultar" : "Ver detalles"}
+                    </span>
+
+                    <ChevronDown
+                      className={`h-4 w-4 text-emerald-600 transition-transform duration-300 ${
+                        mostrandoDetalles ? "rotate-180" : ""
+                      }`}
+                    />
+                  </div>
+                </button>
+
+                <div
+                  id="expense-account-details"
+                  className={`grid transition-all duration-300 ease-out ${
+                    mostrandoDetalles
+                      ? "visible grid-rows-[1fr] opacity-100"
+                      : "invisible grid-rows-[0fr] opacity-0"
+                  }`}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="space-y-3 pt-1">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="rounded-2xl bg-sky-50 p-4">
+                          <div className="flex items-center gap-2">
+                            <ArrowDownToLine className="h-4 w-4 text-sky-600" />
+
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-600">
+                              Depósitos
+                            </p>
+                          </div>
+
+                          <p className="mt-2 text-xl font-black text-sky-800">
+                            +{" "}
+                            {formatoMoneda.format(
+                              resumen.totalDepositosDesdeSaldoInicial,
+                            )}
+                          </p>
+
+                          <p className="mt-1 text-[10px] font-semibold text-sky-700/70">
+                            {resumen.cantidadDepositos === 1
+                              ? "1 depósito nuevo"
+                              : `${resumen.cantidadDepositos} depósitos nuevos`}
+                          </p>
                         </div>
 
-                        <div>
-                          <p className="text-xs font-black text-slate-800">
-                            Dinero comprometido
+                        <div className="rounded-2xl bg-rose-50 p-4">
+                          <div className="flex items-center gap-2">
+                            <ArrowUpFromLine className="h-4 w-4 text-rose-600" />
+
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-rose-600">
+                              Débito / banco
+                            </p>
+                          </div>
+
+                          <p className="mt-2 text-xl font-black text-rose-700">
+                            -{" "}
+                            {formatoMoneda.format(
+                              resumen.totalEgresosVariables,
+                            )}
                           </p>
 
-                          <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                            {resumen
-                              .cantidadCompromisosReservados ===
-                            1
-                              ? `1 compromiso · ${etiquetaPeriodo(resumen.periodoReserva)}`
-                              : `${resumen.cantidadCompromisosReservados} compromisos · ${etiquetaPeriodo(resumen.periodoReserva)}`}
+                          <p className="mt-1 text-[10px] font-semibold text-rose-700/70">
+                            {resumen.cantidadEgresosVariables === 1
+                              ? "1 salida variable"
+                              : `${resumen.cantidadEgresosVariables} salidas variables`}
                           </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-amber-50 p-4">
+                          <div className="flex items-center gap-2">
+                            <ReceiptText className="h-4 w-4 text-amber-600" />
+
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-600">
+                              Fijos completos
+                            </p>
+                          </div>
+
+                          <p className="mt-2 text-xl font-black text-amber-800">
+                            - {formatoMoneda.format(resumen.totalEgresosFijos)}
+                          </p>
+
+                          <p className="mt-1 text-[10px] font-semibold text-amber-700/70">
+                            {resumen.cantidadCompromisosFijosCompletos === 1
+                              ? "1 compromiso completo"
+                              : `${resumen.cantidadCompromisosFijosCompletos} compromisos completos`}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-violet-50 p-4">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4 text-violet-600" />
+
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-600">
+                              Pagos de tarjetas
+                            </p>
+                          </div>
+
+                          <p className="mt-2 text-xl font-black text-violet-800">
+                            -{" "}
+                            {formatoMoneda.format(resumen.totalEgresosTarjetas)}
+                          </p>
+
+                          <p className="mt-1 text-[10px] font-semibold text-violet-700/70">
+                            {resumen.cantidadPagosTarjeta === 1
+                              ? "1 pago realizado"
+                              : `${resumen.cantidadPagosTarjeta} pagos realizados`}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-slate-50 p-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            Total salidas
+                          </p>
+
+                          <p className="mt-2 text-xl font-black text-slate-800">
+                            - {formatoMoneda.format(resumen.totalEgresos)}
+                          </p>
+
+                          <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                            Variables + fijos + tarjetas
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl bg-slate-50 p-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            Saldo base
+                          </p>
+
+                          <p
+                            className={`mt-2 text-xl font-black ${
+                              resumen.saldoInicial < 0
+                                ? "text-rose-600"
+                                : "text-slate-800"
+                            }`}
+                          >
+                            {formatoMoneda.format(resumen.saldoInicial)}
+                          </p>
+
+                          <div className="mt-2 flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                            <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+
+                            {etiquetaFecha(account.cuenta.fechaSaldoInicial)}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <p className="text-sm font-black text-indigo-700">
-                          {formatoMoneda.format(
-                            resumen
-                              .totalComprometido,
+                      {/*
+                       * =====================================================
+                       * DETALLE DEL DINERO COMPROMETIDO
+                       * =====================================================
+                       */}
+                      <div className="overflow-hidden rounded-2xl border border-indigo-100">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMostrandoReservas((actual) => !actual)
+                          }
+                          className="flex w-full items-center justify-between gap-3 bg-indigo-50/70 px-4 py-3 text-left transition hover:bg-indigo-50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-indigo-600 shadow-sm">
+                              <LockKeyhole className="h-4 w-4" />
+                            </div>
+
+                            <div>
+                              <p className="text-xs font-black text-slate-800">
+                                Dinero comprometido
+                              </p>
+
+                              <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                                {resumen.cantidadCompromisosReservados === 1
+                                  ? `1 compromiso fijo · ${etiquetaPeriodo(
+                                      resumen.periodoReserva,
+                                    )}`
+                                  : `${resumen.cantidadCompromisosReservados} compromisos fijos · ${etiquetaPeriodo(
+                                      resumen.periodoReserva,
+                                    )}`}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-sm font-black text-indigo-700">
+                                {formatoMoneda.format(
+                                  resumen.totalComprometido,
+                                )}
+                              </p>
+
+                              <p className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-indigo-400">
+                                Total
+                              </p>
+                            </div>
+
+                            {mostrandoReservas ? (
+                              <ChevronUp className="h-4 w-4 text-indigo-400" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-indigo-400" />
+                            )}
+                          </div>
+                        </button>
+
+                        {mostrandoReservas && (
+                          <div className="bg-white">
+                            {/*
+                             * ===================================================
+                             * 2B.2 — DESGLOSE DEL TOTAL COMPROMETIDO
+                             * ===================================================
+                             */}
+                            <div className="border-b border-indigo-100 bg-indigo-50/30 px-4 py-4">
+                              <div className="space-y-2.5">
+                                <div className="flex items-center justify-between gap-4">
+                                  <div>
+                                    <p className="text-[10px] font-black text-slate-600">
+                                      Reservas fijas
+                                    </p>
+
+                                    <p className="mt-0.5 text-[9px] font-semibold text-slate-400">
+                                      Compromisos pendientes del mes
+                                    </p>
+                                  </div>
+
+                                  <p className="text-xs font-black text-slate-700">
+                                    {formatoMoneda.format(
+                                      resumen.totalReservasFijas,
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-4">
+                                  <div>
+                                    <p className="text-[10px] font-black text-violet-700">
+                                      Tarjetas reservadas
+                                    </p>
+
+                                    <p className="mt-0.5 text-[9px] font-semibold text-slate-400">
+                                      Pagos de tarjeta que requieren dinero de
+                                      la cuenta
+                                    </p>
+                                  </div>
+
+                                  <p className="text-xs font-black text-violet-700">
+                                    +{" "}
+                                    {formatoMoneda.format(
+                                      resumen.totalDeudaTarjetas,
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-4">
+                                  <div>
+                                    <p className="text-[10px] font-black text-emerald-700">
+                                      Solapamiento
+                                    </p>
+
+                                    <p className="mt-0.5 text-[9px] font-semibold text-slate-400">
+                                      Parte ya incluida tanto en fijos como en
+                                      tarjetas
+                                    </p>
+                                  </div>
+
+                                  <p className="text-xs font-black text-emerald-700">
+                                    -{" "}
+                                    {formatoMoneda.format(
+                                      resumen.totalSolapamientoTarjetas,
+                                    )}
+                                  </p>
+                                </div>
+
+                                <div className="border-t border-indigo-100 pt-2.5">
+                                  <div className="flex items-center justify-between gap-4">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-indigo-600">
+                                      Total comprometido
+                                    </p>
+
+                                    <p className="text-sm font-black text-indigo-800">
+                                      {formatoMoneda.format(
+                                        resumen.totalComprometido,
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/*
+                             * ===================================================
+                             * COMPROMISOS FIJOS INDIVIDUALES
+                             * ===================================================
+                             */}
+                            {resumen.reservasCompromisos.length === 0 ? (
+                              <div className="px-4 py-8 text-center">
+                                <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-400" />
+
+                                <p className="mt-3 text-xs font-black text-slate-600">
+                                  No hay compromisos fijos pendientes
+                                </p>
+
+                                <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                                  No existen reservas fijas pendientes para este
+                                  periodo.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="max-h-[28rem] overflow-y-auto px-4">
+                                {resumen.reservasCompromisos.map((reserva) => (
+                                  <FilaReserva
+                                    key={reserva.id}
+                                    reserva={reserva}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/*
+                       * =====================================================
+                       * HISTORIAL
+                       * =====================================================
+                       */}
+                      <div className="overflow-hidden rounded-2xl border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMostrandoMovimientos((actual) => !actual)
+                          }
+                          className="flex w-full items-center justify-between gap-3 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm">
+                              <WalletCards className="h-4 w-4" />
+                            </div>
+
+                            <div>
+                              <p className="text-xs font-black text-slate-800">
+                                Historial de la cuenta
+                              </p>
+
+                              <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                                {Math.max(resumen.movimientos.length - 1, 0)}{" "}
+                                movimientos desde el saldo base
+                              </p>
+                            </div>
+                          </div>
+
+                          {mostrandoMovimientos ? (
+                            <ChevronUp className="h-4 w-4 text-slate-400" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-slate-400" />
                           )}
+                        </button>
+
+                        {mostrandoMovimientos && (
+                          <div className="bg-white">
+                            {resumen.movimientos.length === 1 ? (
+                              <div className="px-4 py-8 text-center">
+                                <WalletCards className="mx-auto h-7 w-7 text-slate-300" />
+
+                                <p className="mt-3 text-xs font-black text-slate-600">
+                                  Todavía no hay movimientos nuevos
+                                </p>
+
+                                <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                                  El historial comenzará desde el saldo base
+                                  configurado.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="max-h-[32rem] overflow-y-auto px-4">
+                                {resumen.movimientos.map((movimiento) => (
+                                  <FilaMovimientoCuenta
+                                    key={movimiento.id}
+                                    movimiento={movimiento}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-1 px-1">
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Disponible real = saldo actual - dinero comprometido
+                        </div>
+
+                        <p className="text-[10px] font-semibold text-slate-400">
+                          Un gasto fijo parcial mantiene reservado su monto
+                          completo hasta quedar totalmente pagado.
                         </p>
 
-                        {mostrandoReservas ? (
-                          <ChevronUp className="h-4 w-4 text-indigo-400" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-indigo-400" />
-                        )}
-                      </div>
-                    </button>
-
-                    {mostrandoReservas && (
-                      <div className="bg-white">
-                        {resumen
-                          .reservasCompromisos
-                          .length ===
-                        0 ? (
-                          <div className="px-4 py-8 text-center">
-                            <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-400" />
-
-                            <p className="mt-3 text-xs font-black text-slate-600">
-                              No hay compromisos pendientes
-                            </p>
-
-                            <p className="mt-1 text-[10px] font-semibold text-slate-400">
-                              El saldo actual está completamente libre de reservas fijas del mes.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="max-h-[28rem] overflow-y-auto px-4">
-                            {resumen
-                              .reservasCompromisos
-                              .map(
-                                (
-                                  reserva,
-                                ) => (
-                                  <FilaReserva
-                                    key={
-                                      reserva.id
-                                    }
-                                    reserva={
-                                      reserva
-                                    }
-                                  />
-                                ),
-                              )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/*
-                   * =====================================================
-                   * HISTORIAL
-                   * =====================================================
-                   */}
-                  <div className="overflow-hidden rounded-2xl border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={
-                        () =>
-                          setMostrandoMovimientos(
-                            (
-                              actual,
-                            ) =>
-                              !actual,
-                          )
-                      }
-                      className="flex w-full items-center justify-between gap-3 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm">
-                          <WalletCards className="h-4 w-4" />
-                        </div>
-
-                        <div>
-                          <p className="text-xs font-black text-slate-800">
-                            Historial de la cuenta
-                          </p>
-
-                          <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                            {Math.max(
-                              resumen
-                                .movimientos
-                                .length -
-                                1,
-                              0,
-                            )} movimientos desde el saldo base
-                          </p>
-                        </div>
-                      </div>
-
-                      {mostrandoMovimientos ? (
-                        <ChevronUp className="h-4 w-4 text-slate-400" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-slate-400" />
-                      )}
-                    </button>
-
-                    {mostrandoMovimientos && (
-                      <div className="bg-white">
-                        {resumen
-                          .movimientos
-                          .length ===
-                        1 ? (
-                          <div className="px-4 py-8 text-center">
-                            <WalletCards className="mx-auto h-7 w-7 text-slate-300" />
-
-                            <p className="mt-3 text-xs font-black text-slate-600">
-                              Todavía no hay movimientos nuevos
-                            </p>
-
-                            <p className="mt-1 text-[10px] font-semibold text-slate-400">
-                              El historial comenzará desde el saldo base configurado.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="max-h-[32rem] overflow-y-auto px-4">
-                            {resumen
-                              .movimientos
-                              .map(
-                                (
-                                  movimiento,
-                                ) => (
-                                  <FilaMovimientoCuenta
-                                    key={
-                                      movimiento.id
-                                    }
-                                    movimiento={
-                                      movimiento
-                                    }
-                                  />
-                                ),
-                              )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                        <div className="space-y-1 px-1">
-                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-
-                            Disponible real = saldo actual - dinero comprometido
-                          </div>
-
-                          <p className="text-[10px] font-semibold text-slate-400">
-                            Un gasto fijo parcial mantiene reservado su monto completo hasta quedar totalmente pagado.
-                          </p>
-
-                          <p className="text-[10px] font-semibold text-slate-400">
-                            Los compromisos inactivos y los ya completados no consumen Disponible real.
-                          </p>
-                        </div>
+                        <p className="text-[10px] font-semibold text-slate-400">
+                          Los compromisos inactivos y los ya completados no
+                          consumen Disponible real.
+                        </p>
                       </div>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-            {!editando &&
-              !account.cuenta && (
-                <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                  <p className="text-sm font-black text-slate-700">
-                    La cuenta todavía no tiene un saldo inicial.
-                  </p>
+            {!editando && !account.cuenta && (
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                <p className="text-sm font-black text-slate-700">
+                  La cuenta todavía no tiene un saldo inicial.
+                </p>
 
-                  <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-                    Configura el saldo que muestra actualmente el banco y la fecha de esa fotografía.
-                  </p>
-                </div>
-              )}
+                <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+                  Configura el saldo que muestra actualmente el banco y la fecha
+                  de esa fotografía.
+                </p>
+              </div>
+            )}
 
             {editando && (
-              <form
-                onSubmit={
-                  guardar
-                }
-                className="mt-5 space-y-4"
-              >
+              <form onSubmit={guardar} className="mt-5 space-y-4">
                 <div>
                   <label
                     htmlFor="expense-account-name"
@@ -1383,25 +1060,10 @@ export function ExpenseAccountCard({
                   <input
                     id="expense-account-name"
                     type="text"
-                    value={
-                      nombre
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setNombre(
-                        event
-                          .target
-                          .value,
-                      )
-                    }
-                    maxLength={
-                      100
-                    }
-                    disabled={
-                      account
-                        .guardando
-                    }
+                    value={nombre}
+                    onChange={(event) => setNombre(event.target.value)}
+                    maxLength={100}
+                    disabled={account.guardando}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
                   />
                 </div>
@@ -1427,22 +1089,11 @@ export function ExpenseAccountCard({
                         step="0.01"
                         min="-1000000"
                         max="1000000"
-                        value={
-                          saldoInicial
+                        value={saldoInicial}
+                        onChange={(event) =>
+                          setSaldoInicial(event.target.value)
                         }
-                        onChange={(
-                          event,
-                        ) =>
-                          setSaldoInicial(
-                            event
-                              .target
-                              .value,
-                          )
-                        }
-                        disabled={
-                          account
-                            .guardando
-                        }
+                        disabled={account.guardando}
                         className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-7 pr-3 text-sm font-bold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
                       />
                     </div>
@@ -1459,75 +1110,50 @@ export function ExpenseAccountCard({
                     <input
                       id="expense-account-date"
                       type="date"
-                      value={
-                        fechaSaldoInicial
+                      value={fechaSaldoInicial}
+                      onChange={(event) =>
+                        setFechaSaldoInicial(event.target.value)
                       }
-                      onChange={(
-                        event,
-                      ) =>
-                        setFechaSaldoInicial(
-                          event
-                            .target
-                            .value,
-                        )
-                      }
-                      disabled={
-                        account
-                          .guardando
-                      }
+                      disabled={account.guardando}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
                     />
                   </div>
                 </div>
 
                 <div className="rounded-xl bg-sky-50 px-3 py-2.5 text-[11px] font-semibold leading-5 text-sky-700">
-                  Al recalibrar, los movimientos registrados hasta esta fecha se consideran incluidos dentro del nuevo saldo base.
+                  Al recalibrar, los movimientos registrados hasta esta fecha se
+                  consideran incluidos dentro del nuevo saldo base.
                 </div>
 
-                {(errorLocal ||
-                  account.error) && (
+                {(errorLocal || account.error) && (
                   <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-700">
-                    {errorLocal ??
-                      account.error}
+                    {errorLocal ?? account.error}
                   </div>
                 )}
 
                 <div className="flex flex-wrap justify-end gap-2">
                   <button
                     type="button"
-                    onClick={
-                      cancelarEdicion
-                    }
-                    disabled={
-                      account
-                        .guardando
-                    }
+                    onClick={cancelarEdicion}
+                    disabled={account.guardando}
                     className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                   >
                     <X className="h-4 w-4" />
-
                     Cancelar
                   </button>
 
                   <button
                     type="submit"
-                    disabled={
-                      account
-                        .guardando
-                    }
+                    disabled={account.guardando}
                     className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {account
-                      .guardando ? (
+                    {account.guardando ? (
                       <LoaderCircle className="h-4 w-4 animate-spin" />
                     ) : (
                       <Save className="h-4 w-4" />
                     )}
 
-                    {account
-                      .guardando
-                      ? "Guardando..."
-                      : "Guardar cuenta"}
+                    {account.guardando ? "Guardando..." : "Guardar cuenta"}
                   </button>
                 </div>
               </form>

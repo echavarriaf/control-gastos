@@ -104,7 +104,7 @@ export function FixedPaymentModal({
       ),
     );
 
-    setMetodo("transferencia");
+    setMetodo(compromiso.metodoPagoPreferido,);
     setPeriodicidad("mensual");
     setReferencia("");
     setNotas("");

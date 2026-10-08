@@ -123,6 +123,15 @@ export function useBudgetDashboard() {
 
       gastos:
         budget.gastos,
+      
+      /**
+     * 2B.2
+     *
+     * Los pagos fijos realizados con tarjeta
+     * también generan deuda de tarjeta.
+     */
+    pagosFijos:
+      budget.pagosFijos,
 
       pagos:
         budget.pagos,

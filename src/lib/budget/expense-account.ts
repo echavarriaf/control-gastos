@@ -25,6 +25,7 @@ import type {
   Ingreso,
   PagoFijo,
   PagoTarjeta,
+  Quincena
 } from "@/lib/budget/types";
 
 export const EXPENSE_ACCOUNT_ID =
@@ -49,10 +50,10 @@ export interface MovimientoCuentaGastos {
   id: string;
 
   tipo:
-    TipoMovimientoCuenta;
+  TipoMovimientoCuenta;
 
   direccion:
-    DireccionMovimientoCuenta;
+  DireccionMovimientoCuenta;
 
   fecha: string;
 
@@ -92,7 +93,7 @@ export interface ReservaCompromisoCuenta {
   prioridad: number;
 
   estado:
-    EstadoReservaCompromiso;
+  EstadoReservaCompromiso;
 }
 
 export interface CuentaGastos {
@@ -107,16 +108,16 @@ export interface CuentaGastos {
   activa: boolean;
 
   ingresosIncluidosEnSaldoInicial:
-    string[];
+  string[];
 
   gastosIncluidosEnSaldoInicial:
-    string[];
+  string[];
 
   pagosFijosIncluidosEnSaldoInicial:
-    string[];
+  string[];
 
   pagosTarjetaIncluidosEnSaldoInicial:
-    string[];
+  string[];
 }
 
 export interface GuardarCuentaGastosInput {
@@ -129,32 +130,76 @@ export interface GuardarCuentaGastosInput {
   activa: boolean;
 }
 
+/**
+ * 2B.2
+ *
+ * Saldo pendiente de una tarjeta que debe reservarse
+ * dentro de la Cuenta de gastos.
+ */
+export interface SaldoTarjetaCuenta {
+  tarjetaId:
+  string;
+
+  /**
+   * Cantidad que realmente requiere reserva bancaria
+   * según la ventana de pago de la tarjeta.
+   */
+  montoReservarCuenta:
+  number;
+}
+
 export interface ResumenCuentaGastos {
   saldoInicial: number;
 
   totalDepositosDesdeSaldoInicial:
-    number;
+  number;
 
   totalEgresosVariables:
-    number;
+  number;
 
   totalEgresosFijos:
-    number;
+  number;
 
   totalEgresosTarjetas:
-    number;
+  number;
 
   totalEgresos:
-    number;
+  number;
 
   saldoActual: number;
 
   /**
-   * Dinero reservado para compromisos fijos activos
-   * del mes actual que todavía no están completos.
+ * 2B.2
+ *
+ * Reservas de compromisos fijos todavía pendientes.
+ */
+  totalReservasFijas:
+  number;
+
+  /**
+   * Deuda positiva actualmente pendiente en tarjetas.
+   */
+  totalDeudaTarjetas:
+  number;
+
+  /**
+   * Parte de la deuda de tarjetas que ya está representada
+   * dentro de una reserva fija parcial.
+   *
+   * Se resta para evitar doble conteo.
+   */
+  totalSolapamientoTarjetas:
+  number;
+
+  /**
+   * Total realmente comprometido:
+   *
+   * reservas fijas
+   * + deuda tarjetas
+   * - solapamiento
    */
   totalComprometido:
-    number;
+  number;
 
   /**
    * Dinero realmente libre después de separar
@@ -163,77 +208,77 @@ export interface ResumenCuentaGastos {
    * Puede ser negativo para mostrar un déficit real.
    */
   disponibleReal:
-    number;
+  number;
 
   faltanteReal:
-    number;
+  number;
 
   cantidadDepositos:
-    number;
+  number;
 
   cantidadEgresosVariables:
-    number;
+  number;
 
   cantidadCompromisosFijosCompletos:
-    number;
+  number;
 
   cantidadPagosTarjeta:
-    number;
+  number;
 
   cantidadCompromisosReservados:
-    number;
+  number;
 
   periodoReserva:
-    string;
+  string;
 
   depositos:
-    Ingreso[];
+  Ingreso[];
 
   egresosVariables:
-    GastoVariable[];
+  GastoVariable[];
 
   egresosFijos:
-    PagoFijo[];
+  PagoFijo[];
 
   egresosTarjetas:
-    PagoTarjeta[];
+  PagoTarjeta[];
 
   reservasCompromisos:
-    ReservaCompromisoCuenta[];
+  ReservaCompromisoCuenta[];
 
   movimientos:
-    MovimientoCuentaGastos[];
+  MovimientoCuentaGastos[];
 }
 
 interface GrupoPagoFijo {
   key: string;
 
   compromiso:
-    CompromisoFijo;
+  CompromisoFijo;
 
   periodo: string;
 
   pagos:
-    PagoFijo[];
+  PagoFijo[];
 
   totalPagado:
-    number;
+  number;
 
   completo:
-    boolean;
+  boolean;
 }
 
 interface MovimientoPendienteSaldo {
   id: string;
 
   tipo:
-    Exclude<
-      TipoMovimientoCuenta,
-      "saldo_inicial"
-    >;
+  Exclude<
+    TipoMovimientoCuenta,
+    "saldo_inicial"
+  >;
 
   direccion:
-    "entrada" | "salida";
+  "entrada" | "salida";
 
   fecha: string;
 
@@ -265,7 +310,7 @@ function esObjeto(
 > {
   return (
     typeof value ===
-      "object" &&
+    "object" &&
     value !== null
   );
 }
@@ -275,7 +320,7 @@ function esFechaCalendarioValida(
 ): value is string {
   if (
     typeof value !==
-      "string" ||
+    "string" ||
     !/^\d{4}-\d{2}-\d{2}$/.test(
       value,
     )
@@ -303,11 +348,11 @@ function esFechaCalendarioValida(
 
   return (
     fecha.getUTCFullYear() ===
-      year &&
+    year &&
     fecha.getUTCMonth() + 1 ===
-      month &&
+    month &&
     fecha.getUTCDate() ===
-      day
+    day
   );
 }
 
@@ -322,9 +367,9 @@ function normalizarSaldo(
       numero,
     ) ||
     numero <
-      SALDO_MINIMO ||
+    SALDO_MINIMO ||
     numero >
-      SALDO_MAXIMO
+    SALDO_MAXIMO
   ) {
     return null;
   }
@@ -353,11 +398,11 @@ function normalizarIds(
             item,
           ): item is string =>
             typeof item ===
-              "string" &&
+            "string" &&
             item
               .trim()
               .length >
-              0,
+            0,
         )
         .map(
           (item) =>
@@ -376,7 +421,7 @@ function redondearMoneda(
         value +
         Number.EPSILON
       ) *
-        100,
+      100,
     ) /
     100
   );
@@ -428,6 +473,22 @@ function obtenerPeriodoLocal(
   return `${year}-${month}`;
 }
 
+/**
+ * Obtiene la quincena calendario usada como fallback.
+ *
+ * Más adelante el componente puede suministrar explícitamente
+ * la quincena financiera financiada por el ciclo de ingreso.
+ */
+function obtenerQuincenaLocal(
+  fecha:
+    Date,
+): Quincena {
+  return fecha.getDate() <=
+    15
+    ? 1
+    : 2;
+}
+
 function obtenerFechaMasReciente(
   pagos:
     PagoFijo[],
@@ -445,7 +506,7 @@ function obtenerFechaMasReciente(
       if (
         !fechaMasReciente ||
         fecha >
-          fechaMasReciente
+        fechaMasReciente
       ) {
         return fecha;
       }
@@ -475,7 +536,7 @@ function etiquetaFuenteIngreso(
     Ingreso,
 ): string {
   switch (
-    ingreso.fuente
+  ingreso.fuente
   ) {
     case "salario":
       return "Salario";
@@ -500,9 +561,9 @@ export function gastoSaleDeCuenta(
 ): boolean {
   return (
     gasto.metodoPago ===
-      "debito" ||
+    "debito" ||
     gasto.metodoPago ===
-      "cuenta_bancaria"
+    "cuenta_bancaria"
   );
 }
 
@@ -512,9 +573,9 @@ export function pagoFijoSaleDeCuenta(
 ): boolean {
   return (
     pago.metodo ===
-      "debito_automatico" ||
+    "debito_automatico" ||
     pago.metodo ===
-      "transferencia"
+    "transferencia"
   );
 }
 
@@ -540,7 +601,7 @@ export function validarCuentaGastos(
   if (
     !nombre ||
     nombre.length >
-      100
+    100
   ) {
     throw new Error(
       "El nombre de la cuenta debe contener entre 1 y 100 caracteres.",
@@ -574,7 +635,7 @@ export function validarCuentaGastos(
 
   const activa =
     input.activa ===
-    undefined
+      undefined
       ? true
       : input.activa;
 
@@ -674,13 +735,13 @@ function construirGruposPagosFijos(
       string,
       {
         compromiso:
-          CompromisoFijo;
+        CompromisoFijo;
 
         periodo:
-          string;
+        string;
 
         pagos:
-          PagoFijo[];
+        PagoFijo[];
       }
     >();
 
@@ -819,6 +880,9 @@ function construirReservasCompromisos(
 
   periodo:
     string,
+
+  quincena:
+    Quincena,
 ): ReservaCompromisoCuenta[] {
   const pagosPeriodo =
     pagosFijos.filter(
@@ -831,8 +895,13 @@ function construirReservasCompromisos(
 
   return compromisosFijos
     .filter(
-      (compromiso) =>
-        compromiso.activo,
+      (
+        compromiso,
+      ) =>
+        compromiso.activo &&
+        compromiso
+          .quincenaPresupuestaria ===
+        quincena,
     )
     .flatMap(
       (
@@ -875,7 +944,7 @@ function construirReservasCompromisos(
           redondearMoneda(
             Math.max(
               compromiso.monto -
-                montoPagadoRegistrado,
+              montoPagadoRegistrado,
               0,
             ),
           );
@@ -916,7 +985,7 @@ function construirReservasCompromisos(
 
             estado:
               montoPagadoRegistrado >
-              0
+                0
                 ? "parcial"
                 : "pendiente",
           },
@@ -954,6 +1023,203 @@ function construirReservasCompromisos(
         );
       },
     );
+}
+
+/**
+ * ============================================================
+ * 2B.2
+ * DEUDA DE TARJETAS Y SOLAPAMIENTO CON COMPROMISOS FIJOS
+ * ============================================================
+ *
+ * Un compromiso parcial continúa reservando su monto completo.
+ *
+ * Sin embargo, si una parte ya fue cargada a una tarjeta,
+ * esa misma cantidad también aparece dentro del saldo de la
+ * tarjeta.
+ *
+ * Ejemplo:
+ *
+ * compromiso                  $145
+ * cargado a Apple              $50
+ * deuda Apple                  $50
+ *
+ * Sin corrección:
+ *
+ * reserva fija                $145
+ * deuda tarjeta                $50
+ * total                       $195  <- incorrecto
+ *
+ * Con solapamiento:
+ *
+ * reserva fija                $145
+ * deuda tarjeta                $50
+ * solapamiento                -$50
+ * total                       $145
+ */
+function calcularCompromisoTarjetas(
+  pagosFijos:
+    PagoFijo[],
+
+  reservasCompromisos:
+    ReservaCompromisoCuenta[],
+
+  periodo:
+    string,
+
+  saldosTarjetas:
+    SaldoTarjetaCuenta[],
+): {
+  totalDeudaTarjetas:
+  number;
+
+  totalSolapamientoTarjetas:
+  number;
+} {
+  /**
+   * Solamente los compromisos todavía reservados
+   * pueden generar doble conteo.
+   */
+  const compromisosReservados =
+    new Set(
+      reservasCompromisos.map(
+        (
+          reserva,
+        ) =>
+          reserva.id,
+      ),
+    );
+
+  /**
+   * Cantidad ya cargada a cada tarjeta proveniente
+   * de compromisos que continúan reservados.
+   */
+  const cargosFijosPorTarjeta =
+    new Map<
+      string,
+      number
+    >();
+
+  for (
+    const pago
+    of pagosFijos
+  ) {
+    if (
+      obtenerPeriodoCalendario(
+        pago.fecha,
+      ) !==
+      periodo
+    ) {
+      continue;
+    }
+
+    if (
+      !compromisosReservados.has(
+        pago.compromisoId,
+      )
+    ) {
+      continue;
+    }
+
+    if (
+      pago.metodo !==
+      "tarjeta"
+    ) {
+      continue;
+    }
+
+    if (
+      !pago.tarjetaId
+    ) {
+      continue;
+    }
+
+    if (
+      !Number.isFinite(
+        pago.monto,
+      ) ||
+      pago.monto <=
+      0
+    ) {
+      continue;
+    }
+
+    const acumulado =
+      cargosFijosPorTarjeta.get(
+        pago.tarjetaId,
+      ) ??
+      0;
+
+    cargosFijosPorTarjeta.set(
+      pago.tarjetaId,
+      redondearMoneda(
+        acumulado +
+        pago.monto,
+      ),
+    );
+  }
+
+  let totalDeudaTarjetas =
+    0;
+
+  let totalSolapamientoTarjetas =
+    0;
+
+  for (
+    const saldoTarjeta
+    of saldosTarjetas
+  ) {
+    const deuda =
+      redondearMoneda(
+        Math.max(
+          saldoTarjeta
+            .montoReservarCuenta,
+          0,
+        ),
+      );
+
+    totalDeudaTarjetas =
+      redondearMoneda(
+        totalDeudaTarjetas +
+        deuda,
+      );
+
+    /**
+     * Solamente podemos descontar como solapamiento
+     * una cantidad que todavía exista dentro de la
+     * deuda actual de ESA tarjeta.
+     *
+     * Si el usuario ya pagó parte o toda la tarjeta,
+     * no descontamos más de lo que sigue pendiente.
+     */
+    const cargosFijosReservados =
+      redondearMoneda(
+        cargosFijosPorTarjeta.get(
+          saldoTarjeta
+            .tarjetaId,
+        ) ??
+        0,
+      );
+
+    const solapamientoTarjeta =
+      redondearMoneda(
+        Math.min(
+          deuda,
+          cargosFijosReservados,
+        ),
+      );
+
+    totalSolapamientoTarjetas =
+      redondearMoneda(
+        totalSolapamientoTarjetas +
+        solapamientoTarjeta,
+      );
+  }
+
+  return {
+    totalDeudaTarjetas,
+
+    totalSolapamientoTarjetas,
+  };
 }
 
 function construirLedger(
@@ -994,7 +1260,7 @@ function construirLedger(
           creadoA &&
           creadoB &&
           creadoA !==
-            creadoB
+          creadoB
         ) {
           return creadoA.localeCompare(
             creadoB,
@@ -1104,21 +1370,35 @@ function construirLedger(
 export function calcularResumenCuentaGastos(
   cuenta:
     CuentaGastos,
-
   ingresos:
     Ingreso[],
-
   gastos:
     GastoVariable[],
-
   pagosFijos:
     PagoFijo[],
-
   compromisosFijos:
     CompromisoFijo[],
-
   pagosTarjeta:
     PagoTarjeta[],
+
+  /**
+* 2B.2
+*
+* Saldos positivos actuales de las tarjetas.
+*/
+  saldosTarjetas:
+    SaldoTarjetaCuenta[] =
+    [],
+  /**
+ * Quincena financiera cuyas obligaciones deben
+ * permanecer reservadas.
+ *
+ * Si el llamador no la suministra todavía,
+ * usamos la quincena calendario actual.
+ */
+  quincenaReserva:
+    Quincena | null =
+    null,
 
   fechaReferencia =
     new Date(),
@@ -1192,7 +1472,7 @@ export function calcularResumenCuentaGastos(
               ingreso.monto,
             ) &&
             ingreso.monto >
-              0
+            0
           );
         },
       );
@@ -1235,7 +1515,7 @@ export function calcularResumenCuentaGastos(
               gasto.monto,
             ) &&
             gasto.monto >
-              0
+            0
           );
         },
       );
@@ -1294,7 +1574,7 @@ export function calcularResumenCuentaGastos(
               pago.monto,
             ) &&
             pago.monto >
-              0
+            0
           );
         },
       );
@@ -1303,6 +1583,32 @@ export function calcularResumenCuentaGastos(
     pagosTarjeta
       .filter(
         (pago) => {
+          /**
+           * ============================================================
+           * 2B.2B — PAGOS PENDIENTES A TARJETA
+           * ============================================================
+           *
+           * Si el pago todavía está pendiente:
+           *
+           * - NO ha salido realmente de la cuenta bancaria;
+           * - NO debe reducir Saldo actual;
+           * - sí estará representado dentro de Comprometido
+           *   mediante montoReservarCuenta.
+           *
+           * Cuando cambie a "contabilizada", automáticamente
+           * entrará en los egresos bancarios.
+           */
+          if (
+            pago.estadoTarjeta ===
+            "pendiente"
+          ) {
+            return false;
+          }
+
+          /**
+           * El pago ya estaba incluido en la fotografía
+           * del saldo inicial de la cuenta.
+           */
           if (
             pagosTarjetaIncluidos.has(
               pago.id,
@@ -1316,6 +1622,10 @@ export function calcularResumenCuentaGastos(
               pago.fecha,
             );
 
+          /**
+           * Ignoramos movimientos anteriores a la fecha
+           * utilizada como saldo inicial/recalibración.
+           */
           if (
             fechaPago <
             cuenta
@@ -1329,7 +1639,7 @@ export function calcularResumenCuentaGastos(
               pago.monto,
             ) &&
             pago.monto >
-              0
+            0
           );
         },
       );
@@ -1356,8 +1666,8 @@ export function calcularResumenCuentaGastos(
         obtenerFechaCalendario(
           ingreso
             .fechaRecibida ??
-            ingreso
-              .fechaProgramada,
+          ingreso
+            .fechaProgramada,
         ),
 
       concepto:
@@ -1437,13 +1747,13 @@ export function calcularResumenCuentaGastos(
           obtenerFechaCalendario(
             pago.fecha,
           ) >=
-            cuenta
-              .fechaSaldoInicial &&
+          cuenta
+            .fechaSaldoInicial &&
           Number.isFinite(
             pago.monto,
           ) &&
           pago.monto >
-            0,
+          0,
       );
 
     const montoBanco =
@@ -1595,15 +1905,15 @@ export function calcularResumenCuentaGastos(
   const totalEgresos =
     redondearMoneda(
       totalEgresosVariables +
-        totalEgresosFijos +
-        totalEgresosTarjetas,
+      totalEgresosFijos +
+      totalEgresosTarjetas,
     );
 
   const saldoActual =
     redondearMoneda(
       cuenta.saldoInicial +
-        totalDepositosDesdeSaldoInicial -
-        totalEgresos,
+      totalDepositosDesdeSaldoInicial -
+      totalEgresos,
     );
 
   /*
@@ -1619,14 +1929,28 @@ export function calcularResumenCuentaGastos(
       fechaReferencia,
     );
 
+  const quincenaReservaActual =
+    quincenaReserva ??
+    obtenerQuincenaLocal(
+      fechaReferencia,
+    );
+
   const reservasCompromisos =
     construirReservasCompromisos(
       compromisosFijos,
       pagosFijos,
       periodoReserva,
+      quincenaReservaActual
     );
 
-  const totalComprometido =
+  /**
+ * ============================================================
+ * 2B.2
+ * DISPONIBLE REAL
+ * ============================================================
+ */
+
+  const totalReservasFijas =
     redondearMoneda(
       reservasCompromisos.reduce(
         (
@@ -1640,6 +1964,33 @@ export function calcularResumenCuentaGastos(
       ),
     );
 
+  const {
+    totalDeudaTarjetas,
+    totalSolapamientoTarjetas,
+  } =
+    calcularCompromisoTarjetas(
+      pagosFijos,
+      reservasCompromisos,
+      periodoReserva,
+      saldosTarjetas,
+    );
+
+  /**
+   * Una misma obligación puede estar temporalmente
+   * representada en dos sitios:
+   *
+   * 1. reserva del compromiso fijo;
+   * 2. saldo pendiente de tarjeta.
+   *
+   * El solapamiento elimina esa duplicación.
+   */
+  const totalComprometido =
+    redondearMoneda(
+      totalReservasFijas +
+      totalDeudaTarjetas -
+      totalSolapamientoTarjetas,
+    );
+
   /*
    * No usamos Math.max(..., 0).
    *
@@ -1649,7 +2000,7 @@ export function calcularResumenCuentaGastos(
   const disponibleReal =
     redondearMoneda(
       saldoActual -
-        totalComprometido,
+      totalComprometido,
     );
 
   const faltanteReal =
@@ -1681,6 +2032,12 @@ export function calcularResumenCuentaGastos(
     totalEgresos,
 
     saldoActual,
+
+    totalReservasFijas,
+
+    totalDeudaTarjetas,
+
+    totalSolapamientoTarjetas,
 
     totalComprometido,
 

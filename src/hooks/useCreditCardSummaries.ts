@@ -49,11 +49,13 @@ import {
 
 import {
   calcularCalendarioPagoTarjeta,
+  evaluarVentanaPagoTarjeta,
   fechaCalendarioAISO,
 } from "@/lib/budget/credit-card-payment-calendar";
 
 import type {
   GastoVariable,
+  PagoFijo,
   PagoTarjeta,
   TarjetaCredito,
 } from "@/lib/budget/types";
@@ -64,22 +66,22 @@ import type {
  */
 export interface PagoPrincipalCorteDetectado {
   pagoId:
-    string;
+  string;
 
   fecha:
-    string;
+  string;
 
   creadoEn:
-    string;
+  string;
 
   montoPago:
-    number;
+  number;
 
   saldoAntesPago:
-    number;
+  number;
 
   saldoDespuesPago:
-    number;
+  number;
 }
 
 /**
@@ -87,19 +89,19 @@ export interface PagoPrincipalCorteDetectado {
  */
 interface CoberturaCorteTarjeta {
   saldoAlInicioVentana:
-    number | null;
+  number | null;
 
   montoObjetivoVentana:
-    number | null;
+  number | null;
 
   corteCubierto:
-    boolean;
+  boolean;
 
   pagoPrincipalCorteRealizado:
-    boolean;
+  boolean;
 
   pagoPrincipalCorte:
-    PagoPrincipalCorteDetectado | null;
+  PagoPrincipalCorteDetectado | null;
 }
 
 /**
@@ -111,14 +113,14 @@ interface ActividadPosteriorCobertura {
    * la obligación principal.
    */
   comprasPosterioresCobertura:
-    number;
+  number;
 
   /**
    * Pagos realizados después de quedar cubierta
    * la obligación principal.
    */
   pagosPosterioresCobertura:
-    number;
+  number;
 
   /**
    * Deuda adicional neta pendiente antes del corte.
@@ -128,13 +130,13 @@ interface ActividadPosteriorCobertura {
    * "PAGO ADICIONAL"
    */
   saldoAdicionalAntesCorte:
-    number;
+  number;
 
   /**
    * true cuando queda una deuda posterior positiva.
    */
   requierePagoAdicionalAntesCorte:
-    boolean;
+  boolean;
 }
 
 /**
@@ -142,28 +144,82 @@ interface ActividadPosteriorCobertura {
  */
 export interface ResumenTarjetaActual {
   tarjeta:
-    TarjetaCredito;
+  TarjetaCredito;
 
   comprasDesdeSaldo:
-    number;
+  number;
+
+  /**
+* 2B.2
+*
+* Gastos fijos registrados directamente contra
+* esta tarjeta desde su saldo inicial.
+*/
+  cargosFijosDesdeSaldo:
+  number;
 
   pagosDesdeSaldo:
-    number;
+  number;
+
+  /**
+ * ============================================================
+ * 2B.2B — TRANSACCIONES PENDIENTES
+ * ============================================================
+ *
+ * Estos movimientos todavía no forman parte del saldo
+ * contabilizado de la tarjeta.
+ */
+  comprasPendientes:
+  number;
+
+  cargosFijosPendientes:
+  number;
+
+  pagosPendientes:
+  number;
+
+  /**
+   * Total de cargos pendientes:
+   *
+   * compras variables pendientes
+   * + cargos fijos pendientes.
+   */
+  totalCargosPendientes:
+  number;
+
+  /**
+   * Saldo esperado cuando todas las transacciones
+   * pendientes sean contabilizadas.
+   */
+  saldoProyectado:
+  number;
 
   saldoActual:
-    number;
+  number;
 
   creditoAFavor:
-    number;
+  number;
 
   montoPagoTotal:
-    number;
+  number;
+
+  /**
+  * 2B.2A
+  *
+  * Deuda positiva actual de la tarjeta que debe formar
+  * parte del dinero comprometido de la Cuenta de gastos.
+  *
+  * No reduce el Saldo actual hasta que se registre
+  * un pago real a la tarjeta.
+  */
+  montoReservarCuenta:
+  number;
 
   creditoDisponible:
-    number | null;
+  number | null;
 
   porcentajeUtilizado:
-    number | null;
+  number | null;
 
   /**
    * ============================================================
@@ -172,19 +228,19 @@ export interface ResumenTarjetaActual {
    */
 
   saldoAlInicioVentana:
-    number | null;
+  number | null;
 
   montoObjetivoVentana:
-    number | null;
+  number | null;
 
   corteCubierto:
-    boolean;
+  boolean;
 
   pagoPrincipalCorteRealizado:
-    boolean;
+  boolean;
 
   pagoPrincipalCorte:
-    PagoPrincipalCorteDetectado | null;
+  PagoPrincipalCorteDetectado | null;
 
   /**
    * ============================================================
@@ -193,27 +249,37 @@ export interface ResumenTarjetaActual {
    */
 
   comprasPosterioresCobertura:
-    number;
+  number;
 
   pagosPosterioresCobertura:
-    number;
+  number;
 
   saldoAdicionalAntesCorte:
-    number;
+  number;
 
   requierePagoAdicionalAntesCorte:
-    boolean;
+  boolean;
 }
 
 interface UseCreditCardSummariesParams {
   tarjetas:
-    TarjetaCredito[];
+  TarjetaCredito[];
 
   gastos:
-    GastoVariable[];
+  GastoVariable[];
+
+  /**
+   * 2B.2
+   *
+   * Pagos de compromisos fijos. Los que tengan
+   * metodo === "tarjeta" se comportan como cargos
+   * sobre la tarjeta indicada.
+   */
+  pagosFijos:
+  PagoFijo[];
 
   pagos:
-    PagoTarjeta[];
+  PagoTarjeta[];
 }
 
 /**
@@ -221,19 +287,19 @@ interface UseCreditCardSummariesParams {
  */
 interface MovimientoCronologicoTarjeta {
   id:
-    string;
+  string;
 
   tipo:
-    "gasto" | "pago";
+  "gasto" | "pago";
 
   monto:
-    number;
+  number;
 
   fecha:
-    string;
+  string;
 
   creadoEn:
-    string;
+  string;
 }
 
 const TOLERANCIA_SALDO =
@@ -260,7 +326,7 @@ function redondearMoneda(
         value +
         Number.EPSILON
       ) *
-        100,
+      100,
     ) /
     100
   );
@@ -291,7 +357,7 @@ function obtenerCreadoEn(
 
   if (
     typeof creadoEn ===
-      "string" &&
+    "string" &&
     creadoEn.trim()
   ) {
     return creadoEn;
@@ -311,6 +377,9 @@ function construirMovimientosTarjeta(
   gastos:
     GastoVariable[],
 
+  pagosFijos:
+    PagoFijo[],
+
   pagos:
     PagoTarjeta[],
 ): MovimientoCronologicoTarjeta[] {
@@ -320,106 +389,201 @@ function construirMovimientosTarjeta(
         .fechaSaldoInicial,
     );
 
+  /**
+   * Compras variables normales.
+   */
   const compras:
     MovimientoCronologicoTarjeta[] =
-      gastos.flatMap(
-        (
-          gasto,
-        ) => {
-          if (
-            gasto.tarjetaId !==
-            tarjeta.id
-          ) {
-            return [];
-          }
+    gastos.flatMap(
+      (
+        gasto,
+      ) => {
+        if (
+          gasto.tarjetaId !==
+          tarjeta.id
+        ) {
+          return [];
+        }
 
-          const fecha =
-            obtenerFechaCalendario(
-              gasto.fecha,
-            );
+        const fecha =
+          obtenerFechaCalendario(
+            gasto.fecha,
+          );
 
-          if (
-            fecha <
-            fechaInicial
-          ) {
-            return [];
-          }
+        if (
+          fecha <
+          fechaInicial
+        ) {
+          return [];
+        }
 
-          return [
-            {
-              id:
-                gasto.id,
+        return [
+          {
+            id:
+              gasto.id,
 
-              tipo:
-                "gasto",
+            tipo:
+              "gasto",
 
-              monto:
-                redondearMoneda(
-                  gasto.monto,
-                ),
+            monto:
+              redondearMoneda(
+                gasto.monto,
+              ),
 
-              fecha,
+            fecha,
 
-              creadoEn:
-                obtenerCreadoEn(
-                  gasto,
-                ),
-            },
-          ];
-        },
-      );
+            creadoEn:
+              obtenerCreadoEn(
+                gasto,
+              ),
+          },
+        ];
+      },
+    );
 
+  /**
+   * ============================================================
+   * 2B.2 — GASTOS FIJOS PAGADOS CON TARJETA
+   * ============================================================
+   *
+   * Registrar un compromiso como pagado con tarjeta NO significa
+   * que salió dinero de la cuenta bancaria.
+   *
+   * Significa que apareció una nueva deuda en esa tarjeta.
+   */
+  const cargosFijos:
+    MovimientoCronologicoTarjeta[] =
+    pagosFijos.flatMap(
+      (
+        pago,
+      ) => {
+        if (
+          pago.metodo !==
+          "tarjeta"
+        ) {
+          return [];
+        }
+
+        if (
+          pago.tarjetaId !==
+          tarjeta.id
+        ) {
+          return [];
+        }
+
+        const fecha =
+          obtenerFechaCalendario(
+            pago.fecha,
+          );
+
+        if (
+          fecha <
+          fechaInicial
+        ) {
+          return [];
+        }
+
+        if (
+          !Number.isFinite(
+            pago.monto,
+          ) ||
+          pago.monto <=
+          0
+        ) {
+          return [];
+        }
+
+        return [
+          {
+            /**
+             * Prefijo para evitar una posible colisión
+             * entre IDs de colecciones distintas.
+             */
+            id:
+              `pago-fijo:${pago.id}`,
+
+            tipo:
+              "gasto",
+
+            monto:
+              redondearMoneda(
+                pago.monto,
+              ),
+
+            fecha,
+
+            /**
+             * PagoFijo todavía no conserva creadoEn en
+             * el modelo público.
+             *
+             * Lo colocamos al inicio del día para que,
+             * cuando exista un pago de tarjeta el mismo
+             * día, la interpretación conservadora sea:
+             *
+             * cargo primero -> pago después.
+             */
+            creadoEn:
+              `${fecha}T00:00:00.000Z`,
+          },
+        ];
+      },
+    );
+
+  /**
+   * Pagos reales realizados A la tarjeta.
+   */
   const pagosTarjeta:
     MovimientoCronologicoTarjeta[] =
-      pagos.flatMap(
-        (
-          pago,
-        ) => {
-          if (
-            pago.tarjetaId !==
-            tarjeta.id
-          ) {
-            return [];
-          }
+    pagos.flatMap(
+      (
+        pago,
+      ) => {
+        if (
+          pago.tarjetaId !==
+          tarjeta.id
+        ) {
+          return [];
+        }
 
-          const fecha =
-            obtenerFechaCalendario(
-              pago.fecha,
-            );
+        const fecha =
+          obtenerFechaCalendario(
+            pago.fecha,
+          );
 
-          if (
-            fecha <
-            fechaInicial
-          ) {
-            return [];
-          }
+        if (
+          fecha <
+          fechaInicial
+        ) {
+          return [];
+        }
 
-          return [
-            {
-              id:
-                pago.id,
+        return [
+          {
+            id:
+              pago.id,
 
-              tipo:
-                "pago",
+            tipo:
+              "pago",
 
-              monto:
-                redondearMoneda(
-                  pago.monto,
-                ),
+            monto:
+              redondearMoneda(
+                pago.monto,
+              ),
 
-              fecha,
+            fecha,
 
-              creadoEn:
-                obtenerCreadoEn(
-                  pago,
-                ),
-            },
-          ];
-        },
-      );
+            creadoEn:
+              obtenerCreadoEn(
+                pago,
+              ),
+          },
+        ];
+      },
+    );
 
   return [
     ...compras,
+    ...cargosFijos,
     ...pagosTarjeta,
   ].sort(
     (
@@ -451,12 +615,10 @@ function construirMovimientosTarjeta(
       }
 
       /**
-       * Para documentos históricos sin hora precisa:
+       * Interpretación conservadora:
        *
-       * gasto antes de pago.
-       *
-       * Es la interpretación conservadora porque
-       * exige que el pago cubra también la compra.
+       * cuando no podemos conocer un orden más preciso,
+       * primero aplicamos el cargo y después el pago.
        */
       if (
         a.tipo !==
@@ -516,6 +678,77 @@ function sumarComprasDesdeSaldo(
         return (
           acumulado +
           gasto.monto
+        );
+      },
+      0,
+    );
+
+  return redondearMoneda(
+    total,
+  );
+}
+
+/**
+ * ============================================================
+ * 2B.2
+ * CARGOS FIJOS DESDE EL SALDO INICIAL DE LA TARJETA
+ * ============================================================
+ */
+function sumarCargosFijosDesdeSaldo(
+  tarjeta:
+    TarjetaCredito,
+
+  pagosFijos:
+    PagoFijo[],
+): number {
+  const fechaInicial =
+    obtenerFechaCalendario(
+      tarjeta
+        .fechaSaldoInicial,
+    );
+
+  const total =
+    pagosFijos.reduce(
+      (
+        acumulado,
+        pago,
+      ) => {
+        if (
+          pago.metodo !==
+          "tarjeta"
+        ) {
+          return acumulado;
+        }
+
+        if (
+          pago.tarjetaId !==
+          tarjeta.id
+        ) {
+          return acumulado;
+        }
+
+        if (
+          obtenerFechaCalendario(
+            pago.fecha,
+          ) <
+          fechaInicial
+        ) {
+          return acumulado;
+        }
+
+        if (
+          !Number.isFinite(
+            pago.monto,
+          ) ||
+          pago.monto <=
+          0
+        ) {
+          return acumulado;
+        }
+
+        return (
+          acumulado +
+          pago.monto
         );
       },
       0,
@@ -587,13 +820,13 @@ function crearPagoPrincipalDetectado({
   saldoDespuesPago,
 }: {
   movimiento:
-    MovimientoCronologicoTarjeta;
+  MovimientoCronologicoTarjeta;
 
   saldoAntesPago:
-    number;
+  number;
 
   saldoDespuesPago:
-    number;
+  number;
 }): PagoPrincipalCorteDetectado {
   return {
     pagoId:
@@ -635,6 +868,9 @@ function evaluarCoberturaCorte(
 
   gastos:
     GastoVariable[],
+
+  pagosFijos:
+    PagoFijo[],
 
   pagos:
     PagoTarjeta[],
@@ -690,6 +926,7 @@ function evaluarCoberturaCorte(
     construirMovimientosTarjeta(
       tarjeta,
       gastos,
+      pagosFijos,
       pagos,
     );
 
@@ -700,7 +937,7 @@ function evaluarCoberturaCorte(
 
   let ultimoPagoLiquidacionAnterior:
     PagoPrincipalCorteDetectado | null =
-      null;
+    null;
 
   /**
    * Calcula el saldo justo antes de comenzar
@@ -730,7 +967,7 @@ function evaluarCoberturaCorte(
       saldo =
         redondearMoneda(
           saldo +
-            movimiento.monto,
+          movimiento.monto,
         );
 
       continue;
@@ -742,7 +979,7 @@ function evaluarCoberturaCorte(
     saldo =
       redondearMoneda(
         saldo -
-          movimiento.monto,
+        movimiento.monto,
       );
 
     if (
@@ -830,7 +1067,7 @@ function evaluarCoberturaCorte(
       saldo =
         redondearMoneda(
           saldo +
-            movimiento.monto,
+          movimiento.monto,
         );
 
       continue;
@@ -842,7 +1079,7 @@ function evaluarCoberturaCorte(
     saldo =
       redondearMoneda(
         saldo -
-          movimiento.monto,
+        movimiento.monto,
       );
 
     if (
@@ -917,6 +1154,9 @@ function evaluarActividadPosteriorCobertura(
   gastos:
     GastoVariable[],
 
+  pagosFijos:
+    PagoFijo[],
+
   pagos:
     PagoTarjeta[],
 
@@ -928,18 +1168,18 @@ function evaluarActividadPosteriorCobertura(
 ): ActividadPosteriorCobertura {
   const vacio:
     ActividadPosteriorCobertura = {
-      comprasPosterioresCobertura:
-        0,
+    comprasPosterioresCobertura:
+      0,
 
-      pagosPosterioresCobertura:
-        0,
+    pagosPosterioresCobertura:
+      0,
 
-      saldoAdicionalAntesCorte:
-        0,
+    saldoAdicionalAntesCorte:
+      0,
 
-      requierePagoAdicionalAntesCorte:
-        false,
-    };
+    requierePagoAdicionalAntesCorte:
+      false,
+  };
 
   if (
     !cobertura
@@ -978,6 +1218,7 @@ function evaluarActividadPosteriorCobertura(
     construirMovimientosTarjeta(
       tarjeta,
       gastos,
+      pagosFijos,
       pagos,
     );
 
@@ -998,11 +1239,11 @@ function evaluarActividadPosteriorCobertura(
           movimiento,
         ) =>
           movimiento.tipo ===
-            "pago" &&
+          "pago" &&
           movimiento.id ===
-            cobertura
-              .pagoPrincipalCorte
-              ?.pagoId,
+          cobertura
+            .pagoPrincipalCorte
+            ?.pagoId,
       );
 
     if (
@@ -1093,7 +1334,7 @@ function evaluarActividadPosteriorCobertura(
     indice <
     movimientos.length;
     indice +=
-      1
+    1
   ) {
     const movimiento =
       movimientos[indice];
@@ -1126,13 +1367,13 @@ function evaluarActividadPosteriorCobertura(
       comprasPosteriores =
         redondearMoneda(
           comprasPosteriores +
-            movimiento.monto,
+          movimiento.monto,
         );
 
       saldoPosterior =
         redondearMoneda(
           saldoPosterior +
-            movimiento.monto,
+          movimiento.monto,
         );
 
       continue;
@@ -1141,13 +1382,13 @@ function evaluarActividadPosteriorCobertura(
     pagosPosteriores =
       redondearMoneda(
         pagosPosteriores +
-          movimiento.monto,
+        movimiento.monto,
       );
 
     saldoPosterior =
       redondearMoneda(
         saldoPosterior -
-          movimiento.monto,
+        movimiento.monto,
       );
   }
 
@@ -1184,29 +1425,121 @@ function crearResumenTarjeta(
   gastos:
     GastoVariable[],
 
+  pagosFijos:
+    PagoFijo[],
+
   pagos:
     PagoTarjeta[],
 
   fechaReferencia:
     Date,
 ): ResumenTarjetaActual {
+  /**
+   * ============================================================
+   * 2B.2B — SEPARACIÓN CONTABILIZADO / PENDIENTE
+   * ============================================================
+   *
+   * Compatibilidad:
+   * cualquier registro que no sea explícitamente "pendiente"
+   * se considera contabilizado.
+   */
+  const gastosContabilizados =
+    gastos.filter(
+      (gasto) =>
+        gasto.estadoTarjeta !==
+        "pendiente",
+    );
+
+  const gastosPendientes =
+    gastos.filter(
+      (gasto) =>
+        gasto.estadoTarjeta ===
+        "pendiente",
+    );
+
+  const pagosFijosContabilizados =
+    pagosFijos.filter(
+      (pago) =>
+        pago.estadoTarjeta !==
+        "pendiente",
+    );
+
+  const pagosFijosPendientes =
+    pagosFijos.filter(
+      (pago) =>
+        pago.estadoTarjeta ===
+        "pendiente",
+    );
+
+  const pagosContabilizados =
+    pagos.filter(
+      (pago) =>
+        pago.estadoTarjeta !==
+        "pendiente",
+    );
+
+  const pagosPendientesTarjeta =
+    pagos.filter(
+      (pago) =>
+        pago.estadoTarjeta ===
+        "pendiente",
+    );
+
+  /**
+ * Solo las transacciones contabilizadas modifican
+ * el saldo oficial de la tarjeta.
+ */
   const comprasDesdeSaldo =
     sumarComprasDesdeSaldo(
       tarjeta,
-      gastos,
+      gastosContabilizados,
+    );
+
+  const cargosFijosDesdeSaldo =
+    sumarCargosFijosDesdeSaldo(
+      tarjeta,
+      pagosFijosContabilizados,
     );
 
   const pagosDesdeSaldo =
     sumarPagosDesdeSaldo(
       tarjeta,
-      pagos,
+      pagosContabilizados,
+    );
+
+  /**
+   * Las pendientes se calculan aparte.
+   */
+  const comprasPendientes =
+    sumarComprasDesdeSaldo(
+      tarjeta,
+      gastosPendientes,
+    );
+
+  const cargosFijosPendientes =
+    sumarCargosFijosDesdeSaldo(
+      tarjeta,
+      pagosFijosPendientes,
+    );
+
+  const pagosPendientes =
+    sumarPagosDesdeSaldo(
+      tarjeta,
+      pagosPendientesTarjeta,
+    );
+
+  const totalCargosPendientes =
+    redondearMoneda(
+      comprasPendientes +
+      cargosFijosPendientes,
     );
 
   const saldoCalculado =
     redondearMoneda(
       tarjeta.saldoInicial +
-        comprasDesdeSaldo -
-        pagosDesdeSaldo,
+      comprasDesdeSaldo +
+      cargosFijosDesdeSaldo -
+      pagosDesdeSaldo,
     );
 
   const saldoActual =
@@ -1225,37 +1558,58 @@ function crearResumenTarjeta(
       ),
     );
 
+  /**
+ * Saldo esperado cuando las transacciones pendientes
+ * terminen de contabilizarse.
+ *
+ * Este valor NO sustituye saldoActual.
+ */
+  const saldoProyectadoCalculado =
+    redondearMoneda(
+      saldoCalculado +
+      totalCargosPendientes -
+      pagosPendientes,
+    );
+
+  const saldoProyectado =
+    redondearMoneda(
+      Math.max(
+        saldoProyectadoCalculado,
+        0,
+      ),
+    );
+
   const montoPagoTotal =
     saldoActual;
 
   const creditoDisponible =
     tarjeta.limiteCredito ===
-    null
+      null
       ? null
       : redondearMoneda(
-          Math.max(
-            tarjeta
-              .limiteCredito -
-              saldoCalculado,
-            0,
-          ),
-        );
+        Math.max(
+          tarjeta
+            .limiteCredito -
+          saldoCalculado,
+          0,
+        ),
+      );
 
   const porcentajeUtilizado =
     tarjeta.limiteCredito ===
       null ||
-    tarjeta.limiteCredito <=
+      tarjeta.limiteCredito <=
       0
       ? null
       : Math.max(
-          0,
-          (
-            saldoActual /
-            tarjeta
-              .limiteCredito
-          ) *
-            100,
-        );
+        0,
+        (
+          saldoActual /
+          tarjeta
+            .limiteCredito
+        ) *
+        100,
+      );
 
   /**
    * 1C.2F
@@ -1263,8 +1617,9 @@ function crearResumenTarjeta(
   const cobertura =
     evaluarCoberturaCorte(
       tarjeta,
-      gastos,
-      pagos,
+      gastosContabilizados,
+      pagosFijosContabilizados,
+      pagosContabilizados,
       fechaReferencia,
     );
 
@@ -1274,27 +1629,163 @@ function crearResumenTarjeta(
   const actividadPosterior =
     evaluarActividadPosteriorCobertura(
       tarjeta,
-      gastos,
-      pagos,
+      gastosContabilizados,
+      pagosFijosContabilizados,
+      pagosContabilizados,
       fechaReferencia,
       cobertura,
+    );
+
+  /**
+* ============================================================
+* 2B.2B
+* MONTO QUE REALMENTE DEBE RESERVAR LA CUENTA
+* ============================================================
+*
+* Separamos:
+*
+* 1. deuda contabilizada que ya está dentro de su ventana
+*    de pago;
+*
+* 2. cargos pendientes, que todavía no forman parte del
+*    saldo oficial pero ya representan dinero comprometido;
+*
+* 3. pagos pendientes, que todavía no han salido del banco
+*    pero ya deben considerarse comprometidos.
+*/
+
+  const calendarioPago =
+    calcularCalendarioPagoTarjeta(
+      tarjeta.diaCorte,
+      fechaReferencia,
+    );
+
+  const evaluacionPagoPrincipal =
+    evaluarVentanaPagoTarjeta({
+      calendario:
+        calendarioPago,
+
+      montoPagoTotal,
+
+      activa:
+        tarjeta.activa,
+    });
+
+  const evaluacionPagoAdicional =
+    evaluarVentanaPagoTarjeta({
+      calendario:
+        calendarioPago,
+
+      montoPagoTotal:
+        actividadPosterior
+          .saldoAdicionalAntesCorte,
+
+      activa:
+        tarjeta.activa,
+    });
+
+  /**
+   * Parte CONTABILIZADA de la deuda que ya requiere
+   * reserva bancaria según la ventana de pago.
+   */
+  let montoReservaContabilizada =
+    0;
+
+  /**
+   * El pago principal todavía está pendiente.
+   */
+  if (
+    !cobertura.corteCubierto &&
+    evaluacionPagoPrincipal
+      .requiereAccion &&
+    montoPagoTotal >
+    TOLERANCIA_SALDO
+  ) {
+    montoReservaContabilizada =
+      montoPagoTotal;
+  }
+
+  /**
+   * El pago principal ya fue cubierto, pero aparecieron
+   * nuevos cargos contabilizados que también necesitan
+   * pagarse antes del corte.
+   */
+  if (
+    cobertura.corteCubierto &&
+    actividadPosterior
+      .requierePagoAdicionalAntesCorte &&
+    evaluacionPagoAdicional
+      .requiereAccion &&
+    actividadPosterior
+      .saldoAdicionalAntesCorte >
+    TOLERANCIA_SALDO
+  ) {
+    montoReservaContabilizada =
+      actividadPosterior
+        .saldoAdicionalAntesCorte;
+  }
+
+  montoReservaContabilizada =
+    redondearMoneda(
+      Math.max(
+        montoReservaContabilizada,
+        0,
+      ),
+    );
+
+  /**
+   * ============================================================
+   * 2B.2B — RESERVA INCLUYENDO TRANSACCIONES PENDIENTES
+   * ============================================================
+   *
+   * Los cargos pendientes aumentan el dinero comprometido.
+   *
+   * Los pagos pendientes representan dinero que todavía
+   * aparece en el banco, pero que ya está en proceso de salir.
+   *
+   * Usamos Math.max para evitar contar dos veces un pago
+   * pendiente que precisamente está cubriendo la deuda
+   * de la tarjeta.
+   *
+   * Ejemplo:
+   *
+   * deuda exigible              $486.45
+   * pago pendiente              $486.45
+   *
+   * reserva real                $486.45
+   *
+   * NO $972.90.
+   */
+  const montoReservarCuenta =
+    redondearMoneda(
+      Math.max(
+        montoReservaContabilizada +
+        totalCargosPendientes,
+
+        pagosPendientes,
+
+        0,
+      ),
     );
 
   return {
     tarjeta,
 
     comprasDesdeSaldo,
-
+    cargosFijosDesdeSaldo,
     pagosDesdeSaldo,
 
+    comprasPendientes,
+    cargosFijosPendientes,
+    pagosPendientes,
+    totalCargosPendientes,
+    saldoProyectado,
+
     saldoActual,
-
     creditoAFavor,
-
     montoPagoTotal,
-
+    montoReservarCuenta,
     creditoDisponible,
-
     porcentajeUtilizado,
 
     saldoAlInicioVentana:
@@ -1378,6 +1869,7 @@ function useFechaFinancieraActual(): Date {
 export function useCreditCardSummaries({
   tarjetas,
   gastos,
+  pagosFijos,
   pagos,
 }: UseCreditCardSummariesParams) {
   const fechaReferencia =
@@ -1394,6 +1886,7 @@ export function useCreditCardSummaries({
               crearResumenTarjeta(
                 tarjeta,
                 gastos,
+                pagosFijos,
                 pagos,
                 fechaReferencia,
               ),
@@ -1431,6 +1924,7 @@ export function useCreditCardSummaries({
       [
         tarjetas,
         gastos,
+        pagosFijos,
         pagos,
         fechaReferencia,
       ],
@@ -1497,6 +1991,27 @@ export function useCreditCardSummaries({
     );
 
   const totalCompras =
+    useMemo
+      (
+        () =>
+          redondearMoneda(
+            resumenes.reduce(
+              (
+                total,
+                resumen,
+              ) =>
+                total +
+                resumen
+                  .comprasDesdeSaldo,
+              0,
+            ),
+          ),
+        [
+          resumenes,
+        ],
+      );
+
+  const totalCargosFijos =
     useMemo(
       () =>
         redondearMoneda(
@@ -1507,7 +2022,7 @@ export function useCreditCardSummaries({
             ) =>
               total +
               resumen
-                .comprasDesdeSaldo,
+                .cargosFijosDesdeSaldo,
             0,
           ),
         ),
@@ -1562,17 +2077,12 @@ export function useCreditCardSummaries({
 
   return {
     resumenes,
-
     totalSaldoActual,
-
     totalPagoTotal,
-
     totalCreditoAFavor,
-
     totalCompras,
-
+    totalCargosFijos,
     totalPagos,
-
     totalPagoAdicionalAntesCorte,
   };
 }

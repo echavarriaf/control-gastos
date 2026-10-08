@@ -262,6 +262,18 @@ service cloud.firestore {
         || value == "tarjeta_credito";
     }
 
+    function estadoTransaccionTarjetaValido(value) {
+      return value == "pendiente"
+        || value == "contabilizada";
+    }
+
+    function actualizadoEnValido(data) {
+      return !data.keys().hasAny([
+          "actualizadoEn"
+        ])
+        || data.actualizadoEn is timestamp;
+    }
+
     /*
      * Valida una referencia de tarjeta dentro del namespace privado
      * del mismo usuario. Impide enlazar movimientos con tarjetas
@@ -426,7 +438,9 @@ service cloud.firestore {
           "fecha",
           "metodoPago",
           "tarjetaId",
-          "creadoEn"
+          "estadoTarjeta",
+          "creadoEn",
+          "actualizadoEn"
         ])
         && data.keys().hasAll([
           "concepto",
@@ -438,6 +452,7 @@ service cloud.firestore {
           "fecha",
           "metodoPago",
           "tarjetaId",
+          "estadoTarjeta",
           "creadoEn"
         ])
         && textoValido(data.concepto, 1, 200)
@@ -475,7 +490,22 @@ service cloud.firestore {
             && data.tarjetaId == null
           )
         )
-        && data.creadoEn is timestamp;
+        && (
+          (
+            data.metodoPago == "tarjeta_credito"
+            && data.tarjetaId != null
+            && estadoTransaccionTarjetaValido(
+              data.estadoTarjeta
+            )
+          )
+          || (
+            data.metodoPago != "tarjeta_credito"
+            && data.tarjetaId == null
+            && data.estadoTarjeta == null
+          )
+        )
+        && data.creadoEn is timestamp
+        && actualizadoEnValido(data);
     }
 
     /*
@@ -490,9 +520,11 @@ service cloud.firestore {
           "categoria",
           "fecha",
           "tarjetaId",
+          "estadoTarjeta",
           "referencia",
           "notas",
-          "creadoEn"
+          "creadoEn",
+          "actualizadoEn"
         ])
         && data.keys().hasAll([
           "concepto",
@@ -501,6 +533,7 @@ service cloud.firestore {
           "categoria",
           "fecha",
           "tarjetaId",
+          "estadoTarjeta",
           "referencia",
           "notas",
           "creadoEn"
@@ -515,61 +548,127 @@ service cloud.firestore {
           userId
         )
         && data.tarjetaId != null
+        && estadoTransaccionTarjetaValido(
+            data.estadoTarjeta
+          )
         && data.referencia is string
         && data.referencia.size() <= 250
         && data.notas is string
         && data.notas.size() <= 1000
-        && data.creadoEn is timestamp;
+        && data.creadoEn is timestamp
+        && actualizadoEnValido(data);
     }
 
     /*
-     * Valida un pago de compromiso fijo. Comprueba la obligación,
-     * importe, fecha, método, periodo, quincena y datos descriptivos.
-     */
-    function pagoFijoValido(data) {
-      return data.keys().hasOnly([
-          "compromisoId",
-          "descripcion",
-          "monto",
-          "fecha",
-          "metodo",
-          "periodicidad",
-          "quincena",
-          "periodo",
-          "referencia",
-          "notas",
-          "creadoEn"
-        ])
-        && data.keys().hasAll([
-          "compromisoId",
-          "descripcion",
-          "monto",
-          "fecha",
-          "metodo",
-          "periodicidad",
-          "quincena",
-          "periodo",
-          "referencia",
-          "notas",
-          "creadoEn"
-        ])
-        && textoValido(data.compromisoId, 1, 100)
-        && textoValido(data.descripcion, 1, 250)
-        && montoValido(data.monto)
-        && fechaValida(data.fecha)
-        && metodoPagoFijoValido(data.metodo)
-        && periodicidadValida(data.periodicidad)
-        && (
-          data.quincena == 1
-          || data.quincena == 2
+ * Valida un pago de compromiso fijo.
+ *
+ * 2B.2:
+ * Cuando el pago se realiza con tarjeta, exige una tarjeta válida
+ * perteneciente al mismo usuario. Para cualquier otro método,
+ * tarjetaId debe ser null.
+ */
+function pagoFijoValido(data, userId) {
+  return data.keys().hasOnly([
+      "compromisoId",
+      "descripcion",
+      "monto",
+      "fecha",
+      "metodo",
+      "periodicidad",
+      "quincena",
+      "periodo",
+      "tarjetaId",
+      "estadoTarjeta",
+      "referencia",
+      "notas",
+      "creadoEn",
+      "actualizadoEn"
+    ])
+    && data.keys().hasAll([
+      "compromisoId",
+      "descripcion",
+      "monto",
+      "fecha",
+      "metodo",
+      "periodicidad",
+      "quincena",
+      "periodo",
+      "tarjetaId",
+      "estadoTarjeta",
+      "referencia",
+      "notas",
+      "creadoEn"
+    ])
+    && textoValido(
+      data.compromisoId,
+      1,
+      100
+    )
+    && textoValido(
+      data.descripcion,
+      1,
+      250
+    )
+    && montoValido(
+      data.monto
+    )
+    && fechaValida(
+      data.fecha
+    )
+    && metodoPagoFijoValido(
+      data.metodo
+    )
+    && periodicidadValida(
+      data.periodicidad
+    )
+    && (
+      data.quincena == 1
+      || data.quincena == 2
+    )
+    && periodoCalendarioValido(
+      data.periodo
+    )
+    && tarjetaIdUsuarioValido(
+      data.tarjetaId,
+      userId
+    )
+    && (
+      (
+        data.metodo == "tarjeta"
+        && data.tarjetaId != null
+      )
+      ||
+      (
+        data.metodo != "tarjeta"
+        && data.tarjetaId == null
+      )
+    )
+    && data.referencia is string
+    && data.referencia.size() <= 250
+    && data.notas is string
+    && data.notas.size() <= 1000
+    && textoONullValido(
+      data.tarjetaId,
+      1,
+      100
+    )
+    && (
+      (
+        data.metodo == "tarjeta"
+        && data.tarjetaId != null
+        && estadoTransaccionTarjetaValido(
+          data.estadoTarjeta
         )
-        && periodoCalendarioValido(data.periodo)
-        && data.referencia is string
-        && data.referencia.size() <= 250
-        && data.notas is string
-        && data.notas.size() <= 1000
-        && data.creadoEn is timestamp;
-    }
+      )
+      || (
+        data.metodo != "tarjeta"
+        && data.tarjetaId == null
+        && data.estadoTarjeta == null
+      )
+    )
+    && data.creadoEn is timestamp
+    && actualizadoEnValido(data);
+}
 
     /*
      * Valida la quincena presupuestaria. Solo admite los valores
@@ -967,12 +1066,23 @@ service cloud.firestore {
         allow read:
           if usuarioPropietarioAutorizado(userId);
 
-        allow create, update:
+        allow create:
           if usuarioPropietarioAutorizado(userId)
           && gastoUsuarioValido(
             request.resource.data,
             userId
           );
+
+        allow update:
+          if usuarioPropietarioAutorizado(userId)
+          && gastoUsuarioValido(
+            request.resource.data,
+            userId
+          )
+          && request.resource.data.creadoEn ==
+            resource.data.creadoEn
+          && request.resource.data.actualizadoEn
+            is timestamp;
 
         allow delete:
           if usuarioPropietarioAutorizado(userId);
@@ -982,28 +1092,51 @@ service cloud.firestore {
         allow read:
           if usuarioPropietarioAutorizado(userId);
 
-        allow create, update:
+        allow create:
           if usuarioPropietarioAutorizado(userId)
           && pagoTarjetaUsuarioValido(
             request.resource.data,
             userId
           );
 
+        allow update:
+          if usuarioPropietarioAutorizado(userId)
+          && pagoTarjetaUsuarioValido(
+            request.resource.data,
+            userId
+          )
+          && request.resource.data.creadoEn ==
+            resource.data.creadoEn
+          && request.resource.data.actualizadoEn
+            is timestamp;
+
         allow delete:
           if usuarioPropietarioAutorizado(userId);
       }
 
       match /pagosFijos/{pagoFijoId} {
-        allow read:
-          if usuarioPropietarioAutorizado(userId);
+  allow read:
+    if usuarioPropietarioAutorizado(userId);
 
-        allow create, update:
-          if usuarioPropietarioAutorizado(userId)
-          && pagoFijoValido(request.resource.data);
+  allow create:
+    if usuarioPropietarioAutorizado(userId)
+    && pagoFijoValido(
+      request.resource.data
+    );
 
-        allow delete:
-          if usuarioPropietarioAutorizado(userId);
-      }
+  allow update:
+    if usuarioPropietarioAutorizado(userId)
+    && pagoFijoValido(
+      request.resource.data
+    )
+    && request.resource.data.creadoEn ==
+      resource.data.creadoEn
+    && request.resource.data.actualizadoEn
+      is timestamp;
+
+  allow delete:
+    if usuarioPropietarioAutorizado(userId);
+}
 
       match /tarjetasCredito/{tarjetaId} {
         allow read:
