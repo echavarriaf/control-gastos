@@ -142,6 +142,7 @@ function BudgetModals({
         onEliminar={
           actions.solicitarEliminarPagoFijo
         }
+        onEditar={actions.startEditingFixedPayment}
       />
 
       <ConfirmDialog

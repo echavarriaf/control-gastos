@@ -229,6 +229,19 @@ export function useBudgetDashboard() {
 
     /**
  * ============================================================
+ * 2B.2D.4 — PAGO FIJO EN EDICIÓN
+ * ============================================================
+ */
+const [
+  selectedFixedPayment,
+  setSelectedFixedPayment,
+] =
+  useState<PagoFijo | null>(
+    null,
+  );
+
+    /**
+ * ============================================================
  * 2B.2D — MOVIMIENTO EN EDICIÓN
  * ============================================================
  */
@@ -590,6 +603,8 @@ const [
 
       selectedFixedCommitment,
 
+      selectedFixedPayment,
+
       selectedIncomeCycle,
       selectedMovement,
 
@@ -710,16 +725,90 @@ cancelEditingMovement:
           ),
 
       /**
-       * Registrar pago fijo.
-       */
-      openFixedPayment:
-        setSelectedFixedCommitment,
+ * Registrar un pago fijo nuevo.
+ *
+ * Limpiamos cualquier pago histórico seleccionado para
+ * garantizar que FixedPaymentModal abra en modo registro.
+ */
+openFixedPayment:
+  (
+    compromiso:
+      CompromisoFijo,
+  ) => {
+    setSelectedFixedPayment(
+      null,
+    );
 
-      closeFixedPayment:
-        () =>
-          setSelectedFixedCommitment(
-            null,
-          ),
+    setSelectedFixedCommitment(
+      compromiso,
+    );
+  },
+
+/**
+ * Editar un pago fijo existente.
+ *
+ * Conservamos el PagoFijo exacto y buscamos también su
+ * compromiso porque FixedPaymentModal necesita ambos datos.
+ */
+startEditingFixedPayment:
+  (
+    pago:
+      PagoFijo,
+  ) => {
+    const compromiso =
+      fixedCommitments.compromisos.find(
+        (item) =>
+          item.id ===
+          pago.compromisoId,
+      ) ?? null;
+
+    if (
+      !compromiso
+    ) {
+      return;
+    }
+
+    setSelectedFixedPayment(
+      pago,
+    );
+
+    setSelectedFixedCommitment(
+      compromiso,
+    );
+
+    /**
+     * Cerramos el historial para que el modal de edición
+     * quede visible sin dos overlays superpuestos.
+     */
+    setFixedPaymentsHistoryOpen(
+      false,
+    );
+  },
+
+/**
+ * Cierra tanto registro como edición.
+ */
+closeFixedPayment:
+  () => {
+    setSelectedFixedCommitment(
+      null,
+    );
+
+    setSelectedFixedPayment(
+      null,
+    );
+  },
+
+cancelEditingFixedPayment:
+  () => {
+    setSelectedFixedPayment(
+      null,
+    );
+
+    setSelectedFixedCommitment(
+      null,
+    );
+  },
 
       /**
        * Eliminar pago fijo.
