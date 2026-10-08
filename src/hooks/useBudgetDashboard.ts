@@ -67,6 +67,7 @@ import type {
   CicloPago,
   CompromisoFijo,
   Ingreso,
+  Movimiento,
   PagoFijo,
   Vista,
 } from "@/lib/budget/types";
@@ -123,15 +124,15 @@ export function useBudgetDashboard() {
 
       gastos:
         budget.gastos,
-      
+
       /**
      * 2B.2
      *
      * Los pagos fijos realizados con tarjeta
      * también generan deuda de tarjeta.
      */
-    pagosFijos:
-      budget.pagosFijos,
+      pagosFijos:
+        budget.pagosFijos,
 
       pagos:
         budget.pagos,
@@ -225,6 +226,19 @@ export function useBudgetDashboard() {
     useState<CompromisoFijo | null>(
       null,
     );
+
+    /**
+ * ============================================================
+ * 2B.2D — MOVIMIENTO EN EDICIÓN
+ * ============================================================
+ */
+const [
+  selectedMovement,
+  setSelectedMovement,
+] =
+  useState<Movimiento | null>(
+    null,
+  );
 
   const [
     selectedIncomeCycle,
@@ -398,28 +412,28 @@ export function useBudgetDashboard() {
 
   const currentCycleIncome:
     Ingreso | null =
-      income.cicloActual
-        ? incomeTransactions
-            .ingresosPorCiclo
-            .get(
-              income.cicloActual.id,
-            ) ??
-          null
-        : null;
+    income.cicloActual
+      ? incomeTransactions
+        .ingresosPorCiclo
+        .get(
+          income.cicloActual.id,
+        ) ??
+      null
+      : null;
 
   /**
    * Ingreso correspondiente al ciclo abierto en el modal.
    */
   const selectedCycleIncome:
     Ingreso | null =
-      selectedIncomeCycle
-        ? incomeTransactions
-            .ingresosPorCiclo
-            .get(
-              selectedIncomeCycle.id,
-            ) ??
-          null
-        : null;
+    selectedIncomeCycle
+      ? incomeTransactions
+        .ingresosPorCiclo
+        .get(
+          selectedIncomeCycle.id,
+        ) ??
+      null
+      : null;
 
   /**
    * ============================================================
@@ -577,6 +591,7 @@ export function useBudgetDashboard() {
       selectedFixedCommitment,
 
       selectedIncomeCycle,
+      selectedMovement,
 
       /**
        * Pago mostrado actualmente en ConfirmDialog.
@@ -593,6 +608,31 @@ export function useBudgetDashboard() {
       setView,
 
       clearErrors,
+
+      /**
+ * ========================================================
+ * 2B.2D — EDICIÓN DE MOVIMIENTOS
+ * ========================================================
+ */
+startEditingMovement:
+  (
+    movimiento:
+      Movimiento,
+  ) => {
+    setSelectedMovement(
+      movimiento,
+    );
+
+    setView(
+      "movimientos",
+    );
+  },
+
+cancelEditingMovement:
+  () =>
+    setSelectedMovement(
+      null,
+    ),
 
       /**
        * Presupuesto.

@@ -38,6 +38,7 @@ import {
   ReceiptText,
   Trash2,
   X,
+  Pencil,
 } from "lucide-react";
 
 import {
@@ -86,6 +87,11 @@ interface VariableMovementsSectionProps {
   eliminandoMovimientoId:
     string | null;
 
+    onEditar: (
+    movimiento:
+      Movimiento,
+  ) => void;
+
   onEliminar: (
     movimiento:
       Movimiento,
@@ -112,6 +118,11 @@ interface MovementRowProps {
     movimiento:
       Movimiento,
   ) => void | Promise<void>;
+
+  onEditar: (
+  movimiento:
+    Movimiento,
+) => void;
 }
 
 /**
@@ -245,6 +256,7 @@ export function VariableMovementsSection({
   tarjetas,
   quincenaSeleccionada,
   eliminandoMovimientoId,
+  onEditar,
   onEliminar,
 }: VariableMovementsSectionProps) {
   const [
@@ -809,6 +821,7 @@ export function VariableMovementsSection({
                       eliminandoMovimientoId ===
                       `${movimiento.tipo}-${movimiento.id}`
                     }
+                    onEditar={onEditar}
                     onEliminar={
                       onEliminar
                     }
@@ -976,6 +989,7 @@ function MovementRow({
   tarjetasPorId,
   eliminando,
   indice,
+  onEditar,
   onEliminar,
 }: MovementRowProps) {
   const esGasto =
@@ -1057,6 +1071,22 @@ function MovementRow({
                   movimiento.monto,
                 )}
               </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onEditar(
+                      movimiento,
+                    );
+                  }}
+                  disabled={
+                    eliminando
+                  }
+                  aria-label={`Editar ${movimiento.concepto}`}
+                  title="Editar movimiento"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition duration-200 hover:bg-indigo-50 hover:text-indigo-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
 
               <button
                 type="button"
