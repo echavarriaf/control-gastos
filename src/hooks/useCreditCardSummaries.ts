@@ -172,9 +172,6 @@ export interface ResumenTarjetaActual {
   comprasPendientes:
   number;
 
-  cargosFijosPendientes:
-  number;
-
   pagosPendientes:
   number;
 
@@ -1457,19 +1454,12 @@ function crearResumenTarjeta(
         "pendiente",
     );
 
+  /**
+ * Los pagos fijos se contabilizan inmediatamente.
+ * No existe estado pendiente para PagoFijo.
+ */
   const pagosFijosContabilizados =
-    pagosFijos.filter(
-      (pago) =>
-        pago.estadoTarjeta !==
-        "pendiente",
-    );
-
-  const pagosFijosPendientes =
-    pagosFijos.filter(
-      (pago) =>
-        pago.estadoTarjeta ===
-        "pendiente",
-    );
+    pagosFijos;
 
   const pagosContabilizados =
     pagos.filter(
@@ -1516,12 +1506,6 @@ function crearResumenTarjeta(
       gastosPendientes,
     );
 
-  const cargosFijosPendientes =
-    sumarCargosFijosDesdeSaldo(
-      tarjeta,
-      pagosFijosPendientes,
-    );
-
   const pagosPendientes =
     sumarPagosDesdeSaldo(
       tarjeta,
@@ -1530,8 +1514,7 @@ function crearResumenTarjeta(
 
   const totalCargosPendientes =
     redondearMoneda(
-      comprasPendientes +
-      cargosFijosPendientes,
+      comprasPendientes
     );
 
   const saldoCalculado =
@@ -1776,7 +1759,6 @@ function crearResumenTarjeta(
     pagosDesdeSaldo,
 
     comprasPendientes,
-    cargosFijosPendientes,
     pagosPendientes,
     totalCargosPendientes,
     saldoProyectado,
