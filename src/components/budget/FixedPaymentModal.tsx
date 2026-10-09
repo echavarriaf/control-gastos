@@ -7,15 +7,11 @@ import {
   Hash,
   Landmark,
   LoaderCircle,
+  Save,
   Wallet,
   X,
 } from "lucide-react";
-import {
-  useEffect,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { METODOS_PAGO } from "@/lib/budget/constants";
 
@@ -23,6 +19,7 @@ import type {
   CompromisoFijo,
   MetodoPagoFijo,
   NuevoPagoFijo,
+  PagoFijo,
   PeriodicidadPagoFijo,
   Quincena,
 } from "@/lib/budget/types";
@@ -33,84 +30,120 @@ import {
   montoSeguro,
 } from "@/lib/budget/utils";
 
-type OpcionMontoPago =
-  | "total"
-  | "mitad"
-  | "otro";
+type OpcionMontoPago = "total" | "mitad" | "otro";
 
 interface FixedPaymentModalProps {
   compromiso: CompromisoFijo | null;
+
+  pagoEditando: PagoFijo | null;
+
   montoPendiente?: number;
+
   mesSeleccionado: string;
+
   quincenaSeleccionada: Quincena;
+
   guardando: boolean;
+
   onCerrar: () => void;
-  onRegistrar: (
-    pago: NuevoPagoFijo,
+
+  onRegistrar: (pago: NuevoPagoFijo) => Promise<boolean>;
+
+  onActualizar: (
+    pagoActual: PagoFijo,
+    cambios: NuevoPagoFijo,
   ) => Promise<boolean>;
 }
 
 export function FixedPaymentModal({
   compromiso,
+  pagoEditando,
   montoPendiente,
   mesSeleccionado,
   quincenaSeleccionada,
   guardando,
   onCerrar,
   onRegistrar,
+  onActualizar,
 }: FixedPaymentModalProps) {
-  const [opcionMonto, setOpcionMonto] =
-    useState<OpcionMontoPago>("total");
+  const [opcionMonto, setOpcionMonto] = useState<OpcionMontoPago>("total");
 
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState("");
-  const [metodo, setMetodo] =
-    useState<MetodoPagoFijo>("transferencia");
+  const [metodo, setMetodo] = useState<MetodoPagoFijo>("transferencia");
 
   const [periodicidad, setPeriodicidad] =
-    useState<PeriodicidadPagoFijo>(
-      "mensual",
-    );
+    useState<PeriodicidadPagoFijo>("mensual");
 
-  const [referencia, setReferencia] =
-    useState("");
+  const [referencia, setReferencia] = useState("");
 
   const [notas, setNotas] = useState("");
 
-  const [errorLocal, setErrorLocal] =
-    useState<string | null>(null);
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
 
   useEffect(() => {
     if (!compromiso) {
       return;
     }
 
+    /**
+     * ============================================================
+     * 2B.2D.4 — MODO EDICIÓN
+     * ============================================================
+     */
+    if (pagoEditando) {
+      /**
+       * Un pago histórico debe mostrar exactamente
+       * el monto almacenado, no el pendiente actual
+       * del compromiso.
+       */
+      setOpcionMonto("otro");
+
+      setMonto(pagoEditando.monto.toFixed(2));
+
+      setFecha(pagoEditando.fecha.slice(0, 10));
+
+      setMetodo(pagoEditando.metodo);
+
+      setPeriodicidad(pagoEditando.periodicidad);
+
+      setReferencia(pagoEditando.referencia ?? "");
+
+      setNotas(pagoEditando.notas ?? "");
+
+      setErrorLocal(null);
+
+      return;
+    }
+
+    /**
+     * ============================================================
+     * MODO REGISTRO
+     * ============================================================
+     */
     const totalPendiente =
-      typeof montoPendiente === "number" &&
-        Number.isFinite(montoPendiente)
+      typeof montoPendiente === "number" && Number.isFinite(montoPendiente)
         ? Math.max(montoPendiente, 0)
         : compromiso.monto;
 
     setOpcionMonto("total");
 
-    setMonto(
-      totalPendiente.toFixed(2),
-    );
+    setMonto(totalPendiente.toFixed(2));
 
-    setFecha(
-      fechaParaPeriodo(
-        mesSeleccionado,
-        quincenaSeleccionada,
-      ),
-    );
+    setFecha(fechaParaPeriodo(mesSeleccionado, quincenaSeleccionada));
 
-    setMetodo(compromiso.metodoPagoPreferido,);
+    setMetodo("transferencia");
+
     setPeriodicidad("mensual");
+
     setReferencia("");
+
     setNotas("");
+
     setErrorLocal(null);
   }, [
     compromiso,
+    pagoEditando,
     montoPendiente,
     mesSeleccionado,
     quincenaSeleccionada,
@@ -121,111 +154,101 @@ export function FixedPaymentModal({
       return;
     }
 
-    const cerrarConEscape = (
-      event: KeyboardEvent,
-    ) => {
-      if (
-        event.key === "Escape" &&
-        !guardando
-      ) {
+    const cerrarConEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !guardando) {
         onCerrar();
       }
     };
 
-    window.addEventListener(
-      "keydown",
-      cerrarConEscape,
-    );
+    window.addEventListener("keydown", cerrarConEscape);
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        cerrarConEscape,
-      );
+      window.removeEventListener("keydown", cerrarConEscape);
     };
-  }, [
-    compromiso,
-    guardando,
-    onCerrar,
-  ]);
+  }, [compromiso, guardando, onCerrar]);
 
   if (!compromiso) {
     return null;
   }
 
   const totalPendiente =
-    typeof montoPendiente === "number" &&
-      Number.isFinite(montoPendiente)
+    typeof montoPendiente === "number" && Number.isFinite(montoPendiente)
       ? Math.max(montoPendiente, 0)
       : compromiso.monto;
 
-  const mitadPendiente =
-    Math.round(
-      (totalPendiente / 2) * 100,
-    ) / 100;
+  const mitadPendiente = Math.round((totalPendiente / 2) * 100) / 100;
 
-  const seleccionarMonto = (
-    opcion: OpcionMontoPago,
-  ) => {
+  const seleccionarMonto = (opcion: OpcionMontoPago) => {
     setOpcionMonto(opcion);
     setErrorLocal(null);
 
     if (opcion === "total") {
-      setMonto(
-        totalPendiente.toFixed(2),
-      );
+      setMonto(totalPendiente.toFixed(2));
       return;
     }
 
     if (opcion === "mitad") {
-      setMonto(
-        mitadPendiente.toFixed(2),
-      );
+      setMonto(mitadPendiente.toFixed(2));
       return;
     }
 
     setMonto("");
   };
 
-  const enviarFormulario = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const enviarFormulario = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorLocal(null);
 
-    const montoValidado =
-      montoSeguro(monto);
+    const montoValidado = montoSeguro(monto);
 
     if (!montoValidado) {
-      setErrorLocal(
-        "Ingresa un monto mayor que cero.",
-      );
+      setErrorLocal("Ingresa un monto mayor que cero.");
       return;
     }
 
     if (!fecha) {
-      setErrorLocal(
-        "Selecciona la fecha del pago.",
-      );
+      setErrorLocal("Selecciona la fecha del pago.");
       return;
     }
 
-    if (!fecha.startsWith(mesSeleccionado)) {
-      setErrorLocal(
-        "La fecha debe pertenecer al mes seleccionado.",
-      );
+    if (!pagoEditando && !fecha.startsWith(mesSeleccionado)) {
+      setErrorLocal("La fecha debe pertenecer al mes seleccionado.");
+
       return;
     }
 
-    const guardado = await onRegistrar({
+    const datosPago: NuevoPagoFijo = {
       compromiso,
+
       monto: montoValidado,
+
       fecha,
+
       metodo,
+
       periodicidad,
+
+      /**
+       * En edición preservamos la tarjeta histórica.
+       *
+       * Para registros nuevos usamos la tarjeta
+       * configurada actualmente en el compromiso.
+       */
+      tarjetaId:
+        metodo === "tarjeta"
+          ? (pagoEditando?.tarjetaId ?? compromiso.tarjetaId ?? null)
+          : null,
+
+      estadoTarjeta: metodo === "tarjeta" ? "contabilizada" : null,
+
       referencia,
+
       notas,
-    });
+    };
+
+    const guardado = pagoEditando
+      ? await onActualizar(pagoEditando, datosPago)
+      : await onRegistrar(datosPago);
 
     if (guardado) {
       onCerrar();
@@ -236,11 +259,7 @@ export function FixedPaymentModal({
     <div
       role="presentation"
       onMouseDown={(event) => {
-        if (
-          event.target ===
-          event.currentTarget &&
-          !guardando
-        ) {
+        if (event.target === event.currentTarget && !guardando) {
           onCerrar();
         }
       }}
@@ -255,7 +274,9 @@ export function FixedPaymentModal({
         <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 p-5 backdrop-blur">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">
-              Pago o transferencia
+              {pagoEditando
+                ? "Editando pago registrado"
+                : "Pago o transferencia"}
             </p>
 
             <h2
@@ -266,10 +287,7 @@ export function FixedPaymentModal({
             </h2>
 
             <p className="mt-1 text-xs font-semibold text-slate-500">
-              Compromiso mensual de{" "}
-              {formatoMoneda.format(
-                compromiso.monto,
-              )}
+              Compromiso mensual de {formatoMoneda.format(compromiso.monto)}
             </p>
           </div>
 
@@ -285,61 +303,50 @@ export function FixedPaymentModal({
           </button>
         </header>
 
-        <form
-          onSubmit={enviarFormulario}
-          className="space-y-5 p-5"
-        >
-          <fieldset>
-            <legend className="mb-2 flex items-center gap-1.5 text-xs font-black text-slate-700">
-              <Wallet className="h-3.5 w-3.5 text-slate-400" />
-              Monto a pagar
-            </legend>
+        <form onSubmit={enviarFormulario} className="space-y-5 p-5">
+          {!pagoEditando && (
+            <fieldset>
+              <legend className="mb-2 flex items-center gap-1.5 text-xs font-black text-slate-700">
+                <Wallet className="h-3.5 w-3.5 text-slate-400" />
+                Monto a pagar
+              </legend>
 
-            <div className="grid gap-2 sm:grid-cols-3">
-              <AmountOption
-                id="pago-fijo-monto-total"
-                name="pago-fijo-opcion-monto"
-                label="Total"
-                amount={totalPendiente}
-                checked={opcionMonto === "total"}
-                disabled={guardando}
-                onChange={() =>
-                  seleccionarMonto("total")
-                }
-              />
+              <div className="grid gap-2 sm:grid-cols-3">
+                <AmountOption
+                  id="pago-fijo-monto-total"
+                  name="pago-fijo-opcion-monto"
+                  label="Total"
+                  amount={totalPendiente}
+                  checked={opcionMonto === "total"}
+                  disabled={guardando}
+                  onChange={() => seleccionarMonto("total")}
+                />
 
-              <AmountOption
-                id="pago-fijo-monto-mitad"
-                name="pago-fijo-opcion-monto"
-                label="Mitad"
-                amount={mitadPendiente}
-                checked={opcionMonto === "mitad"}
-                disabled={guardando}
-                onChange={() =>
-                  seleccionarMonto("mitad")
-                }
-              />
+                <AmountOption
+                  id="pago-fijo-monto-mitad"
+                  name="pago-fijo-opcion-monto"
+                  label="Mitad"
+                  amount={mitadPendiente}
+                  checked={opcionMonto === "mitad"}
+                  disabled={guardando}
+                  onChange={() => seleccionarMonto("mitad")}
+                />
 
-              <AmountOption
-                id="pago-fijo-monto-otro"
-                name="pago-fijo-opcion-monto"
-                label="Otro"
-                checked={opcionMonto === "otro"}
-                disabled={guardando}
-                onChange={() =>
-                  seleccionarMonto("otro")
-                }
-              />
-            </div>
-          </fieldset>
+                <AmountOption
+                  id="pago-fijo-monto-otro"
+                  name="pago-fijo-opcion-monto"
+                  label="Otro"
+                  checked={opcionMonto === "otro"}
+                  disabled={guardando}
+                  onChange={() => seleccionarMonto("otro")}
+                />
+              </div>
+            </fieldset>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             {opcionMonto === "otro" ? (
-              <Field
-                id="pago-fijo-monto"
-                label="Otro monto"
-                icon={Wallet}
-              >
+              <Field id="pago-fijo-monto" label="Otro monto" icon={Wallet}>
                 <input
                   id="pago-fijo-monto"
                   type="number"
@@ -347,11 +354,7 @@ export function FixedPaymentModal({
                   min="0.01"
                   step="0.01"
                   value={monto}
-                  onChange={(event) =>
-                    setMonto(
-                      event.target.value,
-                    )
-                  }
+                  onChange={(event) => setMonto(event.target.value)}
                   placeholder="Escribe el monto"
                   autoFocus
                   disabled={guardando}
@@ -365,27 +368,17 @@ export function FixedPaymentModal({
                 </p>
 
                 <p className="mt-1 text-lg font-black text-indigo-950">
-                  {formatoMoneda.format(
-                    montoSeguro(monto) ?? 0,
-                  )}
+                  {formatoMoneda.format(montoSeguro(monto) ?? 0)}
                 </p>
               </div>
             )}
 
-            <Field
-              id="pago-fijo-fecha"
-              label="Fecha"
-              icon={CalendarDays}
-            >
+            <Field id="pago-fijo-fecha" label="Fecha" icon={CalendarDays}>
               <input
                 id="pago-fijo-fecha"
                 type="date"
                 value={fecha}
-                onChange={(event) =>
-                  setFecha(
-                    event.target.value,
-                  )
-                }
+                onChange={(event) => setFecha(event.target.value)}
                 disabled={guardando}
                 className={inputClassName}
               />
@@ -393,35 +386,21 @@ export function FixedPaymentModal({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              id="pago-fijo-metodo"
-              label="Método"
-              icon={CreditCard}
-            >
+            <Field id="pago-fijo-metodo" label="Método" icon={CreditCard}>
               <select
                 id="pago-fijo-metodo"
                 value={metodo}
                 onChange={(event) =>
-                  setMetodo(
-                    event.target
-                      .value as MetodoPagoFijo,
-                  )
+                  setMetodo(event.target.value as MetodoPagoFijo)
                 }
                 disabled={guardando}
                 className={inputClassName}
               >
-                {Object.entries(
-                  METODOS_PAGO,
-                ).map(
-                  ([value, label]) => (
-                    <option
-                      key={value}
-                      value={value}
-                    >
-                      {label}
-                    </option>
-                  ),
-                )}
+                {Object.entries(METODOS_PAGO).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </Field>
 
@@ -434,21 +413,14 @@ export function FixedPaymentModal({
                 id="pago-fijo-periodicidad"
                 value={periodicidad}
                 onChange={(event) =>
-                  setPeriodicidad(
-                    event.target
-                      .value as PeriodicidadPagoFijo,
-                  )
+                  setPeriodicidad(event.target.value as PeriodicidadPagoFijo)
                 }
                 disabled={guardando}
                 className={inputClassName}
               >
-                <option value="mensual">
-                  Pago mensual
-                </option>
+                <option value="mensual">Pago mensual</option>
 
-                <option value="quincenal">
-                  Pago quincenal
-                </option>
+                <option value="quincenal">Pago quincenal</option>
               </select>
             </Field>
           </div>
@@ -463,31 +435,18 @@ export function FixedPaymentModal({
               id="pago-fijo-referencia"
               type="text"
               value={referencia}
-              onChange={(event) =>
-                setReferencia(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setReferencia(event.target.value)}
               placeholder="Ej. 083729 o AMEX-2026-07"
               disabled={guardando}
               className={inputClassName}
             />
           </Field>
 
-          <Field
-            id="pago-fijo-notas"
-            label="Notas"
-            icon={FileText}
-            optional
-          >
+          <Field id="pago-fijo-notas" label="Notas" icon={FileText} optional>
             <textarea
               id="pago-fijo-notas"
               value={notas}
-              onChange={(event) =>
-                setNotas(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setNotas(event.target.value)}
               placeholder="Detalles adicionales del pago"
               rows={3}
               disabled={guardando}
@@ -501,13 +460,18 @@ export function FixedPaymentModal({
             </p>
 
             <p className="mt-1 text-[11px] font-semibold leading-relaxed text-indigo-700">
-              Este pago se registrará para{" "}
-              <strong>
-                {mesSeleccionado}
-              </strong>
-              . La fecha seleccionada determinará
-              si corresponde a la primera o segunda
-              quincena.
+              {pagoEditando ? (
+                <>
+                  La fecha del pago determinará nuevamente el mes y la quincena
+                  correspondientes.
+                </>
+              ) : (
+                <>
+                  Este pago se registrará para{" "}
+                  <strong>{mesSeleccionado}</strong>. La fecha seleccionada
+                  determinará si corresponde a la primera o segunda quincena.
+                </>
+              )}
             </p>
           </div>
 
@@ -537,13 +501,19 @@ export function FixedPaymentModal({
             >
               {guardando ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : pagoEditando ? (
+                <Save className="h-4 w-4" />
               ) : (
                 <Landmark className="h-4 w-4" />
               )}
 
               {guardando
-                ? "Guardando..."
-                : "Registrar pago"}
+                ? pagoEditando
+                  ? "Actualizando..."
+                  : "Guardando..."
+                : pagoEditando
+                  ? "Guardar cambios"
+                  : "Registrar pago"}
             </button>
           </div>
         </form>
@@ -574,13 +544,11 @@ function AmountOption({
   return (
     <label
       htmlFor={id}
-      className={`flex min-h-20 cursor-pointer items-center gap-3 rounded-2xl border px-3 py-3 transition ${checked
+      className={`flex min-h-20 cursor-pointer items-center gap-3 rounded-2xl border px-3 py-3 transition ${
+        checked
           ? "border-indigo-500 bg-indigo-50 ring-4 ring-indigo-100"
           : "border-slate-200 bg-slate-50 hover:border-indigo-200 hover:bg-white"
-        } ${disabled
-          ? "cursor-not-allowed opacity-60"
-          : ""
-        }`}
+      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
     >
       <input
         id={id}
@@ -593,9 +561,7 @@ function AmountOption({
       />
 
       <span className="min-w-0">
-        <span className="block text-xs font-black text-slate-800">
-          {label}
-        </span>
+        <span className="block text-xs font-black text-slate-800">{label}</span>
 
         {typeof amount === "number" ? (
           <span className="mt-0.5 block text-[11px] font-bold text-slate-500">
@@ -637,9 +603,7 @@ function Field({
         {label}
 
         {optional && (
-          <span className="font-semibold text-slate-400">
-            (opcional)
-          </span>
+          <span className="font-semibold text-slate-400">(opcional)</span>
         )}
       </label>
 

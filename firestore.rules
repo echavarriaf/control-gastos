@@ -567,7 +567,7 @@ service cloud.firestore {
  * perteneciente al mismo usuario. Para cualquier otro método,
  * tarjetaId debe ser null.
  */
-function pagoFijoValido(data, userId) {
+function pagoFijoValido(data) {
   return data.keys().hasOnly([
       "compromisoId",
       "descripcion",
@@ -593,8 +593,6 @@ function pagoFijoValido(data, userId) {
       "periodicidad",
       "quincena",
       "periodo",
-      "tarjetaId",
-      "estadoTarjeta",
       "referencia",
       "notas",
       "creadoEn"
@@ -628,46 +626,64 @@ function pagoFijoValido(data, userId) {
     && periodoCalendarioValido(
       data.periodo
     )
-    && tarjetaIdUsuarioValido(
-      data.tarjetaId,
-      userId
-    )
+
+    /*
+     * Si el gasto fijo se pagó con tarjeta,
+     * exige tarjeta y un estado válido.
+     *
+     * Para cualquier otro método, ambos
+     * campos deben permanecer en null.
+     */
     && (
-      (
-        data.metodo == "tarjeta"
-        && data.tarjetaId != null
-      )
-      ||
-      (
-        data.metodo != "tarjeta"
-        && data.tarjetaId == null
-      )
+  (
+    data.metodo == "tarjeta"
+    && data.get(
+      "tarjetaId",
+      null
+    ) != null
+    && textoValido(
+      data.get(
+        "tarjetaId",
+        null
+      ),
+      1,
+      100
     )
+    && data.get(
+      "estadoTarjeta",
+      null
+    ) == "contabilizada"
+  )
+  ||
+  (
+    data.metodo != "tarjeta"
+    && data.get(
+      "tarjetaId",
+      null
+    ) == null
+    && data.get(
+      "estadoTarjeta",
+      null
+    ) == null
+  )
+)
+
     && data.referencia is string
     && data.referencia.size() <= 250
     && data.notas is string
     && data.notas.size() <= 1000
-    && textoONullValido(
-      data.tarjetaId,
-      1,
-      100
-    )
-    && (
-      (
-        data.metodo == "tarjeta"
-        && data.tarjetaId != null
-        && estadoTransaccionTarjetaValido(
-          data.estadoTarjeta
-        )
-      )
-      || (
-        data.metodo != "tarjeta"
-        && data.tarjetaId == null
-        && data.estadoTarjeta == null
-      )
-    )
     && data.creadoEn is timestamp
-    && actualizadoEnValido(data);
+
+    /*
+     * Los documentos antiguos pueden no tenerlo.
+     * Los editados sí recibirán actualizadoEn.
+     */
+    && timestampONull(
+      data.get(
+        "actualizadoEn",
+        null
+      )
+    );
 }
 
     /*
@@ -1114,7 +1130,7 @@ function pagoFijoValido(data, userId) {
           if usuarioPropietarioAutorizado(userId);
       }
 
-      match /pagosFijos/{pagoFijoId} {
+    match /pagosFijos/{pagoFijoId} {
   allow read:
     if usuarioPropietarioAutorizado(userId);
 
@@ -1122,7 +1138,14 @@ function pagoFijoValido(data, userId) {
     if usuarioPropietarioAutorizado(userId)
     && pagoFijoValido(
       request.resource.data
-    );
+    )
+    && tarjetaIdUsuarioValido(
+    request.resource.data.get(
+      "tarjetaId",
+      null
+    ),
+    userId
+  );
 
   allow update:
     if usuarioPropietarioAutorizado(userId)

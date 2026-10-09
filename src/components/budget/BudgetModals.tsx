@@ -12,44 +12,28 @@
  * acciones expuestos por useBudgetDashboard.
  */
 
-import {
-  BudgetSettingsModal,
-} from "@/components/budget/BudgetSettingsModal";
+import { BudgetSettingsModal } from "@/components/budget/BudgetSettingsModal";
 
 import CreditCardsModal from "@/components/budget/CreditCardsModal";
 
-import {
-  FixedCommitmentsModal,
-} from "@/components/budget/FixedCommitmentsModal";
+import { FixedCommitmentsModal } from "@/components/budget/FixedCommitmentsModal";
 
-import {
-  FixedPaymentModal,
-} from "@/components/budget/FixedPaymentModal";
+import { FixedPaymentModal } from "@/components/budget/FixedPaymentModal";
 
-import {
-  FixedPaymentsHistoryModal,
-} from "@/components/budget/FixedPaymentsHistoryModal";
+import { FixedPaymentsHistoryModal } from "@/components/budget/FixedPaymentsHistoryModal";
 
 import IncomeReceiptModal from "@/components/budget/IncomeReceiptModal";
 
-import {
-  IncomeSettingsModal,
-} from "@/components/budget/IncomeSettingsModal";
+import { IncomeSettingsModal } from "@/components/budget/IncomeSettingsModal";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
-import {
-  formatoMoneda,
-} from "@/lib/budget/utils";
+import { formatoMoneda } from "@/lib/budget/utils";
 
-import type {
-  BudgetDashboardController,
-} from "@/hooks/useBudgetDashboard";
-
+import type { BudgetDashboardController } from "@/hooks/useBudgetDashboard";
 
 interface BudgetModalsProps {
-  dashboard:
-  BudgetDashboardController;
+  dashboard: BudgetDashboardController;
 }
 
 /**
@@ -59,9 +43,7 @@ interface BudgetModalsProps {
  * necesarios y los distribuye entre cada ventana. De esta forma,
  * los modales no necesitan acceder directamente a otros hooks.
  */
-function BudgetModals({
-  dashboard,
-}: BudgetModalsProps) {
+function BudgetModals({ dashboard }: BudgetModalsProps) {
   const {
     actions,
     budget,
@@ -76,247 +58,115 @@ function BudgetModals({
   } = dashboard;
 
   /**
-     * Obtiene el resumen del gasto fijo seleccionado.
-     *
-     * Busca el compromiso por ID dentro de resumenFijos para enviar
-     * al modal de pago el saldo pendiente real del periodo.
-     */
-  const selectedFixedSummary =
-    ui.selectedFixedCommitment
-      ? summary.resumenFijos.find(
-        (item) =>
-          item.compromiso.id ===
-          ui.selectedFixedCommitment
-            ?.id,
-      ) ?? null
-      : null;
+   * Obtiene el resumen del gasto fijo seleccionado.
+   *
+   * Busca el compromiso por ID dentro de resumenFijos para enviar
+   * al modal de pago el saldo pendiente real del periodo.
+   */
+  const selectedFixedSummary = ui.selectedFixedCommitment
+    ? (summary.resumenFijos.find(
+        (item) => item.compromiso.id === ui.selectedFixedCommitment?.id,
+      ) ?? null)
+    : null;
 
   return (
     <>
       <FixedPaymentModal
-        compromiso={
-          ui.selectedFixedCommitment
-        }
-        montoPendiente={
-          selectedFixedSummary
-            ?.pendienteMes
-        }
-        mesSeleccionado={
-          period.mesSeleccionado
-        }
-        quincenaSeleccionada={
-          period
-            .quincenaSeleccionada
-        }
+        compromiso={ui.selectedFixedCommitment}
+        pagoEditando={ui.selectedFixedPayment}
+        montoPendiente={selectedFixedSummary?.pendienteMes}
+        mesSeleccionado={period.mesSeleccionado}
+        quincenaSeleccionada={period.quincenaSeleccionada}
         guardando={
-          budget
-            .guardandoPagoFijo
+          budget.guardandoPagoFijo || budget.actualizandoPagoFijoId !== null
         }
-        onCerrar={
-          actions.closeFixedPayment
-        }
-        onRegistrar={
-          budget.registrarPagoFijo
-        }
+        onCerrar={actions.closeFixedPayment}
+        onRegistrar={budget.registrarPagoFijo}
+        onActualizar={budget.actualizarPagoFijo}
       />
 
       <FixedPaymentsHistoryModal
-        abierto={
-          ui.fixedPaymentsHistoryOpen
-        }
-        pagos={
-          budget.pagosFijos
-        }
-        mesInicial={
-          period.mesSeleccionado
-        }
-        cargando={
-          budget.cargando
-        }
-        eliminandoPagoFijoId={
-          budget.eliminandoPagoFijoId
-        }
-        onCerrar={
-          actions.closeFixedPaymentsHistory
-        }
-        onEliminar={
-          actions.solicitarEliminarPagoFijo
-        }
+        abierto={ui.fixedPaymentsHistoryOpen}
+        pagos={budget.pagosFijos}
+        mesInicial={period.mesSeleccionado}
+        cargando={budget.cargando}
+        eliminandoPagoFijoId={budget.eliminandoPagoFijoId}
+        onCerrar={actions.closeFixedPaymentsHistory}
+        onEliminar={actions.solicitarEliminarPagoFijo}
         onEditar={actions.startEditingFixedPayment}
       />
 
       <ConfirmDialog
-        abierto={
-          ui.pagoFijoPendienteEliminar !==
-          null
-        }
+        abierto={ui.pagoFijoPendienteEliminar !== null}
         titulo="Eliminar pago fijo"
         mensaje={
           ui.pagoFijoPendienteEliminar
-            ? `Se eliminará el pago de ${ui
-              .pagoFijoPendienteEliminar
-              .descripcion
-            } por ${formatoMoneda.format(
-              ui
-                .pagoFijoPendienteEliminar
-                .monto,
-            )}. Esta acción no se puede deshacer.`
+            ? `Se eliminará el pago de ${
+                ui.pagoFijoPendienteEliminar.descripcion
+              } por ${formatoMoneda.format(
+                ui.pagoFijoPendienteEliminar.monto,
+              )}. Esta acción no se puede deshacer.`
             : ""
         }
         textoConfirmar="Eliminar pago"
         procesando={
           ui.pagoFijoPendienteEliminar
-            ? budget
-              .eliminandoPagoFijoId ===
-            ui
-              .pagoFijoPendienteEliminar
-              .id
+            ? budget.eliminandoPagoFijoId === ui.pagoFijoPendienteEliminar.id
             : false
         }
-        onCancelar={
-          actions
-            .cancelarEliminarPagoFijo
-        }
-        onConfirmar={
-          actions
-            .confirmarEliminarPagoFijo
-        }
+        onCancelar={actions.cancelarEliminarPagoFijo}
+        onConfirmar={actions.confirmarEliminarPagoFijo}
       />
 
       <FixedCommitmentsModal
-        abierto={
-          ui.fixedCommitmentsOpen
-        }
-        compromisos={
-          fixedCommitments
-            .compromisos
-        }
-        cargando={
-          fixedCommitments
-            .cargando
-        }
-        guardando={
-          fixedCommitments
-            .guardando
-        }
-        actualizandoId={
-          fixedCommitments
-            .actualizandoId
-        }
-        onCerrar={
-          actions
-            .closeFixedCommitments
-        }
-        onCrear={
-          fixedCommitments
-            .crearCompromiso
-        }
-        onActualizar={
-          fixedCommitments
-            .actualizarCompromiso
-        }
-        onCambiarEstado={
-          fixedCommitments
-            .cambiarEstado
-        }
+        abierto={ui.fixedCommitmentsOpen}
+        compromisos={fixedCommitments.compromisos}
+        cargando={fixedCommitments.cargando}
+        guardando={fixedCommitments.guardando}
+        actualizandoId={fixedCommitments.actualizandoId}
+        onCerrar={actions.closeFixedCommitments}
+        onCrear={fixedCommitments.crearCompromiso}
+        onActualizar={fixedCommitments.actualizarCompromiso}
+        onCambiarEstado={fixedCommitments.cambiarEstado}
       />
 
       <CreditCardsModal
-        abierto={
-          ui.creditCardsOpen
-        }
-        tarjetas={
-          creditCards.tarjetas
-        }
-        cargando={
-          creditCards.cargando
-        }
-        guardando={
-          creditCards.guardando
-        }
-        actualizandoId={
-          creditCards
-            .actualizandoId
-        }
-        onCerrar={
-          actions.closeCreditCards
-        }
-        onCrear={
-          creditCards.crearTarjeta
-        }
-        onActualizar={
-          creditCards
-            .actualizarTarjeta
-        }
-        onCambiarEstado={
-          creditCards.cambiarEstado
-        }
+        abierto={ui.creditCardsOpen}
+        tarjetas={creditCards.tarjetas}
+        cargando={creditCards.cargando}
+        guardando={creditCards.guardando}
+        actualizandoId={creditCards.actualizandoId}
+        onCerrar={actions.closeCreditCards}
+        onCrear={creditCards.crearTarjeta}
+        onActualizar={creditCards.actualizarTarjeta}
+        onCambiarEstado={creditCards.cambiarEstado}
       />
 
       <BudgetSettingsModal
-        abierto={
-          ui.budgetSettingsOpen
-        }
-        limites={
-          budget.limites
-        }
-        guardando={
-          budget.guardandoLimites
-        }
-        onCerrar={
-          actions.closeBudgetSettings
-        }
-        onGuardar={
-          budget.guardarLimites
-        }
+        abierto={ui.budgetSettingsOpen}
+        limites={budget.limites}
+        guardando={budget.guardandoLimites}
+        onCerrar={actions.closeBudgetSettings}
+        onGuardar={budget.guardarLimites}
       />
 
       <IncomeSettingsModal
-        abierta={
-          ui.incomeSettingsOpen
-        }
-        configuracion={
-          income.configuracion
-        }
-        guardando={
-          income
-            .guardandoConfiguracion
-        }
-        onCerrar={
-          actions.closeIncomeSettings
-        }
-        onGuardar={
-          income.guardarConfiguracion
-        }
+        abierta={ui.incomeSettingsOpen}
+        configuracion={income.configuracion}
+        guardando={income.guardandoConfiguracion}
+        onCerrar={actions.closeIncomeSettings}
+        onGuardar={income.guardarConfiguracion}
       />
 
       <IncomeReceiptModal
-        abierto={
-          ui.selectedIncomeCycle !==
-          null
-        }
-        ciclo={
-          ui.selectedIncomeCycle
-        }
-        configuracion={
-          income.configuracion
-        }
-        ingresoExistente={
-          selectedCycleIncome
-        }
-        guardando={
-          incomeTransactions.guardando
-        }
-        error={
-          incomeTransactions.error
-        }
-        onCerrar={
-          actions.closeIncomeReceipt
-        }
-        onGuardar={
-          incomeTransactions
-            .registrarIngresoRecibido
-        }
+        abierto={ui.selectedIncomeCycle !== null}
+        ciclo={ui.selectedIncomeCycle}
+        configuracion={income.configuracion}
+        ingresoExistente={selectedCycleIncome}
+        guardando={incomeTransactions.guardando}
+        error={incomeTransactions.error}
+        onCerrar={actions.closeIncomeReceipt}
+        onGuardar={incomeTransactions.registrarIngresoRecibido}
       />
     </>
   );
