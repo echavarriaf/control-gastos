@@ -164,11 +164,11 @@ export interface ConfiguracionIngreso {
   fuente: FuenteIngreso;
 
   frecuencia:
-    FrecuenciaIngreso;
+  FrecuenciaIngreso;
 
   fechaAncla: string;
   intervaloDias:
-    number | null;
+  number | null;
 
   activa: boolean;
   notas: string;
@@ -181,11 +181,11 @@ export interface NuevaConfiguracionIngreso {
   fuente: FuenteIngreso;
 
   frecuencia:
-    FrecuenciaIngreso;
+  FrecuenciaIngreso;
 
   fechaAncla: string;
   intervaloDias:
-    number | null;
+  number | null;
 
   activa: boolean;
   notas: string;
@@ -203,7 +203,7 @@ export interface CicloPago {
   id: string;
 
   configuracionIngresoId:
-    string | null;
+  string | null;
 
   fechaPagoProgramada: string;
   fechaPagoReal: string | null;
@@ -235,8 +235,8 @@ export interface CicloPago {
    * una primera y una segunda quincena.
    */
   quincenaPresupuestaria:
-    | 1
-    | 2;
+  | 1
+  | 2;
 
   /**
    * Puede ser 1, 2 o 3 dentro del mes calendario
@@ -250,7 +250,7 @@ export interface CicloPago {
   numeroPagoAnual: number;
 
   estado:
-    EstadoCicloPago;
+  EstadoCicloPago;
 }
 
 /**
@@ -263,7 +263,7 @@ export interface Ingreso {
   id: string;
 
   configuracionIngresoId:
-    string | null;
+  string | null;
 
   cicloPagoId: string;
 
@@ -286,7 +286,7 @@ export interface Ingreso {
 
 export interface NuevoIngreso {
   configuracionIngresoId?:
-    string | null;
+  string | null;
 
   cicloPagoId: string;
 
@@ -295,7 +295,7 @@ export interface NuevoIngreso {
 
   fechaProgramada: string;
   fechaRecibida?:
-    string | null;
+  string | null;
 
   fuente: FuenteIngreso;
   estado: EstadoIngreso;
@@ -326,7 +326,7 @@ export interface TarjetaCredito {
   activa: boolean;
 
   estrategiaPago:
-    EstrategiaPagoTarjeta;
+  EstrategiaPagoTarjeta;
 
   pagoObjetivo: number | null;
   limiteCredito: number | null;
@@ -356,7 +356,7 @@ export interface NuevaTarjetaCredito {
   activa: boolean;
 
   estrategiaPago:
-    EstrategiaPagoTarjeta;
+  EstrategiaPagoTarjeta;
 
   pagoObjetivo: number | null;
   limiteCredito: number | null;
@@ -382,17 +382,17 @@ export interface GastoVariable {
    * tarjeta sin presupuesto asociado, por ejemplo "Otro".
    */
   categoria:
-    CategoriaVariable | null;
+  CategoriaVariable | null;
 
   fecha: string;
   creadoEn: string;
 
   metodoPago?:
-    MetodoPagoMovimiento;
+  MetodoPagoMovimiento;
 
   tarjetaId?:
-    string | null;
-  
+  string | null;
+
   /**
  * 2B.2A
  *
@@ -403,7 +403,7 @@ export interface GastoVariable {
  * En ese caso useBudgetData los interpretará como
  * "contabilizada".
  */
-estadoTarjeta?:
+  estadoTarjeta?:
   EstadoTransaccionTarjeta | null;
 
   /**
@@ -412,30 +412,30 @@ estadoTarjeta?:
    * categorías sin ampliar CategoriaVariable.
    */
   categoriaTarjetaId?:
-    string | null;
+  string | null;
 
   /**
    * Copia del nombre visible de la categoría en el momento del gasto.
    * Conserva un historial legible aunque la categoría cambie después.
    */
   categoriaTarjetaNombre?:
-    string;
+  string;
 
   /**
    * Detalle libre del gasto. Es obligatorio cuando la categoría
    * seleccionada tiene requiereComentario=true.
    */
   comentario?:
-    string;
+  string;
 
   periodoEstadoCuenta?:
-    string | null;
+  string | null;
 
   fechaCorteEstimada?:
-    string | null;
+  string | null;
 
   fechaPagoEstimada?:
-    string | null;
+  string | null;
 }
 
 /**
@@ -453,7 +453,7 @@ export interface PagoTarjeta {
   creadoEn: string;
 
   tarjetaId?:
-    string | null;
+  string | null;
 
   /**
  * 2B.2A
@@ -461,20 +461,20 @@ export interface PagoTarjeta {
  * Permite distinguir un pago enviado a la tarjeta
  * de un pago que ya fue contabilizado.
  */
-estadoTarjeta?:
+  estadoTarjeta?:
   EstadoTransaccionTarjeta | null;
 
   cicloPagoId?:
-    string | null;
+  string | null;
 
   ingresoId?:
-    string | null;
+  string | null;
 
   referencia?:
-    string;
+  string;
 
   notas?:
-    string;
+  string;
 }
 
 /**
@@ -494,16 +494,16 @@ export interface CompromisoFijo {
   diaVencimiento: number;
 
   quincenaPresupuestaria:
-    Quincena;
+  Quincena;
 
   prioridad:
-    PrioridadPago;
+  PrioridadPago;
 
   metodoPagoPreferido:
-    MetodoPagoFijo;
+  MetodoPagoFijo;
 
   tarjetaId:
-    string | null;
+  string | null;
 
   activo: boolean;
 
@@ -524,16 +524,16 @@ export interface NuevoCompromisoFijo {
   diaVencimiento: number;
 
   quincenaPresupuestaria:
-    Quincena;
+  Quincena;
 
   prioridad:
-    PrioridadPago;
+  PrioridadPago;
 
   metodoPagoPreferido:
-    MetodoPagoFijo;
+  MetodoPagoFijo;
 
   tarjetaId:
-    string | null;
+  string | null;
 
   activo: boolean;
 }
@@ -552,18 +552,18 @@ export interface PagoFijo {
   fecha: string;
   metodo: MetodoPagoFijo;
   periodicidad:
-    PeriodicidadPagoFijo;
+  PeriodicidadPagoFijo;
   referencia: string;
   notas: string;
 
   cicloPagoId?:
-    string | null;
+  string | null;
 
   ingresoId?:
-    string | null;
+  string | null;
 
   tarjetaId?:
-    string | null;
+  string | null;
 
   /**
  * 2B.2A
@@ -571,17 +571,17 @@ export interface PagoFijo {
  * Estado del cargo cuando este compromiso fijo
  * fue pagado utilizando una tarjeta.
  */
-estadoTarjeta?:
+  estadoTarjeta?:
   EstadoTransaccionTarjeta | null;
 }
 
 export type Movimiento =
   | ({
-      tipo: "gasto";
-    } & GastoVariable)
+    tipo: "gasto";
+  } & GastoVariable)
   | ({
-      tipo: "pago";
-    } & PagoTarjeta);
+    tipo: "pago";
+  } & PagoTarjeta);
 
 export interface NuevoGastoVariable {
   tipo: "gasto";
@@ -593,27 +593,27 @@ export interface NuevoGastoVariable {
    * Puede ser null para compras que no deben consumir Comida ni Gas.
    */
   categoria:
-    CategoriaVariable | null;
+  CategoriaVariable | null;
 
   fecha: string;
 
   metodoPago?:
-    MetodoPagoMovimiento;
+  MetodoPagoMovimiento;
 
   tarjetaId?:
-    string | null;
+  string | null;
 
-    estadoTarjeta?:
+  estadoTarjeta?:
   EstadoTransaccionTarjeta | null;
 
   categoriaTarjetaId:
-    string;
+  string;
 
   categoriaTarjetaNombre:
-    string;
+  string;
 
   comentario:
-    string;
+  string;
 }
 
 export interface NuevoPagoTarjeta {
@@ -624,22 +624,22 @@ export interface NuevoPagoTarjeta {
   fecha: string;
 
   tarjetaId?:
-    string | null;
+  string | null;
 
-    estadoTarjeta?:
+  estadoTarjeta?:
   EstadoTransaccionTarjeta | null;
 
   cicloPagoId?:
-    string | null;
+  string | null;
 
   ingresoId?:
-    string | null;
+  string | null;
 
   referencia?:
-    string;
+  string;
 
   notas?:
-    string;
+  string;
 }
 
 export type NuevoMovimiento =
@@ -648,29 +648,26 @@ export type NuevoMovimiento =
 
 export interface NuevoPagoFijo {
   compromiso:
-    CompromisoFijo;
+  CompromisoFijo;
 
   monto: number;
   fecha: string;
   metodo: MetodoPagoFijo;
 
   periodicidad:
-    PeriodicidadPagoFijo;
+  PeriodicidadPagoFijo;
 
   referencia: string;
   notas: string;
 
   cicloPagoId?:
-    string | null;
+  string | null;
 
   ingresoId?:
-    string | null;
+  string | null;
 
   tarjetaId?:
-    string | null;
-
-    estadoTarjeta?:
-  EstadoTransaccionTarjeta | null;
+  string | null;
 }
 
 export interface ResumenCategoria {
@@ -692,10 +689,10 @@ export type EstadoPagoFijo =
 
 export interface ResumenFijo {
   compromiso:
-    CompromisoFijo;
+  CompromisoFijo;
 
   registrosMes:
-    PagoFijo[];
+  PagoFijo[];
 
   pagadoMes: number;
   pagadoQuincena: number;
@@ -703,10 +700,10 @@ export interface ResumenFijo {
   porcentajePagado: number;
 
   ultimoPago:
-    PagoFijo | null;
+  PagoFijo | null;
 
   estado:
-    EstadoPagoFijo;
+  EstadoPagoFijo;
 }
 
 export interface CicloTarjeta {
@@ -721,10 +718,10 @@ export interface CicloTarjeta {
 
 export interface ResumenTarjeta {
   tarjeta:
-    TarjetaCredito;
+  TarjetaCredito;
 
   ciclo:
-    CicloTarjeta;
+  CicloTarjeta;
 
   saldoAlCorte: number;
   comprasPosterioresAlCorte: number;
@@ -746,11 +743,11 @@ export interface ObligacionFlujo {
   cicloPagoId: string;
 
   tipo:
-    TipoObligacionFlujo;
+  TipoObligacionFlujo;
 
   descripcion: string;
   prioridad:
-    PrioridadPago;
+  PrioridadPago;
 
   montoProgramado: number;
   montoReservado: number;
@@ -760,10 +757,10 @@ export interface ObligacionFlujo {
   fechaVencimiento: string;
 
   estado:
-    EstadoObligacion;
+  EstadoObligacion;
 
   tarjetaId:
-    string | null;
+  string | null;
 }
 
 /**
@@ -771,7 +768,7 @@ export interface ObligacionFlujo {
  */
 export interface ResumenFlujoCicloPago {
   ciclo:
-    CicloPago;
+  CicloPago;
 
   ingresosProgramados: number;
   ingresosRecibidos: number;
@@ -790,7 +787,7 @@ export interface ResumenFlujoCicloPago {
   deficitReal: number;
 
   obligaciones:
-    ObligacionFlujo[];
+  ObligacionFlujo[];
 }
 
 /**

@@ -239,8 +239,6 @@ export function FixedPaymentModal({
           ? (pagoEditando?.tarjetaId ?? compromiso.tarjetaId ?? null)
           : null,
 
-      estadoTarjeta: metodo === "tarjeta" ? "contabilizada" : null,
-
       referencia,
 
       notas,

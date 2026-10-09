@@ -252,7 +252,7 @@ export function useBudgetData() {
   const [guardandoMovimiento, setGuardandoMovimiento] = useState(false);
   const [guardandoPagoFijo, setGuardandoPagoFijo] = useState(false);
   const [guardandoLimites, setGuardandoLimites] = useState(false);
-  const [actualizandoMovimientoId, setActualizandoMovimientoId] = useState<string |null>(null);
+  const [actualizandoMovimientoId, setActualizandoMovimientoId] = useState<string | null>(null);
   const [actualizandoPagoFijoId, setActualizandoPagoFijoId] = useState<string | null>(null)
   const [eliminandoMovimientoId, setEliminandoMovimientoId] = useState<
     string | null
@@ -492,11 +492,11 @@ export function useBudgetData() {
          *
          * No existe estado "pendiente" para PagoFijo.
          */
-        const estadoTarjeta =
-          metodo === "tarjeta" &&
-          tarjetaId !== null
-            ? "contabilizada"
-            : null;
+          const estadoTarjeta =
+            metodo === "tarjeta" &&
+              tarjetaId !== null
+              ? "contabilizada"
+              : null;
 
           return {
             id: documento.id,
@@ -866,146 +866,302 @@ export function useBudgetData() {
  * - estado pendiente/contabilizada
  * - actualizadoEn
  */
-const actualizarMovimiento = async (
-  movimientoActual: Movimiento,
-  cambios: NuevoMovimiento,
-): Promise<boolean> => {
-  if (!uid) {
-    setError(
-      "No existe un usuario autorizado para actualizar el movimiento.",
-    );
+  const actualizarMovimiento = async (
+    movimientoActual: Movimiento,
+    cambios: NuevoMovimiento,
+  ): Promise<boolean> => {
+    if (!uid) {
+      setError(
+        "No existe un usuario autorizado para actualizar el movimiento.",
+      );
 
-    return false;
-  }
+      return false;
+    }
 
-  /**
-   * No permitimos convertir un gasto en pago de tarjeta
-   * ni viceversa porque pertenecen a colecciones distintas.
-   */
-  if (
-    movimientoActual.tipo !==
-    cambios.tipo
-  ) {
-    setError(
-      "No se puede cambiar el tipo del movimiento durante la edición.",
-    );
-
-    return false;
-  }
-
-  const idActualizacion =
-    `${movimientoActual.tipo}-${movimientoActual.id}`;
-
-  setActualizandoMovimientoId(
-    idActualizacion,
-  );
-
-  setError(null);
-
-  try {
+    /**
+     * No permitimos convertir un gasto en pago de tarjeta
+     * ni viceversa porque pertenecen a colecciones distintas.
+     */
     if (
-      cambios.tipo ===
-      "gasto"
+      movimientoActual.tipo !==
+      cambios.tipo
     ) {
-      const tarjetaId =
-        cambios.tarjetaId ??
-        null;
+      setError(
+        "No se puede cambiar el tipo del movimiento durante la edición.",
+      );
 
-      const metodoPago =
-        cambios.metodoPago ??
-        (
-          tarjetaId
-            ? "tarjeta_credito"
-            : "debito"
-        );
+      return false;
+    }
 
-      const estadoTarjeta =
-        normalizarEstadoTarjeta(
-          cambios.estadoTarjeta,
-          metodoPago ===
+    const idActualizacion =
+      `${movimientoActual.tipo}-${movimientoActual.id}`;
+
+    setActualizandoMovimientoId(
+      idActualizacion,
+    );
+
+    setError(null);
+
+    try {
+      if (
+        cambios.tipo ===
+        "gasto"
+      ) {
+        const tarjetaId =
+          cambios.tarjetaId ??
+          null;
+
+        const metodoPago =
+          cambios.metodoPago ??
+          (
+            tarjetaId
+              ? "tarjeta_credito"
+              : "debito"
+          );
+
+        const estadoTarjeta =
+          normalizarEstadoTarjeta(
+            cambios.estadoTarjeta,
+            metodoPago ===
             "tarjeta_credito" &&
             tarjetaId !== null,
+          );
+
+        await updateDoc(
+          getUserDocument(
+            uid,
+            "gastos",
+            movimientoActual.id,
+          ),
+          {
+            concepto:
+              cambios.concepto.trim(),
+
+            monto:
+              cambios.monto,
+
+            categoria:
+              cambios.categoria,
+
+            categoriaTarjetaId:
+              cambios
+                .categoriaTarjetaId
+                .trim(),
+
+            categoriaTarjetaNombre:
+              cambios
+                .categoriaTarjetaNombre
+                .trim(),
+
+            comentario:
+              cambios
+                .comentario
+                .trim(),
+
+            fecha:
+              convertirFechaInputAISO(
+                cambios.fecha,
+              ),
+
+            metodoPago,
+
+            tarjetaId,
+
+            estadoTarjeta,
+
+            actualizadoEn:
+              serverTimestamp(),
+          },
         );
+      } else {
+        const tarjetaId =
+          cambios.tarjetaId ??
+          null;
+
+        const estadoTarjeta =
+          normalizarEstadoTarjeta(
+            cambios.estadoTarjeta,
+            true,
+          );
+
+        await updateDoc(
+          getUserDocument(
+            uid,
+            "pagosTarjeta",
+            movimientoActual.id,
+          ),
+          {
+            concepto:
+              cambios.concepto.trim(),
+
+            tarjeta:
+              cambios.concepto.trim(),
+
+            monto:
+              cambios.monto,
+
+            categoria:
+              cambios.categoria,
+
+            fecha:
+              convertirFechaInputAISO(
+                cambios.fecha,
+              ),
+
+            tarjetaId,
+
+            estadoTarjeta,
+
+            referencia:
+              cambios.referencia
+                ?.trim() ??
+              "",
+
+            notas:
+              cambios.notas
+                ?.trim() ??
+              "",
+
+            actualizadoEn:
+              serverTimestamp(),
+          },
+        );
+      }
+
+      try {
+        if (
+          PUSH_EVALUATION_ENABLED
+        ) {
+          await evaluarAlertasPush();
+        }
+      } catch (pushError) {
+        console.error(
+          "El movimiento se actualizó, pero no se pudieron evaluar las alertas push.",
+          pushError,
+        );
+
+        setError(
+          "El movimiento se actualizó, pero no se pudieron evaluar las alertas push.",
+        );
+      }
+
+      return true;
+    } catch (actualizarError) {
+      console.error(
+        actualizarError,
+      );
+
+      setError(
+        "No se pudo actualizar el movimiento.",
+      );
+
+      return false;
+    } finally {
+      setActualizandoMovimientoId(
+        null,
+      );
+
+      setGuardandoMovimiento(false);
+    }
+  };
+
+  /**
+   * ============================================================
+   * 2B.2C — ACTUALIZAR PAGO FIJO
+   * ============================================================
+   */
+  const actualizarPagoFijo = async (
+    pagoActual: PagoFijo,
+    cambios: NuevoPagoFijo,
+  ): Promise<boolean> => {
+    if (!uid) {
+      setError(
+        "No existe un usuario autorizado para actualizar el pago fijo.",
+      );
+
+      return false;
+    }
+
+    const tarjetaId =
+      cambios.metodo ===
+        "tarjeta"
+        ? normalizarTarjetaId(
+          cambios.tarjetaId ??
+          cambios.compromiso
+            .tarjetaId,
+        )
+        : null;
+
+    if (
+      cambios.metodo ===
+      "tarjeta" &&
+      !tarjetaId
+    ) {
+      setError(
+        "Este gasto fijo está marcado como pago con tarjeta, pero no tiene una tarjeta configurada.",
+      );
+
+      return false;
+    }
+
+    setActualizandoPagoFijoId(
+      pagoActual.id,
+    );
+
+    setError(null);
+
+    try {
+      /**
+       * Un pago fijo realizado con tarjeta se considera
+       * contabilizado inmediatamente.
+       *
+       * No existe estado "pendiente" para PagoFijo.
+       */
+      const estadoTarjeta =
+        cambios.metodo === "tarjeta" &&
+          tarjetaId !== null
+          ? "contabilizada"
+          : null;
 
       await updateDoc(
         getUserDocument(
           uid,
-          "gastos",
-          movimientoActual.id,
+          "pagosFijos",
+          pagoActual.id,
         ),
         {
-          concepto:
-            cambios.concepto.trim(),
+          compromisoId:
+            cambios.compromiso.id,
+
+          descripcion:
+            cambios.compromiso
+              .descripcion,
 
           monto:
             cambios.monto,
-
-          categoria:
-            cambios.categoria,
-
-          categoriaTarjetaId:
-            cambios
-              .categoriaTarjetaId
-              .trim(),
-
-          categoriaTarjetaNombre:
-            cambios
-              .categoriaTarjetaNombre
-              .trim(),
-
-          comentario:
-            cambios
-              .comentario
-              .trim(),
 
           fecha:
             convertirFechaInputAISO(
               cambios.fecha,
             ),
 
-          metodoPago,
+          metodo:
+            cambios.metodo,
 
-          tarjetaId,
+          periodicidad:
+            cambios.periodicidad,
 
-          estadoTarjeta,
+          quincena:
+            obtenerQuincena(
+              new Date(
+                `${cambios.fecha}T12:00:00`,
+              ),
+            ),
 
-          actualizadoEn:
-            serverTimestamp(),
-        },
-      );
-    } else {
-      const tarjetaId =
-        cambios.tarjetaId ??
-        null;
-
-      const estadoTarjeta =
-        normalizarEstadoTarjeta(
-          cambios.estadoTarjeta,
-          true,
-        );
-
-      await updateDoc(
-        getUserDocument(
-          uid,
-          "pagosTarjeta",
-          movimientoActual.id,
-        ),
-        {
-          concepto:
-            cambios.concepto.trim(),
-
-          tarjeta:
-            cambios.concepto.trim(),
-
-          monto:
-            cambios.monto,
-
-          categoria:
-            cambios.categoria,
-
-          fecha:
-            convertirFechaInputAISO(
-              cambios.fecha,
+          periodo:
+            cambios.fecha.slice(
+              0,
+              7,
             ),
 
           tarjetaId,
@@ -1013,185 +1169,33 @@ const actualizarMovimiento = async (
           estadoTarjeta,
 
           referencia:
-            cambios.referencia
-              ?.trim() ??
-            "",
+            cambios.referencia.trim(),
 
           notas:
-            cambios.notas
-              ?.trim() ??
-            "",
+            cambios.notas.trim(),
 
           actualizadoEn:
             serverTimestamp(),
         },
       );
-    }
 
-    try {
-      if (
-        PUSH_EVALUATION_ENABLED
-      ) {
-        await evaluarAlertasPush();
-      }
-    } catch (pushError) {
+      return true;
+    } catch (actualizarError) {
       console.error(
-        "El movimiento se actualizó, pero no se pudieron evaluar las alertas push.",
-        pushError,
+        actualizarError,
       );
 
       setError(
-        "El movimiento se actualizó, pero no se pudieron evaluar las alertas push.",
+        "No se pudo actualizar el pago fijo.",
+      );
+
+      return false;
+    } finally {
+      setActualizandoPagoFijoId(
+        null,
       );
     }
-
-    return true;
-  } catch (actualizarError) {
-    console.error(
-      actualizarError,
-    );
-
-    setError(
-      "No se pudo actualizar el movimiento.",
-    );
-
-    return false;
-  } finally {
-    setActualizandoMovimientoId(
-      null,
-    );
-
-    setGuardandoMovimiento(false);
-  }
-};
-
-/**
- * ============================================================
- * 2B.2C — ACTUALIZAR PAGO FIJO
- * ============================================================
- */
-const actualizarPagoFijo = async (
-  pagoActual: PagoFijo,
-  cambios: NuevoPagoFijo,
-): Promise<boolean> => {
-  if (!uid) {
-    setError(
-      "No existe un usuario autorizado para actualizar el pago fijo.",
-    );
-
-    return false;
-  }
-
-  const tarjetaId =
-    cambios.metodo ===
-      "tarjeta"
-      ? normalizarTarjetaId(
-          cambios.tarjetaId ??
-            cambios.compromiso
-              .tarjetaId,
-        )
-      : null;
-
-  if (
-    cambios.metodo ===
-      "tarjeta" &&
-    !tarjetaId
-  ) {
-    setError(
-      "Este gasto fijo está marcado como pago con tarjeta, pero no tiene una tarjeta configurada.",
-    );
-
-    return false;
-  }
-
-  setActualizandoPagoFijoId(
-    pagoActual.id,
-  );
-
-  setError(null);
-
-  try {
-    const estadoTarjeta =
-      normalizarEstadoTarjeta(
-        cambios.estadoTarjeta,
-        cambios.metodo ===
-          "tarjeta" &&
-          tarjetaId !== null,
-      );
-
-    await updateDoc(
-      getUserDocument(
-        uid,
-        "pagosFijos",
-        pagoActual.id,
-      ),
-      {
-        compromisoId:
-          cambios.compromiso.id,
-
-        descripcion:
-          cambios.compromiso
-            .descripcion,
-
-        monto:
-          cambios.monto,
-
-        fecha:
-          convertirFechaInputAISO(
-            cambios.fecha,
-          ),
-
-        metodo:
-          cambios.metodo,
-
-        periodicidad:
-          cambios.periodicidad,
-
-        quincena:
-          obtenerQuincena(
-            new Date(
-              `${cambios.fecha}T12:00:00`,
-            ),
-          ),
-
-        periodo:
-          cambios.fecha.slice(
-            0,
-            7,
-          ),
-
-        tarjetaId,
-
-        estadoTarjeta,
-
-        referencia:
-          cambios.referencia.trim(),
-
-        notas:
-          cambios.notas.trim(),
-
-        actualizadoEn:
-          serverTimestamp(),
-      },
-    );
-
-    return true;
-  } catch (actualizarError) {
-    console.error(
-      actualizarError,
-    );
-
-    setError(
-      "No se pudo actualizar el pago fijo.",
-    );
-
-    return false;
-  } finally {
-    setActualizandoPagoFijoId(
-      null,
-    );
-  }
-};
+  };
 
   const eliminarMovimiento = async (movimiento: Movimiento) => {
     const idEliminacion = `${movimiento.tipo}-${movimiento.id}`;
@@ -1358,7 +1362,7 @@ const actualizarPagoFijo = async (
 
     eliminarMovimiento,
     eliminarPagoFijo,
-    
+
     guardarLimites,
   };
 }
