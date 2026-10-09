@@ -176,10 +176,10 @@ export interface ResumenTarjetaActual {
   number;
 
   /**
-   * Total de cargos pendientes:
+   * Total de cargos pendientes de tarjeta.
    *
-   * compras variables pendientes
-   * + cargos fijos pendientes.
+   * Los pagos fijos no forman parte de este valor porque
+   * se contabilizan inmediatamente al registrarse.
    */
   totalCargosPendientes:
   number;
@@ -1412,34 +1412,11 @@ function evaluarActividadPosteriorCobertura(
   };
 }
 
-/**
- * Construye el resumen completo.
- */
-function crearResumenTarjeta(
-  tarjeta:
-    TarjetaCredito,
-
-  gastos:
-    GastoVariable[],
-
-  pagosFijos:
-    PagoFijo[],
-
-  pagos:
-    PagoTarjeta[],
-
-  fechaReferencia:
-    Date,
-): ResumenTarjetaActual {
-  /**
-   * ============================================================
-   * 2B.2B — SEPARACIÓN CONTABILIZADO / PENDIENTE
-   * ============================================================
-   *
-   * Compatibilidad:
-   * cualquier registro que no sea explícitamente "pendiente"
-   * se considera contabilizado.
-   */
+export function clasificarTransaccionesTarjeta(
+  gastos: GastoVariable[],
+  pagosFijos: PagoFijo[],
+  pagos: PagoTarjeta[],
+) {
   const gastosContabilizados =
     gastos.filter(
       (gasto) =>
@@ -1455,9 +1432,9 @@ function crearResumenTarjeta(
     );
 
   /**
- * Los pagos fijos se contabilizan inmediatamente.
- * No existe estado pendiente para PagoFijo.
- */
+   * Los pagos fijos se contabilizan inmediatamente.
+   * No existe estado pendiente para PagoFijo.
+   */
   const pagosFijosContabilizados =
     pagosFijos;
 
@@ -1474,6 +1451,47 @@ function crearResumenTarjeta(
         pago.estadoTarjeta ===
         "pendiente",
     );
+
+  return {
+    gastosContabilizados,
+    gastosPendientes,
+    pagosFijosContabilizados,
+    pagosContabilizados,
+    pagosPendientesTarjeta,
+  };
+}
+
+/**
+ * Construye el resumen completo.
+ */
+export function crearResumenTarjeta(
+  tarjeta:
+    TarjetaCredito,
+
+  gastos:
+    GastoVariable[],
+
+  pagosFijos:
+    PagoFijo[],
+
+  pagos:
+    PagoTarjeta[],
+
+  fechaReferencia:
+    Date,
+): ResumenTarjetaActual {
+  const {
+  gastosContabilizados,
+  gastosPendientes,
+  pagosFijosContabilizados,
+  pagosContabilizados,
+  pagosPendientesTarjeta,
+} =
+  clasificarTransaccionesTarjeta(
+    gastos,
+    pagosFijos,
+    pagos,
+  );
 
   /**
  * Solo las transacciones contabilizadas modifican
