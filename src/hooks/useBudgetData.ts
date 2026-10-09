@@ -486,12 +486,17 @@ export function useBudgetData() {
               data.tarjetaId,
             );
 
-          const estadoTarjeta =
-            normalizarEstadoTarjeta(
-              data.estadoTarjeta,
-              metodo === "tarjeta" &&
-              tarjetaId !== null,
-            );
+          /**
+         * Los pagos fijos se consideran contabilizados
+         * desde el momento en que se registran.
+         *
+         * No existe estado "pendiente" para PagoFijo.
+         */
+        const estadoTarjeta =
+          metodo === "tarjeta" &&
+          tarjetaId !== null
+            ? "contabilizada"
+            : null;
 
           return {
             id: documento.id,
@@ -805,15 +810,14 @@ export function useBudgetData() {
           tarjetaId,
 
           /**
-           * 2B.2A
+           * Los pagos fijos se consideran contabilizados
+           * inmediatamente al registrarse.
            *
-           * Solo los gastos fijos pagados mediante tarjeta tienen
-           * estado de transacción de tarjeta.
+           * No existe estado "pendiente" para PagoFijo.
            */
           estadoTarjeta:
             pago.metodo === "tarjeta"
-              ? pago.estadoTarjeta ??
-              "contabilizada"
+              ? "contabilizada"
               : null,
 
           referencia:
