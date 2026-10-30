@@ -90,6 +90,21 @@ Los documentos financieros residen bajo `users/{uid}/`: `gastos`, `pagosTarjeta`
 
 Firebase Admin omite las reglas de Firestore; sus rutas deben autenticar y autorizar cada solicitud. La configuración de la cuenta se gestiona desde `/api/account/expense`.
 
+### Separación de responsabilidades
+
+| Área | Implementación |
+| --- | --- |
+| Tarjetas: cálculo puro | `src/lib/budget/credit-cards/`: tipos, línea de tiempo, cobertura del corte, resumen individual y totales. No depende de React, Firestore ni FCM. |
+| Tarjetas: ciclo de React | `src/hooks/useCreditCardSummaries.ts`: reloj financiero y memoización. Mantiene sus exportaciones anteriores por compatibilidad. |
+| Cuenta bancaria | `src/lib/budget/expense-account/`: validación y normalización, reservas y solapamiento, ledger y resumen. `expense-account.ts` conserva la API pública. |
+| Push: coordinación | `src/lib/push/evaluate-user-alerts.ts`: carga datos, prepara alertas y coordina entrega y confirmación. |
+| Push: acceso a datos | `repository.ts`: lecturas de Firestore, normalización y desactivación de instalaciones. |
+| Push: cálculos | `card-calculations.ts`, `dates.ts` y `utils.ts`: cálculos y formatos sin acceso a Firestore ni FCM. |
+| Push: estado transaccional | `budget-alert-state.ts`, `card-alert-state.ts` y `delivery-state.ts`: deduplicación, reservas de entrega y reintentos. |
+| Push: entrega | `payloads.ts` construye los mensajes; `delivery.ts` los envía por lotes mediante FCM. |
+
+Las implementaciones internas importan sus módulos concretos; las fachadas públicas permiten conservar los consumidores existentes. El cálculo del dashboard y el cálculo de recordatorios siguen siendo implementaciones separadas: esta reorganización no unifica ni cambia sus reglas financieras.
+
 ## Comprobaciones
 
 ### Carga de datos financieros
@@ -119,6 +134,8 @@ La comprobación reutiliza la fecha calendario para la parte anterior a `T` y va
 | `npm run start` | Sirve el build de producción. |
 
 Las pruebas de reglas usan `demo-presupuesto` y Firestore en `127.0.0.1:8080`. El emulador también necesita sus puertos auxiliares libres y puede descargar su binario la primera vez. No despliegan reglas ni modifican el proyecto Firebase real.
+
+Las pruebas de evaluación push también se ejecutan con `npm run test:rules`: usan Firestore emulado y mensajería simulada, sin enviar notificaciones reales. Cubren deduplicación, dispositivos inválidos, reintentos y ventanas de pago. Los tests y sus fixtures sintéticos se versionan junto con el código; credenciales, logs y resultados generados permanecen fuera de Git.
 
 Hay excepciones locales documentadas a `react-hooks/set-state-in-effect` en cargas iniciales y reinicios de datos por sesión. La regla sigue activa donde no existe una excepción local o una configuración previa en `eslint.config.mjs`.
 

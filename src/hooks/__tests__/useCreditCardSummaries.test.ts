@@ -7,7 +7,7 @@ import {
 import {
     clasificarTransaccionesTarjeta,
     crearResumenTarjeta,
-} from "@/hooks/useCreditCardSummaries";
+} from "@/lib/budget/credit-cards/summary";
 
 import type {
     GastoVariable,
