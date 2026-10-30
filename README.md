@@ -92,6 +92,10 @@ Firebase Admin omite las reglas de Firestore; sus rutas deben autenticar y autor
 
 ## Comprobaciones
 
+Las reglas validan las fechas de gastos, pagos, configuraciones, ingresos y solicitudes de acceso. Los campos de texto que antes solo comprobaban longitud aceptan `YYYY-MM-DD` o una fecha ISO con hora y zona (`Z` o un desplazamiento como `-04:00`), con hasta nueve decimales opcionales en los segundos. Se comprueban días reales, años bisiestos y rangos de hora, minuto y segundo. Las fechas exclusivamente de calendario siguen usando su validador específico y las marcas nativas de Firestore conservan el tipo `timestamp`.
+
+La comprobación reutiliza la fecha calendario para la parte anterior a `T` y valida el resto con una expresión regular, mediante las operaciones de [String de Firebase Security Rules](https://firebase.google.com/docs/reference/rules/rules.String). Se aplica a las nuevas escrituras y actualizaciones; no convierte ni modifica documentos históricos automáticamente.
+
 | Comando | Función |
 | --- | --- |
 | `npm run lint` | ESLint sobre el proyecto. |
