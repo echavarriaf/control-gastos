@@ -270,10 +270,8 @@ export function prepararConfiguracionIngresoParaGuardar(
       configuracion,
     );
 
-  const {
-    id: _id,
-    ...datos
-  } = normalizada;
+  const datos: Omit<ConfiguracionIngreso, "id"> & { id?: string } = { ...normalizada };
+  delete datos.id;
 
   return datos;
 }

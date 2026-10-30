@@ -24,5 +24,9 @@ export default defineConfig({
       "src/**/*.test.ts",
       "src/**/*.test.tsx",
     ],
+
+    setupFiles: [
+      "./src/lib/firestore/__tests__/firestore-test-setup.ts",
+    ],
   },
 });

@@ -25,26 +25,118 @@ export function obtenerPeriodo(fecha: Date): string {
   )}`;
 }
 
-export function obtenerPeriodoDesdeISO(fechaISO: string): string {
-  const fecha = new Date(fechaISO);
+/**
+ * Convierte una fecha financiera en Date sin desplazar
+ * las fechas calendario YYYY-MM-DD por efecto del timezone.
+ *
+ * JavaScript interpreta:
+ *
+ * new Date("2026-10-01")
+ *
+ * como UTC. En zonas horarias negativas puede convertirse
+ * localmente en 2026-09-30.
+ *
+ * Para fechas puras usamos mediodía local.
+ * Los timestamps ISO completos conservan su comportamiento normal.
+ */
+function obtenerFechaLocalDesdeISO(
+  fechaISO: string,
+): Date | null {
+  const valor =
+    fechaISO.trim();
 
-  return Number.isNaN(fecha.getTime())
-    ? ""
-    : obtenerPeriodo(fecha);
+  const fechaCalendario =
+    /^(\d{4})-(\d{2})-(\d{2})$/.exec(
+      valor,
+    );
+
+  if (fechaCalendario) {
+    const year =
+      Number(
+        fechaCalendario[1],
+      );
+
+    const month =
+      Number(
+        fechaCalendario[2],
+      );
+
+    const day =
+      Number(
+        fechaCalendario[3],
+      );
+
+    const fecha =
+      new Date(
+        year,
+        month - 1,
+        day,
+        12,
+        0,
+        0,
+        0,
+      );
+
+    /**
+     * Evita que Date normalice silenciosamente
+     * valores inválidos como 2026-02-31.
+     */
+    if (
+      fecha.getFullYear() !==
+      year ||
+      fecha.getMonth() !==
+      month - 1 ||
+      fecha.getDate() !==
+      day
+    ) {
+      return null;
+    }
+
+    return fecha;
+  }
+
+  const fecha =
+    new Date(valor);
+
+  return Number.isNaN(
+    fecha.getTime(),
+  )
+    ? null
+    : fecha;
 }
 
-export function obtenerQuincena(fecha: Date): Quincena {
-  return fecha.getDate() <= 15 ? 1 : 2;
+export function obtenerPeriodoDesdeISO(
+  fechaISO: string,
+): string {
+  const fecha =
+    obtenerFechaLocalDesdeISO(
+      fechaISO,
+    );
+
+  return fecha
+    ? obtenerPeriodo(fecha)
+    : "";
+}
+
+export function obtenerQuincena(
+  fecha: Date,
+): Quincena {
+  return fecha.getDate() <= 15
+    ? 1
+    : 2;
 }
 
 export function obtenerQuincenaDesdeISO(
   fechaISO: string,
 ): Quincena {
-  const fecha = new Date(fechaISO);
+  const fecha =
+    obtenerFechaLocalDesdeISO(
+      fechaISO,
+    );
 
-  return Number.isNaN(fecha.getTime())
-    ? 1
-    : obtenerQuincena(fecha);
+  return fecha
+    ? obtenerQuincena(fecha)
+    : 1;
 }
 
 export function etiquetaMes(periodo: string): string {
@@ -183,7 +275,7 @@ export function normalizarLimites(
     (resultado, key) => {
       const limite =
         typeof data[key] === "object" &&
-        data[key] !== null
+          data[key] !== null
           ? (data[key] as Record<string, unknown>)
           : {};
 
@@ -248,7 +340,16 @@ export function montoSeguro(
 export function fechaCorta(
   fechaISO: string,
 ): string {
-  return new Date(fechaISO).toLocaleDateString(
+  const fecha =
+    obtenerFechaLocalDesdeISO(
+      fechaISO,
+    );
+
+  if (!fecha) {
+    return fechaISO;
+  }
+
+  return fecha.toLocaleDateString(
     "es-US",
     {
       day: "numeric",

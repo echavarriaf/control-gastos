@@ -153,6 +153,7 @@ export function useIncomeData() {
        * Esto también evita que un cambio de sesión pueda
        * mostrar temporalmente la configuración anterior.
        */
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reinicia datos privados al cambiar el UID antes de recibir el snapshot.
       setConfiguracion(
         CONFIGURACION_INGRESO_PREDETERMINADA,
       );

@@ -9,7 +9,6 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  Timestamp,
   updateDoc
 } from "firebase/firestore";
 
@@ -25,11 +24,18 @@ import {
   CATEGORIAS_VARIABLES,
   LIMITES_PREDETERMINADOS,
 } from "@/lib/budget/constants";
+
+import {
+  normalizarCreadoEn,
+  normalizarEstadoTarjeta,
+  normalizarMetodoMovimiento,
+  normalizarTarjetaId,
+  ordenarPorFechaYCreacion,
+} from "@/lib/budget/budget-data-normalizers";
+
 import type {
-  EstadoTransaccionTarjeta,
   GastoVariable,
   LimitesVariables,
-  MetodoPagoMovimiento,
   Movimiento,
   NuevoMovimiento,
   NuevoPagoFijo,
@@ -53,116 +59,6 @@ interface RespuestaEvaluacionPush {
   ok?: boolean;
   error?: unknown;
   detalle?: unknown;
-}
-
-interface RegistroOrdenable {
-  id: string;
-  fecha: string;
-  creadoEn: string;
-}
-
-/**
- * Convierte el Timestamp de Firestore a ISO para mantener
- * el resto de la aplicación trabajando con strings.
- *
- * El fallback cubre el snapshot local inicial mientras
- * Firestore confirma el serverTimestamp().
- */
-function normalizarCreadoEn(
-  value: unknown,
-  fallback: string,
-): string {
-  if (value instanceof Timestamp) {
-    return value.toDate().toISOString();
-  }
-
-  if (typeof value === "string") {
-    return value;
-  }
-
-  return fallback;
-}
-
-/**
- * TARJETAS - 1. Normaliza la referencia de tarjeta y
- * el método de pago de documentos nuevos o antiguos.
- */
-function normalizarTarjetaId(
-  value: unknown,
-): string | null {
-  return typeof value === "string" &&
-    value.trim()
-    ? value.trim()
-    : null;
-}
-
-function normalizarMetodoMovimiento(
-  value: unknown,
-): MetodoPagoMovimiento | undefined {
-  return value === "efectivo" ||
-    value === "debito" ||
-    value === "cuenta_bancaria" ||
-    value === "tarjeta_credito"
-    ? value
-    : undefined;
-}
-
-/**
- * ============================================================
- * 2B.2A — ESTADO DE TRANSACCIONES DE TARJETA
- * ============================================================
- *
- * Compatibilidad:
- *
- * - Los documentos históricos no tienen estadoTarjeta.
- * - Si pertenecen a una tarjeta, se consideran contabilizados.
- * - Si no pertenecen a una tarjeta, el estado es null.
- *
- * De esta forma no alteramos los saldos históricos existentes.
- */
-function normalizarEstadoTarjeta(
-  value: unknown,
-  usaTarjeta: boolean,
-): EstadoTransaccionTarjeta | null {
-  if (!usaTarjeta) {
-    return null;
-  }
-
-  if (
-    value === "pendiente" ||
-    value === "contabilizada"
-  ) {
-    return value;
-  }
-
-  return "contabilizada";
-}
-
-/**
- * Ordena primero por la fecha seleccionada para el movimiento
- * y, cuando coinciden, por la fecha y hora de inserción.
- */
-function ordenarPorFechaYCreacion<T extends RegistroOrdenable>(
-  a: T,
-  b: T,
-): number {
-  const diferenciaFecha =
-    new Date(b.fecha).getTime() -
-    new Date(a.fecha).getTime();
-
-  if (diferenciaFecha !== 0) {
-    return diferenciaFecha;
-  }
-
-  const diferenciaCreacion =
-    new Date(b.creadoEn).getTime() -
-    new Date(a.creadoEn).getTime();
-
-  if (diferenciaCreacion !== 0) {
-    return diferenciaCreacion;
-  }
-
-  return b.id.localeCompare(a.id);
 }
 
 /**

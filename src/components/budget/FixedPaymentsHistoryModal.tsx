@@ -20,7 +20,6 @@ import {
   LoaderCircle,
   Pencil,
   ReceiptText,
-  Trash2,
   X,
 } from "lucide-react";
 
@@ -103,8 +102,6 @@ export function FixedPaymentsHistoryModal({
   pagos,
   mesInicial,
   cargando,
-  eliminandoPagoFijoId,
-  onEliminar,
   onCerrar,
   onEditar,
 }: FixedPaymentsHistoryModalProps) {

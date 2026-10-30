@@ -115,9 +115,9 @@ function esGastoDeCuenta(
 ): boolean {
   return (
     data.metodoPago ===
-      "debito" ||
+    "debito" ||
     data.metodoPago ===
-      "cuenta_bancaria"
+    "cuenta_bancaria"
   );
 }
 
@@ -130,9 +130,9 @@ function esPagoFijoDeCuenta(
 ): boolean {
   return (
     data.metodo ===
-      "debito_automatico" ||
+    "debito_automatico" ||
     data.metodo ===
-      "transferencia"
+    "transferencia"
   );
 }
 
@@ -195,7 +195,7 @@ async function autorizarUsuario(
       allowedSnapshot
         .data()
         ?.activo !==
-        true
+      true
     ) {
       return {
         ok: false,
@@ -218,7 +218,7 @@ async function autorizarUsuario(
       uid,
     };
   } catch (
-    error
+  error
   ) {
     console.error(
       "No se pudo autorizar la cuenta de gastos:",
@@ -308,9 +308,9 @@ async function obtenerIdsIngresosIncluidos(
 
         return (
           fechaRecibida !==
-            "" &&
+          "" &&
           fechaRecibida <=
-            fechaSaldoInicial
+          fechaSaldoInicial
         );
       },
     )
@@ -355,7 +355,7 @@ async function obtenerIdsGastosIncluidos(
         return (
           fecha !== "" &&
           fecha <=
-            fechaSaldoInicial
+          fechaSaldoInicial
         );
       },
     )
@@ -404,7 +404,7 @@ async function obtenerIdsPagosFijosIncluidos(
         return (
           fecha !== "" &&
           fecha <=
-            fechaSaldoInicial
+          fechaSaldoInicial
         );
       },
     )
@@ -451,7 +451,44 @@ async function obtenerIdsPagosTarjetaIncluidos(
         return (
           fecha !== "" &&
           fecha <=
-            fechaSaldoInicial
+          fechaSaldoInicial
+        );
+      },
+    )
+    .map(
+      (documento) =>
+        documento.id,
+    )
+    .sort();
+}
+
+async function obtenerIdsMovimientosManualesIncluidos(
+  uid: string,
+
+  fechaSaldoInicial:
+    string,
+): Promise<string[]> {
+  const snapshot =
+    await obtenerColeccionUsuario(
+      uid,
+      "movimientosCuenta",
+    ).get();
+
+  return snapshot.docs
+    .filter(
+      (documento) => {
+        const data =
+          documento.data();
+
+        const fecha =
+          obtenerFechaCalendario(
+            data.fecha,
+          );
+
+        return (
+          fecha !== "" &&
+          fecha <=
+          fechaSaldoInicial
         );
       },
     )
@@ -538,6 +575,12 @@ export async function GET(
           ?.ingresosIncluidosEnSaldoInicial,
       );
 
+    const tieneSnapshotMovimientosManuales =
+      Array.isArray(
+        data
+          ?.movimientosManualesIncluidosEnSaldoInicial,
+      );
+
     const tieneSnapshotGastos =
       Array.isArray(
         data
@@ -578,6 +621,25 @@ export async function GET(
 
       actualizaciones
         .ingresosIncluidosEnSaldoInicial =
+        ids;
+    }
+
+    if (
+      !tieneSnapshotMovimientosManuales
+    ) {
+      const ids =
+        await obtenerIdsMovimientosManualesIncluidos(
+          autorizacion.uid,
+          cuenta
+            .fechaSaldoInicial,
+        );
+
+      cuenta
+        .movimientosManualesIncluidosEnSaldoInicial =
+        ids;
+
+      actualizaciones
+        .movimientosManualesIncluidosEnSaldoInicial =
         ids;
     }
 
@@ -657,7 +719,7 @@ export async function GET(
       cuenta,
     });
   } catch (
-    error
+  error
   ) {
     console.error(
       "No se pudo leer la Cuenta de gastos:",
@@ -711,6 +773,7 @@ export async function PUT(
       gastosIncluidosEnSaldoInicial,
       pagosFijosIncluidosEnSaldoInicial,
       pagosTarjetaIncluidosEnSaldoInicial,
+      movimientosManualesIncluidosEnSaldoInicial,
     ] =
       await Promise.all([
         obtenerIdsIngresosIncluidos(
@@ -736,6 +799,12 @@ export async function PUT(
           datos
             .fechaSaldoInicial,
         ),
+
+        obtenerIdsMovimientosManualesIncluidos(
+          autorizacion.uid,
+          datos
+            .fechaSaldoInicial,
+        ),
       ]);
 
     const referencia =
@@ -751,30 +820,32 @@ export async function PUT(
         string,
         unknown
       > = {
-        nombre:
-          datos.nombre,
+      nombre:
+        datos.nombre,
 
-        saldoInicial:
-          datos.saldoInicial,
+      saldoInicial:
+        datos.saldoInicial,
 
-        fechaSaldoInicial:
-          datos.fechaSaldoInicial,
+      fechaSaldoInicial:
+        datos.fechaSaldoInicial,
 
-        activa:
-          datos.activa,
+      activa:
+        datos.activa,
 
-        ingresosIncluidosEnSaldoInicial,
+      ingresosIncluidosEnSaldoInicial,
 
-        gastosIncluidosEnSaldoInicial,
+      gastosIncluidosEnSaldoInicial,
 
-        pagosFijosIncluidosEnSaldoInicial,
+      pagosFijosIncluidosEnSaldoInicial,
 
-        pagosTarjetaIncluidosEnSaldoInicial,
+      pagosTarjetaIncluidosEnSaldoInicial,
 
-        actualizadoEn:
-          FieldValue
-            .serverTimestamp(),
-      };
+      movimientosManualesIncluidosEnSaldoInicial,
+
+      actualizadoEn:
+        FieldValue
+          .serverTimestamp(),
+    };
 
     if (
       !existente.exists
@@ -808,10 +879,11 @@ export async function PUT(
         pagosFijosIncluidosEnSaldoInicial,
 
         pagosTarjetaIncluidosEnSaldoInicial,
+        movimientosManualesIncluidosEnSaldoInicial,
       },
     });
   } catch (
-    error
+  error
   ) {
     console.error(
       "No se pudo guardar la Cuenta de gastos:",
@@ -820,7 +892,7 @@ export async function PUT(
 
     const mensaje =
       error instanceof
-      Error
+        Error
         ? error.message
         : "No se pudo guardar la Cuenta de gastos.";
 
@@ -837,7 +909,7 @@ export async function PUT(
 }
 
 export async function POST():
-Promise<NextResponse> {
+  Promise<NextResponse> {
   return respuestaJson(
     {
       ok: false,
@@ -850,7 +922,7 @@ Promise<NextResponse> {
 }
 
 export async function DELETE():
-Promise<NextResponse> {
+  Promise<NextResponse> {
   return respuestaJson(
     {
       ok: false,

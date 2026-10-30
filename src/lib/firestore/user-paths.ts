@@ -31,7 +31,8 @@ export type UserCollectionName =
   | "tarjetasCredito"
   | "categoriasTarjeta"
   | "ingresos"
-  | "notificationDevices";
+  | "notificationDevices"
+  | "movimientosCuenta";
 
 export type UserConfigDocumentId =
   | "presupuestoFelo"

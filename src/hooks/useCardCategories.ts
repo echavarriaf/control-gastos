@@ -598,6 +598,8 @@ export function useCardCategories() {
 
   useEffect(
     () => {
+      // Reinicia los datos privados antes de suscribir las categorías del nuevo UID.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCategorias(
         [],
       );

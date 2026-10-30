@@ -13,9 +13,11 @@ import {
   LoaderCircle,
   LockKeyhole,
   Pencil,
+  Plus,
   ReceiptText,
   Save,
   ShieldCheck,
+  Trash2,
   WalletCards,
   X,
 } from "lucide-react";
@@ -26,6 +28,7 @@ import {
   calcularResumenCuentaGastos,
   EXPENSE_ACCOUNT_DEFAULT_NAME,
   type MovimientoCuentaGastos,
+  type MovimientoManualCuenta,
   type ReservaCompromisoCuenta,
   type SaldoTarjetaCuenta,
 } from "@/lib/budget/expense-account";
@@ -132,6 +135,29 @@ function configuracionMovimiento(movimiento: MovimientoCuentaGastos) {
         signo: "+",
       };
 
+    case "movimiento_manual":
+      if (movimiento.direccion === "entrada") {
+        return {
+          icono: ArrowDownToLine,
+
+          iconClass: "bg-emerald-100 text-emerald-700",
+
+          montoClass: "text-emerald-700",
+
+          signo: "+",
+        };
+      }
+
+      return {
+        icono: ArrowUpFromLine,
+
+        iconClass: "bg-rose-100 text-rose-700",
+
+        montoClass: "text-rose-700",
+
+        signo: "-",
+      };
+
     case "gasto_variable":
       return {
         icono: Banknote,
@@ -169,8 +195,16 @@ function configuracionMovimiento(movimiento: MovimientoCuentaGastos) {
 
 function FilaMovimientoCuenta({
   movimiento,
+  onEditar,
+  onEliminar,
+  eliminando,
 }: {
   movimiento: MovimientoCuentaGastos;
+  onEditar?: () => void;
+
+  onEliminar?: () => void;
+
+  eliminando?: boolean;
 }) {
   const config = configuracionMovimiento(movimiento);
 
@@ -217,6 +251,36 @@ function FilaMovimientoCuenta({
             >
               {formatoMoneda.format(movimiento.saldoDespues)}
             </p>
+
+            {movimiento.tipo === "movimiento_manual" && (
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onEditar}
+                  disabled={eliminando}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                  aria-label="Editar movimiento"
+                  title="Editar movimiento"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onEliminar}
+                  disabled={eliminando}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                  aria-label="Eliminar movimiento"
+                  title="Eliminar movimiento"
+                >
+                  {eliminando ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -308,6 +372,25 @@ export function ExpenseAccountCard({
 
   const [mostrandoReservas, setMostrandoReservas] = useState(false);
 
+  const [mostrandoFormularioMovimiento, setMostrandoFormularioMovimiento] =
+    useState(false);
+
+  const [movimientoEditandoId, setMovimientoEditandoId] = useState<
+    string | null
+  >(null);
+
+  const [direccionMovimiento, setDireccionMovimiento] = useState<
+    "entrada" | "salida"
+  >("entrada");
+
+  const [conceptoMovimiento, setConceptoMovimiento] = useState("");
+
+  const [montoMovimiento, setMontoMovimiento] = useState("");
+
+  const [fechaMovimiento, setFechaMovimiento] = useState(fechaHoyISO);
+
+  const [notasMovimiento, setNotasMovimiento] = useState("");
+
   const [nombre, setNombre] = useState(EXPENSE_ACCOUNT_DEFAULT_NAME);
 
   const [saldoInicial, setSaldoInicial] = useState("0");
@@ -339,10 +422,14 @@ export function ExpenseAccountCard({
             compromisosFijos,
             pagosTarjeta,
             saldosTarjetas,
+            undefined,
+            undefined,
+            account.movimientosManuales,
           )
         : null,
     [
       account.cuenta,
+      account.movimientosManuales,
       ingresos,
       gastos,
       pagosFijos,
@@ -353,7 +440,10 @@ export function ExpenseAccountCard({
   );
 
   const cargandoMovimientos =
-    cargandoIngresos || cargandoPresupuesto || cargandoCompromisos;
+    cargandoIngresos ||
+    cargandoPresupuesto ||
+    cargandoCompromisos ||
+    account.cargandoMovimientosManuales;
 
   const alternarDetallesCuenta = () => {
     if (mostrandoDetalles) {
@@ -363,6 +453,189 @@ export function ExpenseAccountCard({
     }
 
     setMostrandoDetalles((actual) => !actual);
+  };
+
+  const limpiarFormularioMovimiento = () => {
+    setMovimientoEditandoId(null);
+
+    setDireccionMovimiento("entrada");
+
+    setConceptoMovimiento("");
+
+    setMontoMovimiento("");
+
+    setFechaMovimiento(fechaHoyISO());
+
+    setNotasMovimiento("");
+
+    setErrorLocal(null);
+  };
+
+  const abrirNuevoMovimiento = (
+    direccion: "entrada" | "salida" = "entrada",
+  ) => {
+    account.limpiarError();
+
+    limpiarFormularioMovimiento();
+
+    setDireccionMovimiento(direccion);
+
+    setMostrandoFormularioMovimiento(true);
+  };
+
+  const editarMovimientoManual = (movimiento: MovimientoManualCuenta) => {
+    account.limpiarError();
+
+    setErrorLocal(null);
+
+    setMovimientoEditandoId(movimiento.id);
+
+    setDireccionMovimiento(movimiento.direccion);
+
+    setConceptoMovimiento(movimiento.concepto);
+
+    setMontoMovimiento(String(movimiento.monto));
+
+    setFechaMovimiento(movimiento.fecha);
+
+    setNotasMovimiento(movimiento.notas);
+
+    setMostrandoFormularioMovimiento(true);
+  };
+
+  const editarMovimientoHistorial = (movimientoId: string) => {
+    const manualId = movimientoId.replace(/^manual:/, "");
+
+    const movimiento = account.movimientosManuales.find(
+      (item) => item.id === manualId,
+    );
+
+    if (!movimiento) {
+      setErrorLocal("No se encontró el movimiento manual.");
+
+      return;
+    }
+
+    editarMovimientoManual(movimiento);
+  };
+
+  const eliminarMovimientoHistorial = async (movimientoId: string) => {
+    const manualId = movimientoId.replace(/^manual:/, "");
+
+    const movimiento = account.movimientosManuales.find(
+      (item) => item.id === manualId,
+    );
+
+    if (!movimiento) {
+      setErrorLocal("No se encontró el movimiento manual.");
+
+      return;
+    }
+
+    const confirmado = window.confirm(
+      `¿Eliminar "${movimiento.concepto}" por ${formatoMoneda.format(
+        movimiento.monto,
+      )}?`,
+    );
+
+    if (!confirmado) {
+      return;
+    }
+
+    account.limpiarError();
+
+    setErrorLocal(null);
+
+    await account.eliminarMovimientoManual(manualId);
+  };
+
+  const cerrarFormularioMovimiento = () => {
+    if (
+      account.guardandoMovimientoManual ||
+      account.actualizandoMovimientoManualId
+    ) {
+      return;
+    }
+
+    limpiarFormularioMovimiento();
+
+    setMostrandoFormularioMovimiento(false);
+  };
+
+  const guardarMovimientoManual = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    account.limpiarError();
+
+    setErrorLocal(null);
+
+    const concepto = conceptoMovimiento.trim();
+
+    const monto = Number(montoMovimiento);
+
+    const notas = notasMovimiento.trim();
+
+    if (!concepto) {
+      setErrorLocal("Escribe el concepto del movimiento.");
+
+      return;
+    }
+
+    if (!Number.isFinite(monto) || monto <= 0) {
+      setErrorLocal("Escribe un monto mayor que cero.");
+
+      return;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaMovimiento)) {
+      setErrorLocal("Selecciona una fecha válida.");
+
+      return;
+    }
+
+    if (account.cuenta && fechaMovimiento < account.cuenta.fechaSaldoInicial) {
+      setErrorLocal(
+        `La fecha no puede ser anterior al saldo base del ${etiquetaFecha(
+          account.cuenta.fechaSaldoInicial,
+        )}.`,
+      );
+
+      if (fechaMovimiento > fechaHoyISO()) {
+        setErrorLocal(
+          "No puedes registrar un movimiento futuro en el saldo actual.",
+        );
+
+        return;
+      }
+
+      return;
+    }
+
+    const datos = {
+      direccion: direccionMovimiento,
+
+      concepto,
+
+      monto,
+
+      fecha: fechaMovimiento,
+
+      notas,
+    };
+
+    const guardado = movimientoEditandoId
+      ? await account.actualizarMovimientoManual(movimientoEditandoId, datos)
+      : await account.crearMovimientoManual(datos);
+
+    if (!guardado) {
+      return;
+    }
+
+    limpiarFormularioMovimiento();
+
+    setMostrandoFormularioMovimiento(false);
+
+    setMostrandoMovimientos(true);
   };
 
   const comenzarEdicion = () => {
@@ -487,17 +760,262 @@ export function ExpenseAccountCard({
               </div>
 
               {!editando && (
-                <button
-                  type="button"
-                  onClick={comenzarEdicion}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
+                <div className="flex flex-wrap items-center gap-2">
+                  {account.configurada && (
+                    <button
+                      type="button"
+                      onClick={() => abrirNuevoMovimiento("entrada")}
+                      disabled={mostrandoFormularioMovimiento}
+                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Movimiento
+                    </button>
+                  )}
 
-                  {account.configurada ? "Recalibrar" : "Configurar"}
-                </button>
+                  <button
+                    type="button"
+                    onClick={comenzarEdicion}
+                    disabled={mostrandoFormularioMovimiento}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+
+                    {account.configurada ? "Recalibrar" : "Configurar"}
+                  </button>
+                </div>
               )}
             </div>
+
+            {mostrandoFormularioMovimiento && account.cuenta && (
+              <form
+                onSubmit={guardarMovimientoManual}
+                className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                      Cuenta de gastos
+                    </p>
+
+                    <h3 className="mt-1 text-sm font-black text-slate-900">
+                      {movimientoEditandoId
+                        ? "Editar movimiento"
+                        : "Nuevo movimiento"}
+                    </h3>
+
+                    <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                      Registra dinero que entra o sale directamente de esta
+                      cuenta.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={cerrarFormularioMovimiento}
+                    disabled={
+                      account.guardandoMovimientoManual ||
+                      account.actualizandoMovimientoManualId !== null
+                    }
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700 disabled:opacity-50"
+                    aria-label="Cerrar formulario"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-white p-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setDireccionMovimiento("entrada")}
+                    className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-black transition ${
+                      direccionMovimiento === "entrada"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    <ArrowDownToLine className="h-4 w-4" />
+                    Entrada
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDireccionMovimiento("salida")}
+                    className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-black transition ${
+                      direccionMovimiento === "salida"
+                        ? "bg-rose-100 text-rose-700"
+                        : "text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    <ArrowUpFromLine className="h-4 w-4" />
+                    Salida
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label
+                      htmlFor="expense-account-movement-concept"
+                      className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"
+                    >
+                      Concepto
+                    </label>
+
+                    <input
+                      id="expense-account-movement-concept"
+                      type="text"
+                      maxLength={120}
+                      value={conceptoMovimiento}
+                      onChange={(event) =>
+                        setConceptoMovimiento(event.target.value)
+                      }
+                      placeholder={
+                        direccionMovimiento === "entrada"
+                          ? "Ej. Transferencia desde ahorros"
+                          : "Ej. Retiro o transferencia"
+                      }
+                      disabled={
+                        account.guardandoMovimientoManual ||
+                        account.actualizandoMovimientoManualId !== null
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="expense-account-movement-amount"
+                      className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"
+                    >
+                      Monto
+                    </label>
+
+                    <div className="relative">
+                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm font-black text-slate-400">
+                        $
+                      </span>
+
+                      <input
+                        id="expense-account-movement-amount"
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        value={montoMovimiento}
+                        onChange={(event) =>
+                          setMontoMovimiento(event.target.value)
+                        }
+                        placeholder="0.00"
+                        disabled={
+                          account.guardandoMovimientoManual ||
+                          account.actualizandoMovimientoManualId !== null
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-7 pr-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="expense-account-movement-date"
+                      className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"
+                    >
+                      Fecha
+                    </label>
+
+                    <input
+                      id="expense-account-movement-date"
+                      type="date"
+                      min={account.cuenta.fechaSaldoInicial}
+                      max={fechaHoyISO()}
+                      value={fechaMovimiento}
+                      onChange={(event) =>
+                        setFechaMovimiento(event.target.value)
+                      }
+                      disabled={
+                        account.guardandoMovimientoManual ||
+                        account.actualizandoMovimientoManualId !== null
+                      }
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label
+                      htmlFor="expense-account-movement-notes"
+                      className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.14em] text-slate-500"
+                    >
+                      Notas
+                      <span className="ml-1 font-semibold normal-case tracking-normal text-slate-300">
+                        opcional
+                      </span>
+                    </label>
+
+                    <textarea
+                      id="expense-account-movement-notes"
+                      rows={2}
+                      maxLength={500}
+                      value={notasMovimiento}
+                      onChange={(event) =>
+                        setNotasMovimiento(event.target.value)
+                      }
+                      placeholder="Información adicional sobre este movimiento"
+                      disabled={
+                        account.guardandoMovimientoManual ||
+                        account.actualizandoMovimientoManualId !== null
+                      }
+                      className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:text-slate-300 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
+                    />
+                  </div>
+                </div>
+
+                {(errorLocal || account.error) && (
+                  <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-700">
+                    {errorLocal ?? account.error}
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={cerrarFormularioMovimiento}
+                    disabled={
+                      account.guardandoMovimientoManual ||
+                      account.actualizandoMovimientoManualId !== null
+                    }
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={
+                      account.guardandoMovimientoManual ||
+                      account.actualizandoMovimientoManualId !== null
+                    }
+                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                      direccionMovimiento === "entrada"
+                        ? "bg-emerald-600 hover:bg-emerald-700"
+                        : "bg-rose-600 hover:bg-rose-700"
+                    }`}
+                  >
+                    {account.guardandoMovimientoManual ||
+                    account.actualizandoMovimientoManualId !== null ? (
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+
+                    {movimientoEditandoId
+                      ? "Guardar cambios"
+                      : direccionMovimiento === "entrada"
+                        ? "Registrar entrada"
+                        : "Registrar salida"}
+                  </button>
+                </div>
+              </form>
+            )}
 
             {!editando && account.cuenta && resumen && (
               <div className="mt-5 space-y-3">
@@ -1004,6 +1522,27 @@ export function ExpenseAccountCard({
                                   <FilaMovimientoCuenta
                                     key={movimiento.id}
                                     movimiento={movimiento}
+                                    onEditar={
+                                      movimiento.tipo === "movimiento_manual"
+                                        ? () =>
+                                            editarMovimientoHistorial(
+                                              movimiento.id,
+                                            )
+                                        : undefined
+                                    }
+                                    onEliminar={
+                                      movimiento.tipo === "movimiento_manual"
+                                        ? () =>
+                                            void eliminarMovimientoHistorial(
+                                              movimiento.id,
+                                            )
+                                        : undefined
+                                    }
+                                    eliminando={
+                                      movimiento.tipo === "movimiento_manual" &&
+                                      account.eliminandoMovimientoManualId ===
+                                        movimiento.id.replace(/^manual:/, "")
+                                    }
                                   />
                                 ))}
                               </div>

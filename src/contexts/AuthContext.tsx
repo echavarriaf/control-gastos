@@ -50,6 +50,14 @@ import {
   db,
 } from "@/lib/firebase";
 
+import { withAuthTimeout } from "@/lib/auth/with-timeout";
+
+function logAccess(step: string, details?: Record<string, unknown>) {
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[Acceso ${new Date().toISOString()}] ${step}`, details ?? {});
+  }
+}
+
 interface AuthContextValue {
   user: User | null;
   authorized: boolean;
@@ -236,10 +244,13 @@ export function AuthProvider({
               currentUser.uid,
             );
 
+          logAccess("Consultando accessRequests");
           const requestSnapshot =
-            await getDoc(
+            await withAuthTimeout(getDoc(
               requestReference,
-            );
+            ), "No se pudo consultar tu solicitud de acceso. Revisa tu conexión e intenta nuevamente.");
+
+          logAccess("Respuesta de accessRequests", { exists: requestSnapshot.exists() });
 
           if (
             requestSnapshot.exists()
@@ -308,10 +319,12 @@ export function AuthProvider({
                 null,
             };
 
-          await setDoc(
+          logAccess("Guardando solicitud de acceso");
+          await withAuthTimeout(setDoc(
             requestReference,
             newRequest,
-          );
+          ), "No se pudo confirmar el envío de tu solicitud. Intenta comprobar el acceso nuevamente.");
+          logAccess("Solicitud de acceso guardada");
 
           if (
             auth.currentUser
@@ -327,6 +340,7 @@ export function AuthProvider({
         } catch (
           requestError
         ) {
+          logAccess("Falló la solicitud de acceso");
           console.error(
             "No se pudo crear o recuperar la solicitud de acceso:",
             requestError,
@@ -348,6 +362,7 @@ export function AuthProvider({
 
           return null;
         } finally {
+          logAccess("Fin de solicitud de acceso");
           setCreatingAccessRequest(
             false,
           );
@@ -376,20 +391,28 @@ export function AuthProvider({
         );
 
         try {
+          logAccess("Consultando allowedUsers");
           const authorizationSnapshot =
-            await getDoc(
+            await withAuthTimeout(getDoc(
               doc(
                 db,
                 "allowedUsers",
                 currentUser.uid,
               ),
-            );
+            ), "No se pudo conectar para verificar el acceso. Revisa tu conexión e intenta nuevamente.");
 
           const isAuthorized =
             authorizationSnapshot.exists() &&
             authorizationSnapshot
               .data()
               .activo === true;
+
+          logAccess("Respuesta de allowedUsers", {
+            exists: authorizationSnapshot.exists(),
+            authorized: isAuthorized,
+            sameSession: auth.currentUser?.uid === currentUser.uid,
+            fromCache: authorizationSnapshot.metadata.fromCache,
+          });
 
           if (
             auth.currentUser
@@ -423,6 +446,7 @@ export function AuthProvider({
         } catch (
           authorizationError
         ) {
+          logAccess("Falló la comprobación de permisos");
           console.error(
             "No se pudo comprobar la autorización:",
             authorizationError,
@@ -444,6 +468,7 @@ export function AuthProvider({
 
           return false;
         } finally {
+          logAccess("Fin de comprobación de permisos");
           setCheckingAuthorization(
             false,
           );
@@ -459,9 +484,19 @@ export function AuthProvider({
    * sincronizado el estado local con Firebase Authentication.
    */
   useEffect(() => {
+    logAccess("AuthProvider montado; iniciando recuperación de sesión");
+    const authTimeout = setTimeout(() => {
+      logAccess("Tiempo agotado esperando onAuthStateChanged (15 segundos)");
+      setAuthReady(true);
+      setError("La sesión tardó demasiado en responder. Vuelve a intentar iniciar sesión.");
+    }, 15000);
+
+    logAccess("Consultando getRedirectResult");
     void getRedirectResult(
       auth,
-    ).catch(
+    ).then((result) => {
+      logAccess("getRedirectResult completado", { hasResult: result !== null });
+    }).catch(
       (
         redirectError:
           unknown,
@@ -479,6 +514,7 @@ export function AuthProvider({
       },
     );
 
+    logAccess("Registrando onAuthStateChanged");
     const unsubscribe =
       onAuthStateChanged(
         auth,
@@ -486,6 +522,8 @@ export function AuthProvider({
         (
           currentUser,
         ) => {
+          logAccess("onAuthStateChanged respondió", { hasUser: currentUser !== null });
+          clearTimeout(authTimeout);
           setUser(
             currentUser,
           );
@@ -530,6 +568,7 @@ export function AuthProvider({
         (
           authStateError,
         ) => {
+          clearTimeout(authTimeout);
           console.error(
             "No se pudo recuperar la sesión:",
             authStateError,
@@ -565,7 +604,11 @@ export function AuthProvider({
         },
       );
 
-    return unsubscribe;
+    return () => {
+      logAccess("AuthProvider: limpiando suscripción");
+      clearTimeout(authTimeout);
+      unsubscribe();
+    };
   }, [
     checkAuthorization,
   ]);
@@ -728,6 +771,18 @@ export function AuthProvider({
         checkAuthorization,
       ],
     );
+
+  useEffect(() => {
+    logAccess("Estado de la pantalla", {
+      authReady,
+      hasUser: user !== null,
+      authorized,
+      checkingAuthorization,
+      creatingAccessRequest,
+      loading: !authReady || checkingAuthorization || creatingAccessRequest,
+      error,
+    });
+  }, [authReady, user, authorized, checkingAuthorization, creatingAccessRequest, error]);
 
   const value =
     useMemo<AuthContextValue>(

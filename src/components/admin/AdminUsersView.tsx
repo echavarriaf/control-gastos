@@ -442,6 +442,8 @@ export function AdminUsersView() {
 
   useEffect(
     () => {
+      // La carga inicial sincroniza la vista con las API administrativas.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void cargarDatos();
     },
     [
