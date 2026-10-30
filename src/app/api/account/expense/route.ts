@@ -1,5 +1,6 @@
 import {
   FieldValue,
+  type Transaction,
 } from "firebase-admin/firestore";
 
 import {
@@ -277,13 +278,14 @@ function obtenerColeccionUsuario(
 }
 
 async function obtenerIdsIngresosIncluidos(
+  transaction: Transaction,
   uid: string,
 
   fechaSaldoInicial:
     string,
 ): Promise<string[]> {
   const snapshot =
-    await obtenerColeccionUsuario(
+    await transaction.get(obtenerColeccionUsuario(
       uid,
       "ingresos",
     )
@@ -292,7 +294,7 @@ async function obtenerIdsIngresosIncluidos(
         "==",
         "recibido",
       )
-      .get();
+    );
 
   return snapshot.docs
     .filter(
@@ -322,16 +324,17 @@ async function obtenerIdsIngresosIncluidos(
 }
 
 async function obtenerIdsGastosIncluidos(
+  transaction: Transaction,
   uid: string,
 
   fechaSaldoInicial:
     string,
 ): Promise<string[]> {
   const snapshot =
-    await obtenerColeccionUsuario(
+    await transaction.get(obtenerColeccionUsuario(
       uid,
       "gastos",
-    ).get();
+    ));
 
   return snapshot.docs
     .filter(
@@ -371,16 +374,17 @@ async function obtenerIdsGastosIncluidos(
  * ya reflejados por el banco en la fotografía base.
  */
 async function obtenerIdsPagosFijosIncluidos(
+  transaction: Transaction,
   uid: string,
 
   fechaSaldoInicial:
     string,
 ): Promise<string[]> {
   const snapshot =
-    await obtenerColeccionUsuario(
+    await transaction.get(obtenerColeccionUsuario(
       uid,
       "pagosFijos",
-    ).get();
+    ));
 
   return snapshot.docs
     .filter(
@@ -426,16 +430,17 @@ async function obtenerIdsPagosFijosIncluidos(
  * quedan incluidos en saldoInicial y no se restan nuevamente.
  */
 async function obtenerIdsPagosTarjetaIncluidos(
+  transaction: Transaction,
   uid: string,
 
   fechaSaldoInicial:
     string,
 ): Promise<string[]> {
   const snapshot =
-    await obtenerColeccionUsuario(
+    await transaction.get(obtenerColeccionUsuario(
       uid,
       "pagosTarjeta",
-    ).get();
+    ));
 
   return snapshot.docs
     .filter(
@@ -463,16 +468,17 @@ async function obtenerIdsPagosTarjetaIncluidos(
 }
 
 async function obtenerIdsMovimientosManualesIncluidos(
+  transaction: Transaction,
   uid: string,
 
   fechaSaldoInicial:
     string,
 ): Promise<string[]> {
   const snapshot =
-    await obtenerColeccionUsuario(
+    await transaction.get(obtenerColeccionUsuario(
       uid,
       "movimientosCuenta",
-    ).get();
+    ));
 
   return snapshot.docs
     .filter(
@@ -520,203 +526,212 @@ export async function GET(
   }
 
   try {
-    const referencia =
-      obtenerReferenciaCuenta(
-        autorizacion.uid,
-      );
+    // El relleno legacy no puede sobrescribir una recalibración concurrente.
+    return await getAdminDb().runTransaction(async (transaction) => {
+      const referencia =
+        obtenerReferenciaCuenta(
+          autorizacion.uid,
+        );
 
-    const snapshot =
-      await referencia.get();
+      const snapshot =
+        await transaction.get(referencia);
 
-    if (
-      !snapshot.exists
-    ) {
+      if (
+        !snapshot.exists
+      ) {
+        return respuestaJson({
+          ok: true,
+
+          cuenta:
+            null,
+        });
+      }
+
+      const data =
+        snapshot.data();
+
+      const cuenta =
+        normalizarCuentaGastos(
+          data,
+        );
+
+      if (
+        !cuenta
+      ) {
+        console.error(
+          "La Cuenta de gastos almacenada tiene un formato inválido:",
+          {
+            uid:
+              autorizacion.uid,
+          },
+        );
+
+        return respuestaJson(
+          {
+            ok: false,
+
+            error:
+              "La configuración de la cuenta almacenada no es válida.",
+          },
+          500,
+        );
+      }
+
+      const tieneSnapshotIngresos =
+        Array.isArray(
+          data
+            ?.ingresosIncluidosEnSaldoInicial,
+        );
+
+      const tieneSnapshotMovimientosManuales =
+        Array.isArray(
+          data
+            ?.movimientosManualesIncluidosEnSaldoInicial,
+        );
+
+      const tieneSnapshotGastos =
+        Array.isArray(
+          data
+            ?.gastosIncluidosEnSaldoInicial,
+        );
+
+      const tieneSnapshotPagosFijos =
+        Array.isArray(
+          data
+            ?.pagosFijosIncluidosEnSaldoInicial,
+        );
+
+      const tieneSnapshotPagosTarjeta =
+        Array.isArray(
+          data
+            ?.pagosTarjetaIncluidosEnSaldoInicial,
+        );
+
+      const actualizaciones:
+        Record<
+          string,
+          unknown
+        > = {};
+
+      if (
+        !tieneSnapshotIngresos
+      ) {
+        const ids =
+          await obtenerIdsIngresosIncluidos(
+            transaction,
+            autorizacion.uid,
+            cuenta
+              .fechaSaldoInicial,
+          );
+
+        cuenta
+          .ingresosIncluidosEnSaldoInicial =
+          ids;
+
+        actualizaciones
+          .ingresosIncluidosEnSaldoInicial =
+          ids;
+      }
+
+      if (
+        !tieneSnapshotMovimientosManuales
+      ) {
+        const ids =
+          await obtenerIdsMovimientosManualesIncluidos(
+            transaction,
+            autorizacion.uid,
+            cuenta
+              .fechaSaldoInicial,
+          );
+
+        cuenta
+          .movimientosManualesIncluidosEnSaldoInicial =
+          ids;
+
+        actualizaciones
+          .movimientosManualesIncluidosEnSaldoInicial =
+          ids;
+      }
+
+      if (
+        !tieneSnapshotGastos
+      ) {
+        const ids =
+          await obtenerIdsGastosIncluidos(
+            transaction,
+            autorizacion.uid,
+            cuenta
+              .fechaSaldoInicial,
+          );
+
+        cuenta
+          .gastosIncluidosEnSaldoInicial =
+          ids;
+
+        actualizaciones
+          .gastosIncluidosEnSaldoInicial =
+          ids;
+      }
+
+      if (
+        !tieneSnapshotPagosFijos
+      ) {
+        const ids =
+          await obtenerIdsPagosFijosIncluidos(
+            transaction,
+            autorizacion.uid,
+            cuenta
+              .fechaSaldoInicial,
+          );
+
+        cuenta
+          .pagosFijosIncluidosEnSaldoInicial =
+          ids;
+
+        actualizaciones
+          .pagosFijosIncluidosEnSaldoInicial =
+          ids;
+      }
+
+      if (
+        !tieneSnapshotPagosTarjeta
+      ) {
+        const ids =
+          await obtenerIdsPagosTarjetaIncluidos(
+            transaction,
+            autorizacion.uid,
+            cuenta
+              .fechaSaldoInicial,
+          );
+
+        cuenta
+          .pagosTarjetaIncluidosEnSaldoInicial =
+          ids;
+
+        actualizaciones
+          .pagosTarjetaIncluidosEnSaldoInicial =
+          ids;
+      }
+
+      if (
+        Object.keys(
+          actualizaciones,
+        ).length >
+        0
+      ) {
+        transaction.set(
+          referencia,
+          actualizaciones,
+          {
+            merge: true,
+          },
+        );
+      }
+
       return respuestaJson({
         ok: true,
-
-        cuenta:
-          null,
+        cuenta,
       });
-    }
-
-    const data =
-      snapshot.data();
-
-    const cuenta =
-      normalizarCuentaGastos(
-        data,
-      );
-
-    if (
-      !cuenta
-    ) {
-      console.error(
-        "La Cuenta de gastos almacenada tiene un formato inválido:",
-        {
-          uid:
-            autorizacion.uid,
-        },
-      );
-
-      return respuestaJson(
-        {
-          ok: false,
-
-          error:
-            "La configuración de la cuenta almacenada no es válida.",
-        },
-        500,
-      );
-    }
-
-    const tieneSnapshotIngresos =
-      Array.isArray(
-        data
-          ?.ingresosIncluidosEnSaldoInicial,
-      );
-
-    const tieneSnapshotMovimientosManuales =
-      Array.isArray(
-        data
-          ?.movimientosManualesIncluidosEnSaldoInicial,
-      );
-
-    const tieneSnapshotGastos =
-      Array.isArray(
-        data
-          ?.gastosIncluidosEnSaldoInicial,
-      );
-
-    const tieneSnapshotPagosFijos =
-      Array.isArray(
-        data
-          ?.pagosFijosIncluidosEnSaldoInicial,
-      );
-
-    const tieneSnapshotPagosTarjeta =
-      Array.isArray(
-        data
-          ?.pagosTarjetaIncluidosEnSaldoInicial,
-      );
-
-    const actualizaciones:
-      Record<
-        string,
-        unknown
-      > = {};
-
-    if (
-      !tieneSnapshotIngresos
-    ) {
-      const ids =
-        await obtenerIdsIngresosIncluidos(
-          autorizacion.uid,
-          cuenta
-            .fechaSaldoInicial,
-        );
-
-      cuenta
-        .ingresosIncluidosEnSaldoInicial =
-        ids;
-
-      actualizaciones
-        .ingresosIncluidosEnSaldoInicial =
-        ids;
-    }
-
-    if (
-      !tieneSnapshotMovimientosManuales
-    ) {
-      const ids =
-        await obtenerIdsMovimientosManualesIncluidos(
-          autorizacion.uid,
-          cuenta
-            .fechaSaldoInicial,
-        );
-
-      cuenta
-        .movimientosManualesIncluidosEnSaldoInicial =
-        ids;
-
-      actualizaciones
-        .movimientosManualesIncluidosEnSaldoInicial =
-        ids;
-    }
-
-    if (
-      !tieneSnapshotGastos
-    ) {
-      const ids =
-        await obtenerIdsGastosIncluidos(
-          autorizacion.uid,
-          cuenta
-            .fechaSaldoInicial,
-        );
-
-      cuenta
-        .gastosIncluidosEnSaldoInicial =
-        ids;
-
-      actualizaciones
-        .gastosIncluidosEnSaldoInicial =
-        ids;
-    }
-
-    if (
-      !tieneSnapshotPagosFijos
-    ) {
-      const ids =
-        await obtenerIdsPagosFijosIncluidos(
-          autorizacion.uid,
-          cuenta
-            .fechaSaldoInicial,
-        );
-
-      cuenta
-        .pagosFijosIncluidosEnSaldoInicial =
-        ids;
-
-      actualizaciones
-        .pagosFijosIncluidosEnSaldoInicial =
-        ids;
-    }
-
-    if (
-      !tieneSnapshotPagosTarjeta
-    ) {
-      const ids =
-        await obtenerIdsPagosTarjetaIncluidos(
-          autorizacion.uid,
-          cuenta
-            .fechaSaldoInicial,
-        );
-
-      cuenta
-        .pagosTarjetaIncluidosEnSaldoInicial =
-        ids;
-
-      actualizaciones
-        .pagosTarjetaIncluidosEnSaldoInicial =
-        ids;
-    }
-
-    if (
-      Object.keys(
-        actualizaciones,
-      ).length >
-      0
-    ) {
-      await referencia.set(
-        actualizaciones,
-        {
-          merge: true,
-        },
-      );
-    }
-
-    return respuestaJson({
-      ok: true,
-      cuenta,
     });
   } catch (
   error
@@ -759,118 +774,88 @@ export async function PUT(
     return autorizacion.response;
   }
 
+  let datos: ReturnType<typeof validarCuentaGastos>;
   try {
-    const body =
-      await request.json();
-
-    const datos =
-      validarCuentaGastos(
-        body,
-      );
-
-    const [
-      ingresosIncluidosEnSaldoInicial,
-      gastosIncluidosEnSaldoInicial,
-      pagosFijosIncluidosEnSaldoInicial,
-      pagosTarjetaIncluidosEnSaldoInicial,
-      movimientosManualesIncluidosEnSaldoInicial,
-    ] =
-      await Promise.all([
-        obtenerIdsIngresosIncluidos(
-          autorizacion.uid,
-          datos
-            .fechaSaldoInicial,
-        ),
-
-        obtenerIdsGastosIncluidos(
-          autorizacion.uid,
-          datos
-            .fechaSaldoInicial,
-        ),
-
-        obtenerIdsPagosFijosIncluidos(
-          autorizacion.uid,
-          datos
-            .fechaSaldoInicial,
-        ),
-
-        obtenerIdsPagosTarjetaIncluidos(
-          autorizacion.uid,
-          datos
-            .fechaSaldoInicial,
-        ),
-
-        obtenerIdsMovimientosManualesIncluidos(
-          autorizacion.uid,
-          datos
-            .fechaSaldoInicial,
-        ),
-      ]);
-
-    const referencia =
-      obtenerReferenciaCuenta(
-        autorizacion.uid,
-      );
-
-    const existente =
-      await referencia.get();
-
-    const datosFirestore:
-      Record<
-        string,
-        unknown
-      > = {
-      nombre:
-        datos.nombre,
-
-      saldoInicial:
-        datos.saldoInicial,
-
-      fechaSaldoInicial:
-        datos.fechaSaldoInicial,
-
-      activa:
-        datos.activa,
-
-      ingresosIncluidosEnSaldoInicial,
-
-      gastosIncluidosEnSaldoInicial,
-
-      pagosFijosIncluidosEnSaldoInicial,
-
-      pagosTarjetaIncluidosEnSaldoInicial,
-
-      movimientosManualesIncluidosEnSaldoInicial,
-
-      actualizadoEn:
-        FieldValue
-          .serverTimestamp(),
-    };
-
-    if (
-      !existente.exists
-    ) {
-      datosFirestore
-        .creadoEn =
-        FieldValue
-          .serverTimestamp();
-    }
-
-    await referencia.set(
-      datosFirestore,
-      {
-        merge: true,
-      },
-    );
-
+    datos = validarCuentaGastos(await request.json());
+  } catch (error) {
     return respuestaJson({
-      ok: true,
+      ok: false,
+      error: error instanceof Error ? error.message : "Los datos de la cuenta no son válidos.",
+    }, 400);
+  }
 
-      cuenta: {
-        id:
-          EXPENSE_ACCOUNT_ID,
+  try {
+    // La fotografía y sus cinco listas se leen y guardan como una unidad.
+    // Si hay un conflicto, Firestore repite todas las lecturas antes del commit.
+    return await getAdminDb().runTransaction(async (transaction) => {
+      const referencia =
+        obtenerReferenciaCuenta(
+          autorizacion.uid,
+        );
 
-        ...datos,
+      const existente =
+        await transaction.get(referencia);
+
+      const [
+        ingresosIncluidosEnSaldoInicial,
+        gastosIncluidosEnSaldoInicial,
+        pagosFijosIncluidosEnSaldoInicial,
+        pagosTarjetaIncluidosEnSaldoInicial,
+        movimientosManualesIncluidosEnSaldoInicial,
+      ] =
+        await Promise.all([
+          obtenerIdsIngresosIncluidos(
+            transaction,
+            autorizacion.uid,
+            datos
+              .fechaSaldoInicial,
+          ),
+
+          obtenerIdsGastosIncluidos(
+            transaction,
+            autorizacion.uid,
+            datos
+              .fechaSaldoInicial,
+          ),
+
+          obtenerIdsPagosFijosIncluidos(
+            transaction,
+            autorizacion.uid,
+            datos
+              .fechaSaldoInicial,
+          ),
+
+          obtenerIdsPagosTarjetaIncluidos(
+            transaction,
+            autorizacion.uid,
+            datos
+              .fechaSaldoInicial,
+          ),
+
+          obtenerIdsMovimientosManualesIncluidos(
+            transaction,
+            autorizacion.uid,
+            datos
+              .fechaSaldoInicial,
+          ),
+        ]);
+
+      const datosFirestore:
+        Record<
+          string,
+          unknown
+        > = {
+        nombre:
+          datos.nombre,
+
+        saldoInicial:
+          datos.saldoInicial,
+
+        fechaSaldoInicial:
+          datos.fechaSaldoInicial,
+
+        activa:
+          datos.activa,
 
         ingresosIncluidosEnSaldoInicial,
 
@@ -879,8 +864,50 @@ export async function PUT(
         pagosFijosIncluidosEnSaldoInicial,
 
         pagosTarjetaIncluidosEnSaldoInicial,
+
         movimientosManualesIncluidosEnSaldoInicial,
-      },
+
+        actualizadoEn:
+          FieldValue
+            .serverTimestamp(),
+      };
+
+      if (
+        !existente.exists
+      ) {
+        datosFirestore
+          .creadoEn =
+          FieldValue
+            .serverTimestamp();
+      }
+
+      transaction.set(
+        referencia,
+        datosFirestore,
+        {
+          merge: true,
+        },
+      );
+
+      return respuestaJson({
+        ok: true,
+
+        cuenta: {
+          id:
+            EXPENSE_ACCOUNT_ID,
+
+          ...datos,
+
+          ingresosIncluidosEnSaldoInicial,
+
+          gastosIncluidosEnSaldoInicial,
+
+          pagosFijosIncluidosEnSaldoInicial,
+
+          pagosTarjetaIncluidosEnSaldoInicial,
+          movimientosManualesIncluidosEnSaldoInicial,
+        },
+      });
     });
   } catch (
   error
@@ -890,20 +917,12 @@ export async function PUT(
       error,
     );
 
-    const mensaje =
-      error instanceof
-        Error
-        ? error.message
-        : "No se pudo guardar la Cuenta de gastos.";
-
     return respuestaJson(
       {
         ok: false,
-
-        error:
-          mensaje,
+        error: "No se pudo guardar la Cuenta de gastos. Vuelve a intentarlo.",
       },
-      400,
+      500,
     );
   }
 }

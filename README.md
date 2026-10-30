@@ -65,6 +65,8 @@ Sin `--execute`, el script muestra los cambios previstos. Añade esa opción ún
 - **Disponible real:** `saldoActual - totalComprometido`, donde `totalComprometido = reservasFijas + tarjetasReservadas - solapamiento`. Las reservas respetan la quincena presupuestaria y las ventanas de pago de tarjetas; no equivalen a toda la deuda existente.
 - **Pagos fijos parciales:** mantienen la reserva completa del compromiso hasta completarlo. El solapamiento evita reservar dos veces lo que también corresponda a una tarjeta.
 
+La recalibración lee la cuenta y las cinco colecciones de movimientos dentro de una transacción de Firestore. El saldo base y sus listas se confirman juntos o no se guarda ninguno. Las cuentas antiguas que necesitan completar esas listas también se actualizan dentro de una transacción, para que una lectura no sobrescriba una recalibración concurrente. Si coinciden dos recalibraciones, se procesan como operaciones completas; la que se confirme al final determina la fotografía vigente.
+
 Las reglas de negocio y compatibilidad se detallan en [AGENTS.md](AGENTS.md). Los cálculos principales están en `src/lib/budget/` y los resúmenes de tarjetas en `src/hooks/useCreditCardSummaries.ts`.
 
 ## Organización
@@ -95,7 +97,7 @@ Firebase Admin omite las reglas de Firestore; sus rutas deben autenticar y autor
 | `npm run lint` | ESLint sobre el proyecto. |
 | `npm test` | Pruebas unitarias y de componentes con Vitest, excluyendo reglas. |
 | `npm run test:watch` | Pruebas unitarias en modo observación. |
-| `npm run test:rules` | Arranca el emulador, prueba las reglas y lo detiene. |
+| `npm run test:rules` | Arranca el emulador, prueba reglas y consistencia transaccional de la cuenta, y lo detiene. |
 | `npm run test:all` | Ejecuta pruebas unitarias y de reglas. |
 | `npm run build` | Compila y comprueba tipos para producción. |
 | `npm run start` | Sirve el build de producción. |
