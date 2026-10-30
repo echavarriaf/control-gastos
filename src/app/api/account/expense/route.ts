@@ -289,11 +289,7 @@ async function obtenerIdsIngresosIncluidos(
       uid,
       "ingresos",
     )
-      .where(
-        "estado",
-        "==",
-        "recibido",
-      )
+      .where("fechaRecibida", "<=", `${fechaSaldoInicial}\uf8ff`)
     );
 
   return snapshot.docs
@@ -301,6 +297,8 @@ async function obtenerIdsIngresosIncluidos(
       (documento) => {
         const data =
           documento.data();
+
+        if (data.estado !== "recibido") return false;
 
         const fechaRecibida =
           obtenerFechaCalendario(
@@ -334,7 +332,7 @@ async function obtenerIdsGastosIncluidos(
     await transaction.get(obtenerColeccionUsuario(
       uid,
       "gastos",
-    ));
+    ).where("fecha", "<=", `${fechaSaldoInicial}\uf8ff`));
 
   return snapshot.docs
     .filter(
@@ -384,7 +382,7 @@ async function obtenerIdsPagosFijosIncluidos(
     await transaction.get(obtenerColeccionUsuario(
       uid,
       "pagosFijos",
-    ));
+    ).where("fecha", "<=", `${fechaSaldoInicial}\uf8ff`));
 
   return snapshot.docs
     .filter(
@@ -440,7 +438,7 @@ async function obtenerIdsPagosTarjetaIncluidos(
     await transaction.get(obtenerColeccionUsuario(
       uid,
       "pagosTarjeta",
-    ));
+    ).where("fecha", "<=", `${fechaSaldoInicial}\uf8ff`));
 
   return snapshot.docs
     .filter(
@@ -478,7 +476,7 @@ async function obtenerIdsMovimientosManualesIncluidos(
     await transaction.get(obtenerColeccionUsuario(
       uid,
       "movimientosCuenta",
-    ));
+    ).where("fecha", "<=", `${fechaSaldoInicial}\uf8ff`));
 
   return snapshot.docs
     .filter(

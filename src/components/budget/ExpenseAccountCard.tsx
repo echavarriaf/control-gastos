@@ -41,9 +41,10 @@ import type {
   PagoTarjeta,
 } from "@/lib/budget/types";
 
-import { useExpenseAccount } from "@/hooks/useExpenseAccount";
+import type { ExpenseAccountController } from "@/hooks/useExpenseAccount";
 
 interface ExpenseAccountCardProps {
+  account: ExpenseAccountController;
   ingresos: Ingreso[];
 
   gastos: GastoVariable[];
@@ -352,6 +353,7 @@ function FilaReserva({ reserva }: { reserva: ReservaCompromisoCuenta }) {
 }
 
 export function ExpenseAccountCard({
+  account,
   ingresos,
   gastos,
   pagosFijos,
@@ -362,8 +364,6 @@ export function ExpenseAccountCard({
   cargandoPresupuesto,
   cargandoCompromisos,
 }: ExpenseAccountCardProps) {
-  const account = useExpenseAccount();
-
   const [editando, setEditando] = useState(false);
 
   const [mostrandoMovimientos, setMostrandoMovimientos] = useState(false);

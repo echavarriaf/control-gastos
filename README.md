@@ -92,9 +92,21 @@ Firebase Admin omite las reglas de Firestore; sus rutas deben autenticar y autor
 
 ## Comprobaciones
 
+### Carga de datos financieros
+
+El dashboard consulta los movimientos manuales y los depósitos desde la fecha del saldo inicial de la cuenta. En ingresos se filtra por **fecha recibida**, para conservar depósitos programados antes de la recalibración pero cobrados después. El ciclo actual y el abierto en el modal se escuchan por ID, incluso cuando están proyectados y todavía no tienen fecha recibida. Si un ingreso aparece en ambas fuentes, se combina por ID para no sumarlo dos veces.
+
+El administrador de depósitos monta su historial completo al abrir el panel y libera sus suscripciones al cerrarlo. La recalibración del servidor consulta únicamente movimientos hasta el día de su fotografía, incluyendo timestamps de ese mismo día, dentro de la transacción existente.
+
+Los filtros son por fechas financieras y no requieren índices compuestos nuevos. No se aplican límites arbitrarios a las listas que calculan dinero: los gastos siguen necesitando historia para el arrastre quincenal y los movimientos de tarjetas para sus saldos. Esta optimización reduce lecturas de ingresos y movimientos manuales antiguos; no convierte todos los historiales en consultas de tamaño constante.
+
+### Validación de fechas
+
 Las reglas validan las fechas de gastos, pagos, configuraciones, ingresos y solicitudes de acceso. Los campos de texto que antes solo comprobaban longitud aceptan `YYYY-MM-DD` o una fecha ISO con hora y zona (`Z` o un desplazamiento como `-04:00`), con hasta nueve decimales opcionales en los segundos. Se comprueban días reales, años bisiestos y rangos de hora, minuto y segundo. Las fechas exclusivamente de calendario siguen usando su validador específico y las marcas nativas de Firestore conservan el tipo `timestamp`.
 
 La comprobación reutiliza la fecha calendario para la parte anterior a `T` y valida el resto con una expresión regular, mediante las operaciones de [String de Firebase Security Rules](https://firebase.google.com/docs/reference/rules/rules.String). Se aplica a las nuevas escrituras y actualizaciones; no convierte ni modifica documentos históricos automáticamente.
+
+### Comandos
 
 | Comando | Función |
 | --- | --- |

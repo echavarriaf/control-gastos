@@ -56,6 +56,7 @@ export function BudgetDashboard() {
 
         <div className="space-y-5 p-4 pb-28 sm:p-6 sm:pb-8">
           <ExpenseAccountCard
+            account={dashboard.account}
             ingresos={incomeTransactions.ingresos}
             gastos={budget.gastos}
             pagosFijos={budget.pagosFijos}

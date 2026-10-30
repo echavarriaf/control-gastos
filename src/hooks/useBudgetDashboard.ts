@@ -72,6 +72,8 @@ import type {
   Vista,
 } from "@/lib/budget/types";
 
+import { useExpenseAccount } from "@/hooks/useExpenseAccount";
+
 /**
  * Controlador principal de la pantalla del presupuesto.
  */
@@ -84,6 +86,8 @@ export function useBudgetDashboard() {
 
   const period =
     useBudgetPeriod();
+
+  const account = useExpenseAccount();
 
   const budget =
     useBudgetData();
@@ -140,9 +144,6 @@ export function useBudgetDashboard() {
 
   const income =
     useIncomeData();
-
-  const incomeTransactions =
-    useIncomeTransactions();
 
   const push =
     usePushNotifications();
@@ -260,6 +261,14 @@ const [
     useState<CicloPago | null>(
       null,
     );
+
+  const incomeTransactions =
+    useIncomeTransactions({
+      modo: "cuenta",
+      fechaSaldoInicial: account.cuenta?.fechaSaldoInicial ?? null,
+      cicloActualId: income.cicloActual?.id ?? null,
+      cicloSeleccionadoId: selectedIncomeCycle?.id ?? null,
+    });
 
   /**
    * ============================================================
@@ -541,6 +550,7 @@ const [
      * Datos.
      */
     period,
+    account,
     budget,
     fixedCommitments,
 

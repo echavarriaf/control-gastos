@@ -446,7 +446,7 @@ export function IncomeCycleSummary({
         }`}
       >
         <div className="min-h-0 overflow-hidden">
-          <IncomeDepositsManager />
+          {abierto ? <IncomeDepositsManager /> : null}
         </div>
       </div>
     </div>

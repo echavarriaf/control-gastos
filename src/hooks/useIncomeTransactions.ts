@@ -8,6 +8,8 @@ import {
 
 import {
   deleteDoc,
+  type DocumentData,
+  type QueryDocumentSnapshot,
   doc,
   onSnapshot,
   orderBy,
@@ -17,6 +19,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { ingresosDesdeSaldoInicial } from "@/lib/firestore/financial-queries";
 
 import {
   getUserCollection,
@@ -451,7 +454,19 @@ function validarDepositoManual(
  * Los depósitos manuales reciben un ID automático y se guardan con
  * recurrente=false.
  */
-export function useIncomeTransactions() {
+interface IncomeQueryScope {
+  modo?: "historial" | "cuenta";
+  fechaSaldoInicial?: string | null;
+  cicloActualId?: string | null;
+  cicloSeleccionadoId?: string | null;
+}
+
+export function useIncomeTransactions({
+  modo = "historial",
+  fechaSaldoInicial = null,
+  cicloActualId = null,
+  cicloSeleccionadoId = null,
+}: IncomeQueryScope = {}) {
   const {
     user,
     authorized,
@@ -465,7 +480,7 @@ export function useIncomeTransactions() {
       : null;
 
   const [
-    ingresos,
+    ingresosCargados,
     setIngresos,
   ] =
     useState<
@@ -500,82 +515,92 @@ export function useIncomeTransactions() {
       null,
     );
 
-  useEffect(
-    () => {
-      if (
-        !uid
-      ) {
-        return;
-      }
-
-      const consulta =
-        query(
-          getUserCollection(
-            uid,
-            "ingresos",
-          ),
-
-          orderBy(
-            "fechaProgramada",
-            "desc",
-          ),
-        );
-
-      return onSnapshot(
-        consulta,
-
-        (
-          snapshot,
-        ) => {
-          const siguientesIngresos =
-            snapshot.docs
-              .map(
-                (
-                  documento,
-                ) =>
-                  normalizarIngreso(
-                    documento.id,
-                    documento.data(),
-                  ),
-              )
-              .filter(
-                (
-                  ingreso,
-                ): ingreso is Ingreso =>
-                  ingreso !==
-                  null,
-              );
-
-          setIngresos(
-            siguientesIngresos,
-          );
-
-          setCargando(
-            false,
-          );
-        },
-
-        (
-          snapshotError,
-        ) => {
-          console.error(
-            snapshotError,
-          );
-
-          setError(
-            "No se pudieron cargar los ingresos.",
-          );
-
-          setCargando(
-            false,
-          );
-        },
-      );
-    },
-    [
-      uid,
-    ],
+  const claveConsulta = JSON.stringify([uid, modo, fechaSaldoInicial, cicloActualId, cicloSeleccionadoId]);
+  const [claveDatos, setClaveDatos] = useState<string | null>(null);
+  const ingresos = useMemo(
+    () => claveDatos === claveConsulta ? ingresosCargados : [],
+    [claveDatos, claveConsulta, ingresosCargados],
   );
+
+  useEffect(() => {
+    // A new user or scope must not display the previous collection while loading.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIngresos([]);
+    setClaveDatos(claveConsulta);
+    setError(null);
+    setCargando(Boolean(uid));
+    if (!uid) return;
+
+    const fuentes = new Map<string, Ingreso[]>();
+    const pendientes = new Set<string>();
+    let activo = true;
+    const cancelar: Array<() => void> = [];
+
+    const publicar = () => {
+      if (!activo) return;
+      const unicos = new Map<string, Ingreso>();
+      for (const registros of fuentes.values()) {
+        for (const ingreso of registros) unicos.set(ingreso.id, ingreso);
+      }
+      setIngresos(Array.from(unicos.values()).sort((a, b) =>
+        b.fechaProgramada.localeCompare(a.fechaProgramada) || b.id.localeCompare(a.id),
+      ));
+      setCargando(pendientes.size > 0);
+    };
+    const recibir = (fuente: string, documentos: Array<Pick<QueryDocumentSnapshot<DocumentData>, "id" | "data">>) => {
+      if (!activo) return;
+      // The latest observed snapshot wins if a cycle also appears in the bank query.
+      fuentes.delete(fuente);
+      fuentes.set(fuente, documentos.flatMap(documento => {
+        const ingreso = normalizarIngreso(documento.id, documento.data());
+        return ingreso ? [ingreso] : [];
+      }));
+      pendientes.delete(fuente);
+      publicar();
+    };
+    const fallar = (fuente: string, error: Error) => {
+      if (!activo) return;
+      console.error(error);
+      pendientes.delete(fuente);
+      fuentes.delete(fuente);
+      setError("No se pudieron cargar los ingresos.");
+      publicar();
+    };
+
+    // Register every source before callbacks so partial initial results stay loading.
+    const ciclos = Array.from(new Set([cicloActualId, cicloSeleccionadoId].filter((id): id is string => Boolean(id))));
+    if (modo === "historial") pendientes.add("historial");
+    if (modo === "cuenta" && fechaSaldoInicial) pendientes.add("cuenta");
+    if (modo === "cuenta") ciclos.forEach(id => pendientes.add(`ciclo:${id}`));
+
+    if (modo === "historial") {
+      cancelar.push(onSnapshot(
+        query(getUserCollection(uid, "ingresos"), orderBy("fechaProgramada", "desc")),
+        snapshot => recibir("historial", snapshot.docs),
+        error => fallar("historial", error),
+      ));
+    } else {
+      if (fechaSaldoInicial) {
+        cancelar.push(onSnapshot(
+          ingresosDesdeSaldoInicial(getUserCollection(uid, "ingresos"), fechaSaldoInicial),
+          snapshot => recibir("cuenta", snapshot.docs),
+          error => fallar("cuenta", error),
+        ));
+      }
+      for (const id of ciclos) {
+        cancelar.push(onSnapshot(
+          getUserDocument(uid, "ingresos", id),
+          snapshot => recibir(`ciclo:${id}`, snapshot.exists() ? [snapshot] : []),
+          error => fallar(`ciclo:${id}`, error),
+        ));
+      }
+    }
+    if (pendientes.size === 0) publicar();
+    return () => {
+      activo = false;
+      cancelar.forEach(unsubscribe => unsubscribe());
+    };
+  }, [uid, modo, fechaSaldoInicial, cicloActualId, cicloSeleccionadoId, claveConsulta]);
 
   const ingresosPorCiclo =
     useMemo(
@@ -958,7 +983,7 @@ export function useIncomeTransactions() {
 
     depositosManuales,
 
-    cargando,
+    cargando: cargando || (Boolean(uid) && claveDatos !== claveConsulta),
 
     guardando,
 

@@ -18,8 +18,6 @@ import {
   addDoc,
   deleteDoc,
   onSnapshot,
-  orderBy,
-  query,
   serverTimestamp,
   setDoc,
   Timestamp,
@@ -29,6 +27,8 @@ import {
   getUserCollection,
   getUserDocument,
 } from "@/lib/firestore/user-paths";
+
+import { movimientosDesdeSaldoInicial } from "@/lib/firestore/financial-queries";
 
 import {
   type CuentaGastos,
@@ -323,9 +323,11 @@ export function useExpenseAccount() {
     ],
   );
 
+  const fechaInicioMovimientos = cuenta?.fechaSaldoInicial ?? null;
+
   useEffect(
     () => {
-      if (!uid) {
+      if (!uid || !fechaInicioMovimientos) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- Elimina los movimientos privados cuando ya no existe una sesión autorizada.
         setMovimientosManuales(
           [],
@@ -343,16 +345,13 @@ export function useExpenseAccount() {
       );
 
       const consulta =
-        query(
+        movimientosDesdeSaldoInicial(
           getUserCollection(
             uid,
             "movimientosCuenta",
           ),
 
-          orderBy(
-            "fecha",
-            "desc",
-          ),
+          fechaInicioMovimientos,
         );
 
       return onSnapshot(
@@ -429,6 +428,7 @@ export function useExpenseAccount() {
     },
     [
       uid,
+      fechaInicioMovimientos,
     ],
   );
 
