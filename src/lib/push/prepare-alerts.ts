@@ -1,5 +1,6 @@
 // Prepara alertas de presupuesto y tarjetas antes de solicitar su reserva.
 import { CATEGORY_KEYS } from "./types";
+import { calcularCarryOverQuincenal } from "@/lib/budget/carry-over";
 import type {
   AlertaPresupuestoPendiente,
   AlertaTarjetaPendiente,
@@ -14,6 +15,7 @@ import { reclamarAlertaTarjeta } from "./card-alert-state";
 
 export async function prepararAlertasPresupuesto({
   uid,
+  usarCarryOver = false,
   periodo,
   quincena,
   limites,
@@ -25,6 +27,11 @@ export async function prepararAlertasPresupuesto({
     AlertaPresupuestoPendiente[] =
       [];
 
+  const carry = usarCarryOver ? calcularCarryOverQuincenal({
+    movimientos: datos.gastos.flatMap(movimiento => movimiento.categoria === null ? [] : [{ ...movimiento, categoria: movimiento.categoria }]),
+    limites, periodoObjetivo: periodo, quincenaObjetivo: quincena,
+  }) : null;
+
   for (
     const categoria of
     CATEGORY_KEYS
@@ -34,8 +41,7 @@ export async function prepararAlertasPresupuesto({
         (
           movimiento,
         ) =>
-          movimiento.categoria ===
-          categoria,
+          movimiento.categoria === categoria && movimiento.periodo === periodo,
       );
 
     const saldoMensual =
@@ -86,7 +92,7 @@ export async function prepararAlertasPresupuesto({
           quincena,
       );
 
-    const saldoQuincenal =
+    const saldoQuincenal = carry ? carry[categoria].consumoAjustadoQuincena :
       Math.max(
         sumarMontos(
           gastosQuincena,

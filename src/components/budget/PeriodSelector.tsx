@@ -3,9 +3,11 @@
 import { CalendarDays } from "lucide-react";
 
 import type { Quincena } from "@/lib/budget/types";
-import { etiquetaMes } from "@/lib/budget/utils";
+import { etiquetaMes, fechaCorta } from "@/lib/budget/utils";
+import type { CoberturaPresupuestaria } from "@/lib/budget/budget-periods";
 
 interface PeriodSelectorProps {
+  cobertura?: CoberturaPresupuestaria | null;
   mesesDisponibles: string[];
   mesSeleccionado: string;
   quincenaSeleccionada: Quincena;
@@ -14,6 +16,7 @@ interface PeriodSelectorProps {
 }
 
 export function PeriodSelector({
+  cobertura,
   mesesDisponibles,
   mesSeleccionado,
   quincenaSeleccionada,
@@ -28,7 +31,7 @@ export function PeriodSelector({
             htmlFor="periodo-presupuesto"
             className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.18em] text-slate-500"
           >
-            Mes del presupuesto
+            Mes presupuestario
           </label>
 
           <div className="relative">
@@ -55,6 +58,11 @@ export function PeriodSelector({
               ))}
             </select>
           </div>
+          {cobertura ? (
+            <p className="mt-2 text-xs font-medium text-slate-500">
+              Del {fechaCorta(cobertura.inicio)} al {fechaCorta(cobertura.fin)}
+            </p>
+          ) : null}
         </div>
 
         <div>
@@ -111,7 +119,7 @@ function QuincenaButton({
           : "text-slate-500 hover:text-slate-800"
       }`}
     >
-      {quincena === 1 ? "1–15" : "16–fin"}
+      Quincena {quincena}
     </button>
   );
 }

@@ -63,6 +63,7 @@ const FILTRO_SIN_TARJETA = "__sin_tarjeta__";
 const LIMITE_MOVIMIENTOS = 5;
 
 interface VariableMovementsSectionProps {
+  movimientosDeQuincena?: Movimiento[];
   movimientos: Movimiento[];
 
   tarjetas: TarjetaCredito[];
@@ -169,6 +170,7 @@ function obtenerFechaMovimiento(movimiento: Movimiento): string {
  * Historial completo de movimientos variables.
  */
 export function VariableMovementsSection({
+  movimientosDeQuincena,
   movimientos,
   tarjetas,
   quincenaSeleccionada,
@@ -205,11 +207,11 @@ export function VariableMovementsSection({
 
   const movimientosQuincena = useMemo(
     () =>
-      movimientos.filter(
+      movimientosDeQuincena ?? movimientos.filter(
         (movimiento) =>
           obtenerQuincenaDesdeISO(movimiento.fecha) === quincenaSeleccionada,
       ),
-    [movimientos, quincenaSeleccionada],
+    [movimientos, quincenaSeleccionada, movimientosDeQuincena],
   );
 
   /**

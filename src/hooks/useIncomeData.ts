@@ -15,6 +15,8 @@ import {
   useAuth,
 } from "@/contexts/AuthContext";
 
+import { useFinancialDate } from "@/hooks/useFinancialDate";
+
 import {
   getUserConfigDocument,
 } from "@/lib/firestore/user-paths";
@@ -29,7 +31,6 @@ import {
 import {
   agregarDiasUTC,
   generarCiclosPago,
-  obtenerCiclosDelMes,
   obtenerPagoEnOAntesDe,
 } from "@/lib/budget/pay-cycles";
 
@@ -43,31 +44,6 @@ const CICLOS_ANTERIORES_DIAS =
 
 const CANTIDAD_CICLOS_GENERADOS =
   32;
-
-function obtenerFechaLocalISO(
-  fecha = new Date(),
-): string {
-  const anio =
-    fecha.getFullYear();
-
-  const mes =
-    String(
-      fecha.getMonth() + 1,
-    ).padStart(
-      2,
-      "0",
-    );
-
-  const dia =
-    String(
-      fecha.getDate(),
-    ).padStart(
-      2,
-      "0",
-    );
-
-  return `${anio}-${mes}-${dia}`;
-}
 
 interface ResultadoCiclosIngreso {
   ciclos:
@@ -230,6 +206,8 @@ export function useIncomeData() {
     ],
   );
 
+  const fechaReferencia = useFinancialDate();
+
   const resultadoCiclos =
     useMemo<ResultadoCiclosIngreso>(
       () => {
@@ -269,9 +247,6 @@ export function useIncomeData() {
               [],
           };
         }
-
-        const fechaReferencia =
-          obtenerFechaLocalISO();
 
         const intervaloDias =
           configuracion
@@ -337,14 +312,12 @@ export function useIncomeData() {
           proximoCiclo,
 
           ciclosMesActual:
-            obtenerCiclosDelMes(
-              ciclos,
-              periodoActual,
-            ),
+            ciclos.filter(ciclo => ciclo.periodoCalendario === periodoActual),
         };
       },
       [
         configuracion,
+        fechaReferencia,
       ],
     );
 

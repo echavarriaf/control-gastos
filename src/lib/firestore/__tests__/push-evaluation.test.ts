@@ -108,4 +108,45 @@ describe("Push evaluation with emulated storage and simulated messaging", () => 
     expect(await evaluarAlertasUsuario(uid, new Date("2026-10-15T12:00:00Z"))).toMatchObject({ alertasTarjetas: 0, enviadas: 0 });
     expect(state.send).not.toHaveBeenCalled();
   });
+
+  it("assigns third-paycheck spending and calendar-only dates to the next budget month", async () => {
+    await db.doc(`users/${uid}/configuracion/ingresoPrincipal`).set({ descripcion: "Salario", montoEstimado: 1000,
+      fuente: "salario", frecuencia: "cada_2_semanas", fechaAncla: "2026-10-02", intervaloDias: 14, activa: true, notas: "" });
+    await db.doc(`users/${uid}/configuracion/presupuestoFelo`).set({ limites: {
+      comida: { mensual: 100, quincenal: 100 }, gas: { mensual: 100, quincenal: 100 },
+    } });
+    await db.doc(`users/${uid}/gastos/third-paycheck`).set({ categoria: "comida", monto: 95, fecha: "2026-10-30" });
+    await device();
+    expect(await evaluarAlertasUsuario(uid, new Date("2026-10-30T12:00:00Z")))
+      .toMatchObject({ periodo: "2026-11", quincena: 1, alertasPresupuesto: 2 });
+    expect(state.send.mock.calls.map(([message]) => message.data.tag).sort())
+      .toEqual(["2026-11_comida_mensual_90", "2026-11_comida_q1_90"]);
+  });
+
+  it("includes prior-cycle overspending in a paycheck's quincenal alert", async () => {
+    await db.doc(`users/${uid}/configuracion/ingresoPrincipal`).set({ descripcion: "Salario", montoEstimado: 1000,
+      fuente: "salario", frecuencia: "cada_2_semanas", fechaAncla: "2026-10-02", intervaloDias: 14, activa: true, notas: "" });
+    await db.doc(`users/${uid}/configuracion/presupuestoFelo`).set({ limites: {
+      comida: { mensual: 1200, quincenal: 600 }, gas: { mensual: 200, quincenal: 100 },
+    } });
+    await db.doc(`users/${uid}/gastos/previous`).set({ categoria: "comida", monto: 650, fecha: "2026-10-20T12:00:00Z" });
+    await db.doc(`users/${uid}/gastos/current`).set({ categoria: "comida", monto: 500, fecha: "2026-10-30T12:00:00Z" });
+    await device();
+    expect(await evaluarAlertasUsuario(uid, new Date("2026-10-30T12:00:00Z")))
+      .toMatchObject({ periodo: "2026-11", quincena: 1, alertasPresupuesto: 1, enviadas: 1 });
+    expect(state.send.mock.calls[0][0].data).toMatchObject({ alcance: "quincenal", nivel: "90", saldo: "550.00", limite: "600.00" });
+  });
+
+  it("does not apply next-paycheck expenses to the current quincena", async () => {
+    await db.doc(`users/${uid}/configuracion/ingresoPrincipal`).set({ descripcion: "Salario", montoEstimado: 1000,
+      fuente: "salario", frecuencia: "cada_2_semanas", fechaAncla: "2026-10-02", intervaloDias: 14, activa: true, notas: "" });
+    await db.doc(`users/${uid}/configuracion/presupuestoFelo`).set({ limites: {
+      comida: { mensual: 100, quincenal: 100 }, gas: { mensual: 100, quincenal: 100 },
+    } });
+    await db.doc(`users/${uid}/gastos/future-paycheck`).set({ categoria: "comida", monto: 1000, fecha: "2026-10-30T12:00:00Z" });
+    await device();
+    expect(await evaluarAlertasUsuario(uid, new Date("2026-10-29T12:00:00Z")))
+      .toMatchObject({ periodo: "2026-10", quincena: 2, alertasPresupuesto: 0 });
+    expect(state.send).not.toHaveBeenCalled();
+  });
 });

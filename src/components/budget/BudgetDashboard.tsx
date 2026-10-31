@@ -47,6 +47,7 @@ export function BudgetDashboard() {
         />
 
         <PeriodSelector
+          cobertura={summary.coberturaQuincena}
           mesesDisponibles={summary.mesesDisponibles}
           mesSeleccionado={period.mesSeleccionado}
           quincenaSeleccionada={period.quincenaSeleccionada}

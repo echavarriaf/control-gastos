@@ -14,11 +14,16 @@ import type {
   TarjetaPush,
 } from "./types";
 import { esObjeto, normalizarNumero } from "./utils";
+import { normalizarConfiguracionIngreso } from "@/lib/budget/income-config";
+import {
+  asignarFechaAPresupuesto, obtenerCoberturaPresupuestaria, obtenerReglaPresupuestaria,
+  type ReglaPresupuestaria,
+} from "@/lib/budget/budget-periods";
+import { agregarDiasUTC } from "@/lib/budget/pay-cycles";
 import {
   convertirFecha,
   esFechaISOValida,
   obtenerFechaZonaHorariaISO,
-  obtenerInfoPeriodo,
   obtenerRangoBusqueda,
 } from "./dates";
 
@@ -224,107 +229,44 @@ function normalizarLimite(
   };
 }
 
+export async function cargarReglaPresupuesto(uid: string): Promise<ReglaPresupuestaria | null> {
+  const snapshot = await getAdminDb().doc(`users/${uid}/configuracion/ingresoPrincipal`).get();
+  return snapshot.exists ? obtenerReglaPresupuestaria(normalizarConfiguracionIngreso(snapshot.data())) : null;
+}
+
 export async function cargarDatosPeriodo(
-  uid:
-    string,
-
-  periodo:
-    string,
+  uid: string, periodo: string, regla?: ReglaPresupuestaria | null,
 ): Promise<DatosPeriodo> {
-  const {
-    inicioBusqueda,
-    finBusqueda,
-  } =
-    obtenerRangoBusqueda(
-      periodo,
-    );
-
-  const gastosSnapshot =
-    await getAdminDb()
-      .collection(
-        "users",
-      )
-      .doc(
-        uid,
-      )
-      .collection(
-        "gastos",
-      )
-      .where(
-        "fecha",
-        ">=",
-        inicioBusqueda,
-      )
-      .where(
-        "fecha",
-        "<",
-        finBusqueda,
-      )
-      .get();
-
-  const gastos =
-    gastosSnapshot.docs
-      .flatMap(
-        (
-          documento,
-        ) => {
-          const movimiento =
-            normalizarMovimientoPresupuesto(
-              documento.data(),
-            );
-
-          return movimiento &&
-            movimiento.periodo ===
-              periodo
-            ? [
-                movimiento,
-              ]
-            : [];
-        },
-      );
-
-  return {
-    gastos,
-  };
+  const rangoCalendario = obtenerRangoBusqueda(periodo);
+  const coberturaFinal = obtenerCoberturaPresupuestaria(periodo, 2, regla);
+  // Include UTC/NY date boundaries. Historical purchases are needed for continuous carry-over.
+  const finBusqueda = regla && coberturaFinal
+    ? agregarDiasUTC(coberturaFinal.fin, 3).toISOString()
+    : rangoCalendario.finBusqueda;
+  let consulta = getAdminDb().collection(`users/${uid}/gastos`).where("fecha", "<", finBusqueda);
+  if (!regla) consulta = consulta.where("fecha", ">=", rangoCalendario.inicioBusqueda);
+  const snapshot = await consulta.get();
+  const gastos = snapshot.docs.flatMap(documento => {
+    const movimiento = normalizarMovimientoPresupuesto(documento.data(), regla);
+    return movimiento && (regla || movimiento.periodo === periodo) ? [movimiento] : [];
+  });
+  return { gastos };
 }
 
 function normalizarMovimientoPresupuesto(
-  data:
-    DocumentData,
+  data: DocumentData, regla?: ReglaPresupuestaria | null,
 ): MovimientoPresupuestoNormalizado | null {
-  const fecha =
-    convertirFecha(
-      data.fecha,
-    );
-
-  if (
-    !fecha
-  ) {
-    return null;
-  }
-
-  const info =
-    obtenerInfoPeriodo(
-      fecha,
-    );
-
+  // Calendar-only strings represent a day, not midnight UTC on the previous NY day.
+  const fecha = convertirFecha(data.fecha);
+  const dia = typeof data.fecha === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.fecha)
+    ? data.fecha : fecha ? obtenerFechaZonaHorariaISO(fecha) : null;
+  const info = dia ? asignarFechaAPresupuesto(dia, regla) : null;
+  if (!info) return null;
   return {
-    monto:
-      normalizarNumero(
-        data.monto,
-        0,
-      ),
-
-    categoria:
-      normalizarCategoriaGasto(
-        data.categoria,
-      ),
-
-    periodo:
-      info.periodo,
-
-    quincena:
-      info.quincena,
+    monto: normalizarNumero(data.monto, 0),
+    categoria: normalizarCategoriaGasto(data.categoria),
+    periodo: info.periodoPresupuestario,
+    quincena: info.quincenaPresupuestaria,
   };
 }
 

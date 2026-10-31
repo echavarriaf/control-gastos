@@ -39,8 +39,10 @@ import type {
 import type { DireccionCategoria } from "@/hooks/useCardCategories";
 
 import { fechaParaPeriodo, montoSeguro } from "@/lib/budget/utils";
+import { fechaSugeridaParaCobertura, type CoberturaPresupuestaria } from "@/lib/budget/budget-periods";
 
 interface VariableMovementFormProps {
+  cobertura?: CoberturaPresupuestaria | null;
   mesSeleccionado: string;
 
   quincenaSeleccionada: Quincena;
@@ -196,6 +198,7 @@ function iconoCategoria(categoria: CategoriaTarjeta) {
 }
 
 export function VariableMovementForm({
+  cobertura,
   mesSeleccionado,
   quincenaSeleccionada,
   guardando,
@@ -240,7 +243,7 @@ export function VariableMovementForm({
     useState<EstadoTransaccionTarjeta>("contabilizada");
 
   const [fecha, setFecha] = useState(() =>
-    fechaParaPeriodo(mesSeleccionado, quincenaSeleccionada),
+    cobertura ? fechaSugeridaParaCobertura(cobertura) : fechaParaPeriodo(mesSeleccionado, quincenaSeleccionada),
   );
 
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
@@ -298,13 +301,18 @@ export function VariableMovementForm({
     [tarjetasDisponibles, tarjetaId],
   );
 
+  const inicioCobertura = cobertura?.inicio;
+  const finCobertura = cobertura?.fin;
+
   useEffect(() => {
     if (movimientoEditando) {
       return;
     }
 
-    setFecha(fechaParaPeriodo(mesSeleccionado, quincenaSeleccionada));
-  }, [mesSeleccionado, quincenaSeleccionada, movimientoEditando]);
+    setFecha(inicioCobertura && finCobertura
+      ? fechaSugeridaParaCobertura({ inicio: inicioCobertura, fin: finCobertura })
+      : fechaParaPeriodo(mesSeleccionado, quincenaSeleccionada));
+  }, [mesSeleccionado, quincenaSeleccionada, movimientoEditando, inicioCobertura, finCobertura]);
 
   useEffect(() => {
     if (movimientoEditando) {

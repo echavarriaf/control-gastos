@@ -1,8 +1,9 @@
 // Coordina carga, preparación, entrega y confirmación de alertas; conserva la API pública.
 import { CATEGORY_KEYS } from "./types";
 import type { AlertaPendiente, EvaluacionAlertasUsuarioResultado } from "./types";
-import { obtenerInfoPeriodo } from "./dates";
-import { cargarDatosPeriodo, cargarDatosTarjetas, cargarFidsActivos, cargarLimites } from "./repository";
+import { obtenerFechaZonaHorariaISO, obtenerInfoPeriodo } from "./dates";
+import { asignarFechaAPresupuesto } from "@/lib/budget/budget-periods";
+import { cargarDatosPeriodo, cargarDatosTarjetas, cargarFidsActivos, cargarLimites, cargarReglaPresupuesto } from "./repository";
 import { prepararAlertasPresupuesto, prepararAlertasTarjetas } from "./prepare-alerts";
 import { liberarAlertaParaReintento, marcarAlertaEntregada } from "./delivery-state";
 import { enviarAlerta } from "./delivery";
@@ -38,10 +39,12 @@ export async function evaluarAlertasUsuario(
     );
   }
 
-  const infoPeriodo =
-    obtenerInfoPeriodo(
-      ahora,
-    );
+  const regla = await cargarReglaPresupuesto(uid);
+  const asignacion = asignarFechaAPresupuesto(obtenerFechaZonaHorariaISO(ahora), regla);
+  const infoPeriodo = asignacion ? {
+    periodo: asignacion.periodoPresupuestario,
+    quincena: asignacion.quincenaPresupuestaria,
+  } : obtenerInfoPeriodo(ahora);
 
   const [
     limites,
@@ -56,6 +59,7 @@ export async function evaluarAlertasUsuario(
       cargarDatosPeriodo(
         uid,
         infoPeriodo.periodo,
+        regla,
       ),
 
       cargarDatosTarjetas(
@@ -70,6 +74,7 @@ export async function evaluarAlertasUsuario(
     await Promise.all([
       prepararAlertasPresupuesto({
         uid,
+        usarCarryOver: Boolean(regla),
 
         periodo:
           infoPeriodo.periodo,

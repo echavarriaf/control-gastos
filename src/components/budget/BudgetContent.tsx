@@ -86,6 +86,7 @@ export function BudgetContent({ dashboard }: BudgetContentProps) {
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
           <VariableMovementForm
+            cobertura={summary.coberturaQuincena}
             /**
              * 2B.2D
              *
@@ -152,6 +153,7 @@ export function BudgetContent({ dashboard }: BudgetContentProps) {
           />
 
           <VariableMovementsSection
+            movimientosDeQuincena={summary.movimientosQuincena}
             movimientos={summary.movimientos}
             tarjetas={creditCards.tarjetas}
             quincenaSeleccionada={period.quincenaSeleccionada}

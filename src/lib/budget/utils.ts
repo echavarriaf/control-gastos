@@ -105,6 +105,11 @@ function obtenerFechaLocalDesdeISO(
     : fecha;
 }
 
+export function obtenerFechaCalendarioDesdeISO(fechaISO: string): string | null {
+  const fecha = obtenerFechaLocalDesdeISO(fechaISO);
+  return fecha ? fechaInputLocal(fecha) : null;
+}
+
 export function obtenerPeriodoDesdeISO(
   fechaISO: string,
 ): string {

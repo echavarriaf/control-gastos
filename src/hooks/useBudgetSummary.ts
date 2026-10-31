@@ -54,7 +54,14 @@ import {
   porcentaje,
 } from "@/lib/budget/utils";
 
+import {
+  asignarFechaAPresupuesto,
+  obtenerCoberturaPresupuestaria,
+  type ReglaPresupuestaria,
+} from "@/lib/budget/budget-periods";
+
 interface UseBudgetSummaryArgs {
+  reglaPresupuestaria?: ReglaPresupuestaria | null;
   gastos:
     GastoVariable[];
 
@@ -88,6 +95,7 @@ interface UseBudgetSummaryArgs {
  * siguiente puede recibir exceso de Q2 del mes anterior.
  */
 export function useBudgetSummary({
+  reglaPresupuestaria = null,
   gastos,
   pagos,
   pagosFijos,
@@ -99,21 +107,19 @@ export function useBudgetSummary({
 }: UseBudgetSummaryArgs) {
   return useMemo(
     () => {
+      const asignacion = (fecha: string) => asignarFechaAPresupuesto(fecha, reglaPresupuestaria);
+      const coberturaQuincena = obtenerCoberturaPresupuestaria(mesSeleccionado, quincenaSeleccionada, reglaPresupuestaria);
       const gastosMes =
         gastos.filter(
           (gasto) =>
-            obtenerPeriodoDesdeISO(
-              gasto.fecha,
-            ) ===
+            asignacion(gasto.fecha)?.periodoPresupuestario ===
             mesSeleccionado,
         );
 
       const pagosMes =
         pagos.filter(
           (pago) =>
-            obtenerPeriodoDesdeISO(
-              pago.fecha,
-            ) ===
+            asignacion(pago.fecha)?.periodoPresupuestario ===
             mesSeleccionado,
         );
 
@@ -234,15 +240,9 @@ export function useBudgetSummary({
         MovimientoCarryOver[] =
         gastos.flatMap(
           (gasto) => {
-            const periodo =
-              obtenerPeriodoDesdeISO(
-                gasto.fecha,
-              );
-
-            const quincena =
-              obtenerQuincenaDesdeISO(
-                gasto.fecha,
-              );
+            const presupuesto = asignacion(gasto.fecha);
+            const periodo = presupuesto?.periodoPresupuestario;
+            const quincena = presupuesto?.quincenaPresupuestaria;
 
             if (
               !periodo ||
@@ -556,10 +556,9 @@ export function useBudgetSummary({
         ...pagosFijos,
       ].forEach(
         (registro) => {
-          const periodo =
-            obtenerPeriodoDesdeISO(
-              registro.fecha,
-            );
+          const periodo = "compromisoId" in registro
+            ? obtenerPeriodoDesdeISO(registro.fecha)
+            : asignacion(registro.fecha)?.periodoPresupuestario;
 
           if (periodo) {
             periodos.add(
@@ -569,7 +568,13 @@ export function useBudgetSummary({
         },
       );
 
+      const movimientosQuincena = movimientos.filter(movimiento =>
+        asignacion(movimiento.fecha)?.quincenaPresupuestaria === quincenaSeleccionada,
+      );
+
       return {
+        coberturaQuincena,
+        movimientosQuincena,
         totalFijo,
         limiteVariableMensual,
         limiteVariableQuincenal,
@@ -607,6 +612,7 @@ export function useBudgetSummary({
       };
     },
     [
+      reglaPresupuestaria,
       gastos,
       pagos,
       pagosFijos,

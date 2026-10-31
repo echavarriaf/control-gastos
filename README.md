@@ -69,6 +69,25 @@ La recalibración lee la cuenta y las cinco colecciones de movimientos dentro de
 
 Las reglas de negocio y compatibilidad se detallan en [AGENTS.md](AGENTS.md). Los cálculos principales están en `src/lib/budget/` y los resúmenes de tarjetas en `src/hooks/useCreditCardSummaries.ts`.
 
+### Comida y gas: quincenas iniciadas por el cobro
+
+Cuando el ingreso principal está activo, configurado con frecuencia `cada_2_semanas` e intervalo de 14 días, los presupuestos variables usan ciclos de cobro, no los días 1–15 y 16–fin. La fecha ancla determina la secuencia; cada dos ciclos consecutivos financian un mes presupuestario. El gasto pertenece al ciclo abierto en su fecha real.
+
+Por ejemplo, con fecha ancla `2026-10-02`:
+
+| Cobro | Presupuesto financiado | Cobertura |
+| --- | --- | --- |
+| 2 de octubre | Octubre Q1 | 2–15 de octubre |
+| 16 de octubre | Octubre Q2 | 16–29 de octubre |
+| 30 de octubre | Noviembre Q1 | 30 de octubre–12 de noviembre |
+| 13 de noviembre | Noviembre Q2 | 13–26 de noviembre |
+
+El consumo mensual, el disponible por quincena, el arrastre y las alertas de comida/gas usan esa misma asignación. El selector abre el ciclo vigente y muestra sus fechas; el formulario conserva la fecha real del gasto, aunque el nombre del mes presupuestario sea el siguiente. Una pestaña abierta actualiza el ciclo al cambiar de día o regresar de una suspensión.
+
+La asignación se deriva de las fechas existentes: no modifica movimientos, saldos bancarios ni deudas de tarjetas y no requiere una migración. Cambiar la fecha ancla reinterpreta la asignación presupuestaria del historial. Las cuentas sin esa configuración conservan el comportamiento calendario. Los pagos fijos mantienen su agrupación calendario existente.
+
+Para calcular correctamente las alertas con arrastre, el servidor necesita los gastos históricos hasta el periodo financiado; no se recorta ese historial con un límite arbitrario de documentos. La política de recordatorios de tarjetas conserva su calendario de corte.
+
 ## Organización
 
 ```text

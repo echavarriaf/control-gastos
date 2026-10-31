@@ -16,6 +16,7 @@
 
 import {
   useCallback,
+  useMemo,
   useState,
 } from "react";
 
@@ -73,6 +74,7 @@ import type {
 } from "@/lib/budget/types";
 
 import { useExpenseAccount } from "@/hooks/useExpenseAccount";
+import { obtenerReglaPresupuestaria } from "@/lib/budget/budget-periods";
 
 /**
  * Controlador principal de la pantalla del presupuesto.
@@ -84,8 +86,16 @@ export function useBudgetDashboard() {
    * ============================================================
    */
 
-  const period =
-    useBudgetPeriod();
+  const income = useIncomeData();
+  const reglaPresupuestaria = useMemo(
+    () => obtenerReglaPresupuestaria(income.configuracion),
+    [income.configuracion],
+  );
+  const period = useBudgetPeriod({
+    periodoPresupuestarioActual: reglaPresupuestaria ? income.cicloActual?.periodoPresupuestario : undefined,
+    quincenaPresupuestariaActual: reglaPresupuestaria ? income.cicloActual?.quincenaPresupuestaria : undefined,
+    cargando: income.cargando,
+  });
 
   const account = useExpenseAccount();
 
@@ -141,9 +151,6 @@ export function useBudgetDashboard() {
       pagos:
         budget.pagos,
     });
-
-  const income =
-    useIncomeData();
 
   const push =
     usePushNotifications();
@@ -380,6 +387,7 @@ const [
 
   const summary =
     useBudgetSummary({
+      reglaPresupuestaria,
       gastos:
         budget.gastos,
 
