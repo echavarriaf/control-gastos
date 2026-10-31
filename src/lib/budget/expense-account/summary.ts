@@ -32,6 +32,7 @@ import {
   construirReservasCompromisos,
 } from "./fixed-reserves";
 import { construirLedger } from "./ledger";
+import { pagoTarjetaSaleDeCuenta } from "../payment-origin";
 
 export function calcularResumenCuentaGastos(
   cuenta:
@@ -315,6 +316,7 @@ export function calcularResumenCuentaGastos(
     pagosTarjeta
       .filter(
         (pago) => {
+          if (!pagoTarjetaSaleDeCuenta(pago)) return false;
           /**
            * ============================================================
            * 2B.2B — PAGOS PENDIENTES A TARJETA

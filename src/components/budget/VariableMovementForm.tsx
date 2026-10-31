@@ -40,8 +40,11 @@ import type { DireccionCategoria } from "@/hooks/useCardCategories";
 
 import { fechaParaPeriodo, montoSeguro } from "@/lib/budget/utils";
 import { fechaSugeridaParaCobertura, type CoberturaPresupuestaria } from "@/lib/budget/budget-periods";
+import { normalizarOrigenFondosPago } from "@/lib/budget/payment-origin";
+import type { OrigenFondosPago } from "@/lib/budget/types";
 
 interface VariableMovementFormProps {
+  nombreCuentaGastos?: string;
   cobertura?: CoberturaPresupuestaria | null;
   mesSeleccionado: string;
 
@@ -198,6 +201,7 @@ function iconoCategoria(categoria: CategoriaTarjeta) {
 }
 
 export function VariableMovementForm({
+  nombreCuentaGastos,
   cobertura,
   mesSeleccionado,
   quincenaSeleccionada,
@@ -228,6 +232,8 @@ export function VariableMovementForm({
   const [comentario, setComentario] = useState("");
 
   const [categoriaPago, setCategoriaPago] = useState<CategoriaPago>("general");
+
+  const [origenFondos, setOrigenFondos] = useState<OrigenFondosPago>("cuenta_gastos");
 
   const [tarjetaId, setTarjetaId] = useState("");
 
@@ -396,6 +402,8 @@ export function VariableMovementForm({
     } else {
       setCategoriaPago(movimientoEditando.categoria);
 
+      setOrigenFondos(normalizarOrigenFondosPago(movimientoEditando.origenFondos));
+
       setComentario("");
     }
 
@@ -431,6 +439,8 @@ export function VariableMovementForm({
     setErrorLocal(null);
 
     setEstadoTarjeta("contabilizada");
+
+    setOrigenFondos("cuenta_gastos");
 
     if (nuevoTipo === "pago" && !tarjetaId) {
       setTarjetaId(tarjetasDisponibles[0]?.id ?? "");
@@ -541,6 +551,8 @@ export function VariableMovementForm({
         : {
             tipo: "pago",
 
+            origenFondos,
+
             concepto: concepto.trim(),
 
             monto: montoValidado,
@@ -564,6 +576,8 @@ export function VariableMovementForm({
     setConcepto("");
 
     setMonto("");
+
+    setOrigenFondos("cuenta_gastos");
 
     setComentario("");
 
@@ -642,6 +656,8 @@ export function VariableMovementForm({
               setMonto("");
               setComentario("");
               setErrorLocal(null);
+
+              setOrigenFondos("cuenta_gastos");
 
               setEstadoTarjeta("contabilizada");
 
@@ -943,6 +959,29 @@ export function VariableMovementForm({
                 </p>
               </div>
 
+              {!esGasto && (
+                <div>
+                  <label htmlFor="movimiento-origen-fondos" className="mb-1.5 block text-xs font-black text-slate-700">
+                    Cuenta de origen
+                  </label>
+                  <select
+                    id="movimiento-origen-fondos"
+                    value={origenFondos}
+                    onChange={event => setOrigenFondos(normalizarOrigenFondosPago(event.target.value))}
+                    disabled={guardando}
+                    className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-bold text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 disabled:opacity-60"
+                  >
+                    <option value="cuenta_gastos">{nombreCuentaGastos || "Cuenta configurada"}</option>
+                    <option value="cuenta_externa">Otra cuenta externa</option>
+                  </select>
+                  <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-slate-500">
+                    {origenFondos === "cuenta_externa"
+                      ? "Reduce la deuda de la tarjeta sin descontar dinero de la cuenta configurada."
+                      : "Al contabilizarse, el pago se descuenta de la cuenta configurada."}
+                  </p>
+                </div>
+              )}
+
               {errorLocal && (
                 <p
                   role="alert"
@@ -980,10 +1019,14 @@ export function VariableMovementForm({
                   <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-slate-500">
                     {estadoTarjeta === "pendiente"
                       ? tipo === "pago"
-                        ? "El pago todavía aparece en tu cuenta bancaria. Se reservará en Comprometido hasta que sea contabilizado."
+                        ? origenFondos === "cuenta_externa"
+                          ? "El pago procede de otra cuenta. La deuda de la tarjeta se reducirá cuando sea contabilizado."
+                          : "El pago todavía aparece en tu cuenta bancaria. Se reservará en Comprometido hasta que sea contabilizado."
                         : "El cargo todavía no forma parte del saldo oficial de la tarjeta, pero se incluirá en Comprometido."
                       : tipo === "pago"
-                        ? "El pago ya salió de la cuenta y ya fue aplicado por la tarjeta."
+                        ? origenFondos === "cuenta_externa"
+                          ? "El pago fue aplicado por la tarjeta y no descuenta dinero de la cuenta configurada."
+                          : "El pago ya salió de la cuenta y ya fue aplicado por la tarjeta."
                         : "El cargo ya forma parte del saldo oficial de la tarjeta."}
                   </p>
                 </div>

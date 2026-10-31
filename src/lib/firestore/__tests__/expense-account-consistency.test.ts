@@ -76,6 +76,15 @@ afterAll(async () => {
 });
 
 describe("Expense account atomic baseline", () => {
+  it.each(["GET", "PUT"] as const)("excludes external payments from bank baseline snapshots during %s", async method => {
+    await seedMovements();
+    await db.doc(`users/${state.uid}/pagosTarjeta/external`).set({ fecha: baseline.fechaSaldoInicial, monto: 100, origenFondos: "cuenta_externa" });
+    if (method === "GET") await accountRef().set(baseline);
+    const response = method === "GET" ? await GET(request("GET")) : await PUT(request("PUT"));
+    expect(response.status).toBe(200);
+    expect((await accountRef().get()).data()?.pagosTarjetaIncluidosEnSaldoInicial).toEqual(["before", "same-day"]);
+  });
+
   it("commits all five movement snapshots and the balance in a transaction", async () => {
     await seedMovements();
     const transaction = vi.spyOn(db, "runTransaction");

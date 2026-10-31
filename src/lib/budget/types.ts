@@ -438,13 +438,15 @@ export interface GastoVariable {
   string | null;
 }
 
+export type OrigenFondosPago = "cuenta_gastos" | "cuenta_externa";
+
 /**
- * Pago real realizado a una tarjeta.
- *
- * Reduce el efectivo disponible, pero no vuelve a
- * descontar el presupuesto de la categoría.
+ * Pago real a una tarjeta. Solo reduce el efectivo de la Cuenta de gastos
+ * cuando sale de ella; no vuelve a descontar el presupuesto de la categoría.
  */
 export interface PagoTarjeta {
+  /** Missing on historical payments means the configured expense account. */
+  origenFondos?: OrigenFondosPago;
   id: string;
   concepto: string;
   monto: number;
@@ -617,6 +619,7 @@ export interface NuevoGastoVariable {
 }
 
 export interface NuevoPagoTarjeta {
+  origenFondos?: OrigenFondosPago;
   tipo: "pago";
   concepto: string;
   monto: number;

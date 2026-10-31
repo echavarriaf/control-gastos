@@ -60,7 +60,7 @@ Sin `--execute`, el script muestra los cambios previstos. Añade esa opción ún
 
 - **Cuenta de gastos:** representa efectivo bancario. Parte de un saldo inicial y su fecha; incluye depósitos, gastos bancarios, pagos fijos bancarios, pagos reales a tarjetas y movimientos manuales.
 - **Recalibración:** conserva identificadores de movimientos ya incluidos en la fotografía del saldo para evitar contabilizarlos nuevamente. Los registros históricos se conservan.
-- **Tarjetas:** una compra contabilizada aumenta deuda sin descontar inmediatamente efectivo del banco. Un pago real a tarjeta reduce deuda y efectivo.
+- **Tarjetas:** una compra contabilizada aumenta deuda sin descontar inmediatamente efectivo del banco. Un pago contabilizado reduce deuda y, cuando sale de la cuenta configurada, también su efectivo.
 - **Compras pendientes:** se muestran por separado y no afectan el saldo oficial ni la reserva bancaria hasta contabilizarse. Las compras históricas de tarjeta sin `estadoTarjeta` se interpretan como contabilizadas.
 - **Disponible real:** `saldoActual - totalComprometido`, donde `totalComprometido = reservasFijas + tarjetasReservadas - solapamiento`. Las reservas respetan la quincena presupuestaria y las ventanas de pago de tarjetas; no equivalen a toda la deuda existente.
 - **Pagos fijos parciales:** mantienen la reserva completa del compromiso hasta completarlo. El solapamiento evita reservar dos veces lo que también corresponda a una tarjeta.
@@ -68,6 +68,8 @@ Sin `--execute`, el script muestra los cambios previstos. Añade esa opción ún
 La recalibración lee la cuenta y las cinco colecciones de movimientos dentro de una transacción de Firestore. El saldo base y sus listas se confirman juntos o no se guarda ninguno. Las cuentas antiguas que necesitan completar esas listas también se actualizan dentro de una transacción, para que una lectura no sobrescriba una recalibración concurrente. Si coinciden dos recalibraciones, se procesan como operaciones completas; la que se confirme al final determina la fotografía vigente.
 
 Las reglas de negocio y compatibilidad se detallan en [AGENTS.md](AGENTS.md). Los cálculos principales están en `src/lib/budget/` y los resúmenes de tarjetas en `src/hooks/useCreditCardSummaries.ts`.
+
+Al registrar o editar un pago a tarjeta se puede elegir la cuenta configurada u **Otra cuenta externa**. El origen externo reduce la deuda al contabilizarse, sin descontar efectivo de la cuenta configurada ni incluirse en su recalibración. No administra un saldo externo. El historial muestra el origen y los pagos anteriores sin `origenFondos` conservan la cuenta configurada como origen. El campo opcional acepta `cuenta_gastos` o `cuenta_externa`; publicar estas reglas de Firestore es necesario antes de guardar pagos desde la nueva versión.
 
 ### Comida y gas: quincenas iniciadas por el cobro
 

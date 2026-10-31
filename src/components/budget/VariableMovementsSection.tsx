@@ -1,5 +1,7 @@
 "use client";
 
+import { etiquetaOrigenFondosPago } from "@/lib/budget/payment-origin";
+
 /*
  * Nombre: Sección de movimientos variables
  * Ruta: src/components/budget/VariableMovementsSection.tsx
@@ -749,6 +751,9 @@ function MovementRow({
 
               <span className="max-w-[14rem] truncate">{etiquetaPago}</span>
             </span>
+            {movimiento.tipo === "pago" ? (
+              <span className="text-slate-500">· Origen: {etiquetaOrigenFondosPago(movimiento.origenFondos)}</span>
+            ) : null}
             {estadoMovimiento && (
               <>
                 <span aria-hidden="true" className="text-slate-300">

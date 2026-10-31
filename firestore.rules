@@ -605,6 +605,7 @@ service cloud.firestore {
           "fecha",
           "tarjetaId",
           "estadoTarjeta",
+          "origenFondos",
           "referencia",
           "notas",
           "creadoEn",
@@ -635,6 +636,10 @@ service cloud.firestore {
         && estadoTransaccionTarjetaValido(
             data.estadoTarjeta
           )
+        && (
+          data.get("origenFondos", "cuenta_gastos") == "cuenta_gastos"
+          || data.get("origenFondos", "cuenta_gastos") == "cuenta_externa"
+        )
         && data.referencia is string
         && data.referencia.size() <= 250
         && data.notas is string

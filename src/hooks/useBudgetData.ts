@@ -14,6 +14,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/firebase";
+import { normalizarOrigenFondosPago, validarOrigenFondosPago } from "@/lib/budget/payment-origin";
 import {
   getUserCollection,
   getUserConfigDocument,
@@ -299,6 +300,7 @@ export function useBudgetData() {
 
           return {
             id: documento.id,
+            origenFondos: normalizarOrigenFondosPago(data.origenFondos),
             concepto:
               typeof data.concepto === "string"
                 ? data.concepto
@@ -547,6 +549,7 @@ export function useBudgetData() {
         });
       } else {
         await addDoc(getUserCollection(uid, "pagosTarjeta"), {
+          origenFondos: validarOrigenFondosPago(movimiento.origenFondos),
           concepto: movimiento.concepto.trim(),
           tarjeta: movimiento.concepto.trim(),
           monto: movimiento.monto,
@@ -887,6 +890,12 @@ export function useBudgetData() {
             movimientoActual.id,
           ),
           {
+            origenFondos: validarOrigenFondosPago(
+              cambios.origenFondos === undefined
+                ? (movimientoActual.tipo === "pago" ? movimientoActual.origenFondos : undefined)
+                : cambios.origenFondos,
+            ),
+
             concepto:
               cambios.concepto.trim(),
 

@@ -19,6 +19,8 @@ import {
   validarCuentaGastos,
 } from "@/lib/budget/expense-account";
 
+import { pagoTarjetaSaleDeCuenta } from "@/lib/budget/payment-origin";
+
 export const runtime =
   "nodejs";
 
@@ -421,8 +423,8 @@ async function obtenerIdsPagosFijosIncluidos(
  * Todos los documentos de pagosTarjeta representan
  * pagos reales efectuados a una tarjeta.
  *
- * Mientras exista una sola Cuenta de gastos,
- * se asume que estos pagos salen de ella.
+ * Solo los pagos de la Cuenta de gastos entran en su fotografía.
+ * Los históricos sin origen explícito se consideran de esa cuenta.
  *
  * Los pagos realizados hasta la fecha de la fotografía
  * quedan incluidos en saldoInicial y no se restan nuevamente.
@@ -445,6 +447,8 @@ async function obtenerIdsPagosTarjetaIncluidos(
       (documento) => {
         const data =
           documento.data();
+
+        if (!pagoTarjetaSaleDeCuenta(data)) return false;
 
         const fecha =
           obtenerFechaCalendario(
