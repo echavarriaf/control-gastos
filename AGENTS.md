@@ -614,6 +614,25 @@ Do not use broad allow rules as a shortcut.
 
 Card IDs and other user-scoped references must continue to belong to the same authenticated user's namespace.
 
+## Firebase publication after completed changes
+
+After every completed change, check whether it requires publishing Firebase resources, including Firestore rules, indexes, or other Firebase configuration.
+
+If Firebase publication is required:
+
+1. finish the implementation and relevant validation, including emulator tests for changed Firestore rules;
+2. describe the exact resources to publish, the target Firebase project, and any pending Firebase changes from earlier tasks;
+3. ask once: `Los cambios están validados. ¿Quieres que publique [recursos] en Firebase, en el proyecto [proyecto]?`;
+4. wait for explicit user approval before deploying, unless the user already authorized that exact deployment in the current task;
+5. after approval, use the existing deployment script and limit deployment to the approved resources;
+6. verify the command result and report what was published, or the actual error if publication failed.
+
+Committing or pushing to Git does not authorize Firebase publication. Never treat silence as approval. If the user declines, leave the validated changes ready and report that publication remains pending.
+
+If the change does not require publishing Firebase resources, do not request a Firebase deployment.
+
+For Firestore rules, use `npm run deploy:rules -- --project <verified-project-id>` after approval. Verify the target project from the current configuration; do not assume that a remembered project or a CLI default is correct. Do not deploy all Firebase resources when only rules were approved.
+
 ---
 
 # 23. Multi-user architecture
@@ -784,7 +803,7 @@ At minimum for significant TypeScript changes:
 
 When Firestore rules change, also run the project's Firestore rules tests/emulator tests where available.
 
-After they pass, rules may be deployed with the existing Firebase workflow.
+After they pass, follow the Firebase publication and approval workflow in section 22 before deploying.
 
 Do not claim success if a build or test failed.
 
