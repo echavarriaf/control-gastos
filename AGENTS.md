@@ -221,7 +221,7 @@ Do not reintroduce old transactions into the current bank balance.
 
 The intended conceptual calculation is:
 
-`totalComprometido = reservasFijas + tarjetasReservadas - solapamiento`
+`totalComprometido = reservasFijas + tarjetasReservadas - solapamiento + ahorroApartado`
 
 and:
 
@@ -233,6 +233,9 @@ Where:
 - `reservasFijas` represents outstanding fixed obligations that must be funded;
 - `tarjetasReservadas` represents credit-card payments currently requiring bank money;
 - `solapamiento` removes double counting.
+- `ahorroApartado` sums the allocated amounts of active savings goals in the operating account, not their unfunded targets.
+
+Savings allocations and releases change reserved money only. They must never create bank deposits, withdrawals, card payments, or ledger entries. Completed goals remain reserved until explicitly released. Archived goals must have zero allocated money and remain immutable. Preserve allocations during bank recalibration and show deficits rather than silently reducing savings. If savings cannot be loaded reliably, do not display a spendable balance that assumes they are zero.
 
 Never use current total credit-card debt blindly as immediate committed bank cash.
 

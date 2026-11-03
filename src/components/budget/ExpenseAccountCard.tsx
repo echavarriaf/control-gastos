@@ -47,9 +47,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { CashFlowProjection } from "./CashFlowProjection";
 import { useFinancialDate } from "@/hooks/useFinancialDate";
 import type { CicloPago, TarjetaCredito } from "@/lib/budget/types";
+import type { SavingsGoalsController } from "@/hooks/useSavingsGoals";
+import { SavingsGoals } from "./SavingsGoals";
 
 interface ExpenseAccountCardProps {
   account: ExpenseAccountController;
+  ahorros: SavingsGoalsController;
   ingresos: Ingreso[];
 
   gastos: GastoVariable[];
@@ -365,6 +368,7 @@ function FilaReserva({ reserva }: { reserva: ReservaCompromisoCuenta }) {
 
 export function ExpenseAccountCard({
   account,
+  ahorros,
   ingresos,
   gastos,
   pagosFijos,
@@ -444,11 +448,13 @@ export function ExpenseAccountCard({
             undefined,
             undefined,
             account.movimientosManuales,
+            ahorros.metas,
           )
         : null,
     [
       account.cuenta,
       account.movimientosManuales,
+      ahorros.metas,
       ingresos,
       gastos,
       pagosFijos,
@@ -1038,6 +1044,8 @@ export function ExpenseAccountCard({
 
             {!editando && account.cuenta && resumen && (
               <div className="mt-5 space-y-3">
+                <SavingsGoals key={user?.uid} ahorros={ahorros} hoy={hoy}
+                  disponibleReal={cargandoMovimientos || ahorros.cargando || ahorros.errorCarga || errorDatos || account.error ? null : resumen.disponibleReal} />
                 <BankReconciliation
                   key={JSON.stringify([user?.uid, account.cuenta])}
                   movimientos={resumen.movimientos}
@@ -1051,9 +1059,12 @@ export function ExpenseAccountCard({
                   proximoCiclo={proximoCiclo} montoEstimado={montoIngresoEstimado}
                   ingresos={ingresos} compromisos={compromisosFijos} pagosFijos={pagosFijos}
                   tarjetas={tarjetas} gastos={gastos} pagosTarjeta={pagosTarjeta}
-                  cargando={cargandoMovimientos || cargandoProyeccion}
-                  errorDatos={errorDatos || errorProyeccion || account.error}
+                  cargando={cargandoMovimientos || cargandoProyeccion || ahorros.cargando}
+                  errorDatos={errorDatos || errorProyeccion || account.error || ahorros.errorCarga}
+                  ahorroApartado={resumen.totalAhorroApartado}
                 />
+                {ahorros.errorCarga ? <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm font-bold text-rose-700">No se puede calcular el disponible hasta cargar los apartados de ahorro.</p>
+                  : ahorros.cargando ? <p role="status" className="p-3 text-sm text-slate-600">Cargando los apartados para calcular el disponible…</p> : <>
                 {/*
                  * =====================================================
                  * 2B — DISPONIBLE REAL
@@ -1451,6 +1462,11 @@ export function ExpenseAccountCard({
                                   </p>
                                 </div>
 
+                                <div className="flex items-center justify-between gap-4">
+                                  <div><p className="text-[10px] font-black text-indigo-700">Ahorro apartado</p>
+                                    <p className="mt-0.5 text-[9px] font-semibold text-slate-400">Dinero reservado en metas de esta cuenta</p></div>
+                                  <p className="text-xs font-black text-indigo-700">+ {formatoMoneda.format(resumen.totalAhorroApartado)}</p>
+                                </div>
                                 <div className="border-t border-indigo-100 pt-2.5">
                                   <div className="flex items-center justify-between gap-4">
                                     <p className="text-[10px] font-black uppercase tracking-[0.12em] text-indigo-600">
@@ -1601,10 +1617,12 @@ export function ExpenseAccountCard({
                           Los compromisos inactivos y los ya completados no
                           consumen Disponible real.
                         </p>
+                        <p className="text-[10px] font-semibold text-slate-400">El ahorro apartado sigue en el saldo bancario y se resta del disponible mientras no lo liberes.</p>
                       </div>
                     </div>
                   </div>
                 </div>
+                </>}
               </div>
             )}
 

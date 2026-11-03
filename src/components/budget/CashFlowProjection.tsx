@@ -20,6 +20,7 @@ interface Props {
   pagosTarjeta: PagoTarjeta[];
   cargando: boolean;
   errorDatos?: string | null;
+  ahorroApartado?: number;
 }
 export function CashFlowProjection(props: Props) {
   const [otrosGastos, setOtrosGastos] = useState("");
@@ -59,6 +60,8 @@ export function CashFlowProjection(props: Props) {
               {resultado.estadoCobro !== "proyectado" && <p className="text-xs text-slate-600">El próximo cobro figura como {resultado.estadoCobro === "recibido" ? "recibido; ya forma parte del saldo calculado" : "cancelado"} y no se añade otra vez como ingreso previsto.</p>}
               {resultado.estadoCobro === "proyectado" && resultado.cobroPrevisto === 0 && <p className="text-xs text-slate-600">No se ha incluido un importe del próximo cobro dentro del intervalo. Revisa su fecha y monto programados.</p>}
               <p className="text-xs text-slate-600">Saldo de partida: {moneda.format(resultado.saldoInicial)} · Entradas previstas: {moneda.format(resultado.entradasPrevistas)} · Salidas previstas: {moneda.format(resultado.salidasPrevistas)} · Saldo al final del intervalo: {moneda.format(resultado.saldoFinal)}.</p>
+              {Boolean(props.ahorroApartado) && <p className="text-xs font-semibold text-indigo-800">Ahorro apartado: {moneda.format(props.ahorroApartado ?? 0)}. Saldo final sin usar ese ahorro: {moneda.format(resultado.saldoFinal - (props.ahorroApartado ?? 0))}.
+                {resultado.saldoMinimo < (props.ahorroApartado ?? 0) ? " La proyección prevé utilizar parte del dinero apartado; revisa las metas o los pagos." : ""}</p>}
               <div className="max-h-80 overflow-auto rounded-xl border border-slate-200">
                 <table className="w-full text-left text-xs">
                   <caption className="sr-only">Movimientos estimados hasta el próximo cobro</caption>

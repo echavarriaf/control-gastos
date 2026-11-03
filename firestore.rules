@@ -1204,6 +1204,28 @@ function pagoFijoValido(data) {
       allow read, write:
         if false;
 
+      match /metasAhorro/{metaId} {
+        function metaValida(data) {
+          return data.keys().hasOnly(["nombre", "objetivo", "apartado", "fechaObjetivo", "notas", "archivada", "creadoEn", "actualizadoEn"])
+            && data.keys().hasAll(["nombre", "objetivo", "apartado", "fechaObjetivo", "notas", "archivada", "creadoEn", "actualizadoEn"])
+            && data.nombre is string && data.nombre.size() > 0 && data.nombre.size() <= 100
+            && data.objetivo is number && data.objetivo >= 0.01 && data.objetivo <= 1000000
+            && data.apartado is number && data.apartado >= 0 && data.apartado <= data.objetivo
+            && fechaCalendarioONullValida(data.fechaObjetivo)
+            && data.notas is string && data.notas.size() <= 500
+            && data.archivada is bool && (!data.archivada || data.apartado == 0)
+            && data.creadoEn is timestamp && data.actualizadoEn == request.time;
+        }
+        allow read: if usuarioPropietarioAutorizado(userId);
+        allow create: if usuarioPropietarioAutorizado(userId)
+          && exists(/databases/$(database)/documents/users/$(userId)/cuentas/cuenta-gastos)
+          && metaValida(request.resource.data) && request.resource.data.apartado == 0
+          && request.resource.data.archivada == false && request.resource.data.creadoEn == request.time;
+        allow update: if usuarioPropietarioAutorizado(userId) && resource.data.archivada == false
+          && metaValida(request.resource.data) && request.resource.data.creadoEn == resource.data.creadoEn;
+        allow delete: if false;
+      }
+
       match /gastos/{gastoId} {
         allow read:
           if usuarioPropietarioAutorizado(userId);

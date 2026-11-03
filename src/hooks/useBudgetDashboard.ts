@@ -74,6 +74,7 @@ import type {
 
 import { useExpenseAccount } from "@/hooks/useExpenseAccount";
 import { useFinancialDate } from "@/hooks/useFinancialDate";
+import { useSavingsGoals } from "@/hooks/useSavingsGoals";
 
 /**
  * Controlador principal de la pantalla del presupuesto.
@@ -89,6 +90,7 @@ export function useBudgetDashboard() {
   const period = useBudgetPeriod();
 
   const account = useExpenseAccount();
+  const savingsGoals = useSavingsGoals();
 
   const budget =
     useBudgetData();
@@ -553,6 +555,7 @@ const [
      */
     period,
     account,
+    savingsGoals,
     budget,
     fixedCommitments,
 

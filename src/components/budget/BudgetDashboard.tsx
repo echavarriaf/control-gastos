@@ -62,6 +62,7 @@ export function BudgetDashboard() {
           <ExportMovements mesSeleccionado={period.mesSeleccionado} />
           <ExpenseAccountCard
             account={dashboard.account}
+            ahorros={dashboard.savingsGoals}
             ingresos={incomeTransactions.ingresos}
             gastos={budget.gastos}
             pagosFijos={budget.pagosFijos}

@@ -62,7 +62,7 @@ Sin `--execute`, el script muestra los cambios previstos. Añade esa opción ún
 - **Recalibración:** conserva identificadores de movimientos ya incluidos en la fotografía del saldo para evitar contabilizarlos nuevamente. Los registros históricos se conservan.
 - **Tarjetas:** una compra contabilizada aumenta deuda sin descontar inmediatamente efectivo del banco. Un pago contabilizado reduce deuda y, cuando sale de la cuenta configurada, también su efectivo.
 - **Compras pendientes:** se muestran por separado y no afectan el saldo oficial ni la reserva bancaria hasta contabilizarse. Las compras históricas de tarjeta sin `estadoTarjeta` se interpretan como contabilizadas.
-- **Disponible real:** `saldoActual - totalComprometido`, donde `totalComprometido = reservasFijas + tarjetasReservadas - solapamiento`. Las reservas respetan la quincena presupuestaria y las ventanas de pago de tarjetas; no equivalen a toda la deuda existente.
+- **Disponible real:** `saldoActual - totalComprometido`, donde `totalComprometido = reservasFijas + tarjetasReservadas - solapamiento + ahorroApartado`. Las reservas respetan la quincena presupuestaria y las ventanas de pago de tarjetas; no equivalen a toda la deuda existente. Solo se reserva el importe apartado en metas, no sus objetivos sin financiar.
 - **Pagos fijos parciales:** mantienen la reserva completa del compromiso hasta completarlo. El solapamiento evita reservar dos veces lo que también corresponda a una tarjeta.
 
 La recalibración lee la cuenta y las cinco colecciones de movimientos dentro de una transacción de Firestore. El saldo base y sus listas se confirman juntos o no se guarda ninguno. Las cuentas antiguas que necesitan completar esas listas también se actualizan dentro de una transacción, para que una lectura no sobrescriba una recalibración concurrente. Si coinciden dos recalibraciones, se procesan como operaciones completas; la que se confirme al final determina la fotografía vigente.
@@ -70,6 +70,14 @@ La recalibración lee la cuenta y las cinco colecciones de movimientos dentro de
 Las reglas de negocio y compatibilidad se detallan en [AGENTS.md](AGENTS.md). Los cálculos principales están en `src/lib/budget/` y los resúmenes de tarjetas en `src/hooks/useCreditCardSummaries.ts`.
 
 Al registrar o editar un pago a tarjeta se puede elegir la cuenta configurada u **Otra cuenta externa**. El origen externo reduce la deuda al contabilizarse, sin descontar efectivo de la cuenta configurada ni incluirse en su recalibración. No administra un saldo externo. El historial muestra el origen y los pagos anteriores sin `origenFondos` conservan la cuenta configurada como origen. El campo opcional acepta `cuenta_gastos` o `cuenta_externa`; publicar estas reglas de Firestore es necesario antes de guardar pagos desde la nueva versión.
+
+### Metas de ahorro
+
+En **Cuenta operativa → Metas de ahorro** se crean objetivos con nombre, importe, fecha opcional y notas. Cada meta comienza con un apartado de cero. **Apartar** reserva dinero de la misma cuenta, reduciendo el disponible sin modificar su saldo bancario, la deuda de tarjetas ni el historial de entradas y salidas. **Liberar apartado** revierte esa reserva, sin crear un depósito. Si se utiliza el dinero, el gasto o la salida real se registra por separado. La proyección distingue también el saldo bancario del saldo final sin usar el ahorro apartado.
+
+El objetivo no genera reservas por sí solo. Una meta alcanzada conserva su apartado hasta liberarlo; para archivar hay que liberar primero todo el importe. Las metas archivadas quedan guardadas como registros inmutables y no se eliminan. Los aportes y liberaciones usan transacciones sobre el valor más reciente, con límites entre cero y el objetivo. El objetivo no puede reducirse por debajo del apartado existente. Los importes se redondean a centavos. Si las reservas superan el dinero de la cuenta, el disponible muestra el déficit, sin crear dinero ni reducir automáticamente otras reservas. Recalibrar el banco conserva los apartados existentes.
+
+Los datos viven en `users/{uid}/metasAhorro`, con reglas de propietario autorizado, esquema explícito y marcas de tiempo. El listener carga todas las metas activas, sin un límite que pueda omitir reservas. Al cambiar de sesión se ocultan los datos anteriores; si la carga falla o contiene importes inválidos, se oculta el disponible hasta resolverlo. La creación requiere una Cuenta de gastos configurada. Es necesario publicar las reglas actualizadas antes de usar esta función; no requiere índices compuestos ni migrar datos anteriores. Los apartados son reservas internas, no transacciones bancarias exportables ni transferencias a una cuenta externa.
 
 ### Exportar a CSV / Excel
 

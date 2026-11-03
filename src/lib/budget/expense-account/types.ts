@@ -192,11 +192,14 @@ export interface ResumenCuentaGastos {
   totalSolapamientoTarjetas:
   number;
 
+  /** Money earmarked for active savings goals; it remains part of bank cash. */
+  totalAhorroApartado: number;
+
   /**
    * Total realmente comprometido:
    *
    * reservas fijas
-   * + deuda tarjetas
+   * + deuda tarjetas + ahorro apartado
    * - solapamiento
    */
   totalComprometido:

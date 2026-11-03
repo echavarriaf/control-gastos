@@ -65,4 +65,11 @@ describe("Cash flow forecast view", () => {
     expect(html()).toContain("Revisa los importes de la proyección");
     expect(html()).not.toContain("$3,001.00");
   });
+  it("distinguishes reserved savings from projected bank cash and identifies savings at risk", () => {
+    props.ahorroApartado = 1200;
+    const result = html();
+    expect(result).toContain("Ahorro apartado: $1,200.00");
+    expect(result).toContain("Saldo final sin usar ese ahorro: $1,800.00");
+    expect(result).toContain("utilizar parte del dinero apartado");
+  });
 });

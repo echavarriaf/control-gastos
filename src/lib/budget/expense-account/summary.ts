@@ -33,6 +33,7 @@ import {
 } from "./fixed-reserves";
 import { construirLedger } from "./ledger";
 import { pagoTarjetaSaleDeCuenta } from "../payment-origin";
+import { totalAhorroApartado as sumarAhorros, type MetaAhorro } from "../savings-goals";
 
 export function calcularResumenCuentaGastos(
   cuenta:
@@ -73,6 +74,7 @@ export function calcularResumenCuentaGastos(
   movimientosManuales:
     MovimientoManualCuenta[] =
     [],
+  metasAhorro: Pick<MetaAhorro, "apartado" | "archivada">[] = [],
 ): ResumenCuentaGastos {
   const ingresosIncluidos =
     new Set(
@@ -804,11 +806,12 @@ export function calcularResumenCuentaGastos(
    *
    * El solapamiento elimina esa duplicación.
    */
+  const totalAhorroApartado = sumarAhorros(metasAhorro);
   const totalComprometido =
     redondearMoneda(
       totalReservasFijas +
       totalDeudaTarjetas -
-      totalSolapamientoTarjetas,
+      totalSolapamientoTarjetas + totalAhorroApartado,
     );
 
   /*
@@ -862,6 +865,7 @@ export function calcularResumenCuentaGastos(
 
     totalSolapamientoTarjetas,
 
+    totalAhorroApartado,
     totalComprometido,
 
     disponibleReal,
