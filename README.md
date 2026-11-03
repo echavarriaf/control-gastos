@@ -77,6 +77,16 @@ En la Cuenta operativa, **Conciliar con el banco** compara el saldo contable del
 
 La conciliación se completa cuando los saldos coinciden a centavos y todas las partidas están revisadas. La revisión es temporal: se reinicia al salir de la pantalla, recalibrar la cuenta o cambiar de sesión; un importe, fecha o dirección editado requiere revisar nuevamente esa partida. La comparación no modifica ni guarda saldos o movimientos y no requiere publicar recursos de Firebase. Para corregir diferencias, se registran o corrigen los movimientos en sus secciones habituales. No permite comparar fechas anteriores al saldo base vigente.
 
+### Proyección hasta el próximo cobro
+
+En la Cuenta operativa, **Proyección hasta el próximo cobro** parte del saldo actual calculado, antes de restar reservas, y muestra el saldo antes y después del ingreso previsto, el saldo mínimo y un detalle cronológico. Es una estimación: no crea movimientos ni altera el saldo real. Los ingresos recibidos o cancelados no se vuelven a sumar; un importe programado explícito sustituye el estimado de la configuración. También se cargan los ingresos programados del intervalo, mediante una consulta acotada por fecha y una lectura del documento del próximo ciclo.
+
+Se prevén los compromisos bancarios pendientes del mes actual y los meses incluidos hasta el cobro, ajustando vencimientos al último día real del mes. Los vencidos del mes actual se sitúan hoy. Se respeta la regla existente de pagos fijos parciales: su porción bancaria todavía no aplicada se incluye una vez, junto al pendiente bancario; los importes incluidos en una recalibración no se descuentan otra vez. Los compromisos con tarjeta no generan una salida bancaria directa.
+
+Las tarjetas activas se prevén cinco días antes del próximo corte por el saldo proyectado restante, con los cargos registrados hasta esa fecha. Los pagos pendientes propios se muestran aparte; los externos reducen la previsión de deuda sin descontar efectivo bancario. Los pagos ya contabilizados no se duplican. No se estiman cargos futuros a tarjetas todavía sin registrar. El campo **Otros gastos previstos** permite añadir una estimación temporal de comida, gas u otros gastos aún no registrados; se sitúa antes del cobro y no se guarda. Las salidas del mismo día se ordenan antes de las entradas para mostrar un escenario conservador. Las fechas reales de contabilización pueden variar.
+
+La proyección se actualiza con los datos y el cambio de día, es independiente del mes seleccionado y se oculta mientras faltan datos o existen errores de carga. No requiere publicar reglas ni índices nuevos de Firebase.
+
 ### Comida y gas: quincenas calendario
 
 Los presupuestos variables se agrupan por la fecha real del gasto: Q1 del día 1 al 15 y Q2 del 16 al último día del mes. Por ejemplo, el 30 de octubre pertenece a octubre Q2 y el 13 de noviembre a noviembre Q1, aunque sean fechas de cobro. Los ingresos mantienen sus ciclos de cobro cada 14 días; un tercer cobro no adelanta la quincena de comida o gas.

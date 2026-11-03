@@ -44,6 +44,9 @@ import type {
 import type { ExpenseAccountController } from "@/hooks/useExpenseAccount";
 import { BankReconciliation } from "./BankReconciliation";
 import { useAuth } from "@/contexts/AuthContext";
+import { CashFlowProjection } from "./CashFlowProjection";
+import { useFinancialDate } from "@/hooks/useFinancialDate";
+import type { CicloPago, TarjetaCredito } from "@/lib/budget/types";
 
 interface ExpenseAccountCardProps {
   account: ExpenseAccountController;
@@ -65,6 +68,11 @@ interface ExpenseAccountCardProps {
 
   cargandoCompromisos: boolean;
   errorDatos?: string | null;
+  proximoCiclo: CicloPago | null;
+  montoIngresoEstimado: number;
+  tarjetas: TarjetaCredito[];
+  cargandoProyeccion: boolean;
+  errorProyeccion?: string | null;
 }
 
 const formatoMoneda = new Intl.NumberFormat("en-US", {
@@ -367,8 +375,14 @@ export function ExpenseAccountCard({
   cargandoPresupuesto,
   cargandoCompromisos,
   errorDatos,
+  proximoCiclo,
+  montoIngresoEstimado,
+  tarjetas,
+  cargandoProyeccion,
+  errorProyeccion,
 }: ExpenseAccountCardProps) {
   const { user } = useAuth();
+  const hoy = useFinancialDate();
   const [editando, setEditando] = useState(false);
 
   const [mostrandoMovimientos, setMostrandoMovimientos] = useState(false);
@@ -1030,6 +1044,15 @@ export function ExpenseAccountCard({
                   fechaSaldoInicial={account.cuenta.fechaSaldoInicial}
                   cargando={cargandoMovimientos}
                   errorDatos={errorDatos || account.error}
+                />
+                <CashFlowProjection
+                  key={`proyeccion:${JSON.stringify([user?.uid, account.cuenta, proximoCiclo?.id])}`}
+                  hoy={hoy} cuenta={account.cuenta} resumenCuenta={resumen}
+                  proximoCiclo={proximoCiclo} montoEstimado={montoIngresoEstimado}
+                  ingresos={ingresos} compromisos={compromisosFijos} pagosFijos={pagosFijos}
+                  tarjetas={tarjetas} gastos={gastos} pagosTarjeta={pagosTarjeta}
+                  cargando={cargandoMovimientos || cargandoProyeccion}
+                  errorDatos={errorDatos || errorProyeccion || account.error}
                 />
                 {/*
                  * =====================================================

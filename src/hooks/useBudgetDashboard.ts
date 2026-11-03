@@ -73,6 +73,7 @@ import type {
 } from "@/lib/budget/types";
 
 import { useExpenseAccount } from "@/hooks/useExpenseAccount";
+import { useFinancialDate } from "@/hooks/useFinancialDate";
 
 /**
  * Controlador principal de la pantalla del presupuesto.
@@ -259,12 +260,16 @@ const [
       null,
     );
 
+  const fechaProyeccion = useFinancialDate();
   const incomeTransactions =
     useIncomeTransactions({
       modo: "cuenta",
       fechaSaldoInicial: account.cuenta?.fechaSaldoInicial ?? null,
       cicloActualId: income.cicloActual?.id ?? null,
       cicloSeleccionadoId: selectedIncomeCycle?.id ?? null,
+      proximoCicloId: income.proximoCiclo?.id ?? null,
+      inicioProyeccion: fechaProyeccion,
+      finProyeccion: income.proximoCiclo?.fechaPagoProgramada ?? null,
     });
 
   /**

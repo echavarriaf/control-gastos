@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { assertFails, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { collection, doc, getDocs, setDoc, writeBatch } from "firebase/firestore";
-import { ingresosDesdeSaldoInicial, movimientosDesdeSaldoInicial } from "@/lib/firestore/financial-queries";
+import { ingresosDesdeSaldoInicial, ingresosProgramadosEntre, movimientosDesdeSaldoInicial } from "@/lib/firestore/financial-queries";
 import { calcularResumenCuentaGastos, type CuentaGastos, type MovimientoManualCuenta } from "@/lib/budget/expense-account";
 import type { Ingreso } from "@/lib/budget/types";
 
@@ -58,6 +58,12 @@ beforeEach(async () => {
 afterAll(async () => { await env.cleanup(); });
 
 describe("Financial query ranges", () => {
+  it("loads projected and cancelled income only within the inclusive forecast dates", async () => {
+    const db = env.authenticatedContext(UID).firestore();
+    const result = await getDocs(ingresosProgramadosEntre(collection(db, "users", UID, "ingresos"), fecha, "2026-10-20"));
+    expect(result.docs.map(document => document.id).sort()).toEqual(["cancelled", "projected", "same-day"]);
+  });
+
   it("reads only manual movements on or after the bank baseline", async () => {
     const db = env.authenticatedContext(UID).firestore();
     const result = await getDocs(movimientosDesdeSaldoInicial(collection(db, "users", UID, "movimientosCuenta"), fecha));
@@ -100,5 +106,6 @@ describe("Financial query ranges", () => {
     const db = env.authenticatedContext("other").firestore();
     await assertFails(getDocs(ingresosDesdeSaldoInicial(collection(db, "users", UID, "ingresos"), fecha)));
     await assertFails(getDocs(movimientosDesdeSaldoInicial(collection(db, "users", UID, "movimientosCuenta"), fecha)));
+    await assertFails(getDocs(ingresosProgramadosEntre(collection(db, "users", UID, "ingresos"), fecha, "2026-10-20")));
   });
 });

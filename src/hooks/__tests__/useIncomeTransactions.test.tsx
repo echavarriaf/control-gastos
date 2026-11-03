@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface TestDocument { id: string; data: () => Record<string, unknown> }
 interface Listener {
-  reference: { kind?: string; path?: string; fecha?: string };
+  reference: { kind?: string; path?: string; fecha?: string; inicio?: string; fin?: string };
   next: (snapshot: unknown) => void;
   error: (error: Error) => void;
   unsubscribe: ReturnType<typeof vi.fn>;
@@ -34,6 +34,7 @@ vi.mock("@/lib/firestore/user-paths", () => ({
 }));
 vi.mock("@/lib/firestore/financial-queries", () => ({
   ingresosDesdeSaldoInicial: (reference: object, fecha: string) => ({ ...reference, kind: "bank", fecha }),
+  ingresosProgramadosEntre: (reference: object, inicio: string, fin: string) => ({ ...reference, kind: "projection", inicio, fin }),
 }));
 vi.mock("firebase/firestore", () => ({
   query: (reference: object) => ({ ...reference, kind: "history" }), orderBy: vi.fn(),
@@ -73,6 +74,34 @@ beforeEach(() => {
 });
 
 describe("Scoped income subscriptions", () => {
+  it("loads only the forecast interval and next-cycle document, deduplicating overlapping receipts", () => {
+    const projection = { ...scope, inicioProyeccion: "2026-10-10", finProyeccion: "2026-10-24", proximoCicloId: "next" };
+    render(projection); state.effect?.();
+    expect(state.listeners.map(listener => listener.reference)).toEqual([
+      { path: "user-a/ingresos", kind: "projection", inicio: "2026-10-10", fin: "2026-10-24" },
+      { path: "user-a/ingresos", kind: "bank", fecha: "2026-10-10" },
+      { path: "user-a/ingresos/cycle" }, { path: "user-a/ingresos/next" },
+    ]);
+    receiveCollection(0, [document("next", { estado: "proyectado", fechaRecibida: null })]);
+    receiveCollection(1, [document("cycle")]); receiveDocument(2, document("cycle"));
+    expect(render(projection).cargando).toBe(true);
+    receiveDocument(3, document("next", { estado: "cancelado", fechaRecibida: null }));
+    const result = render(projection);
+    expect(result.cargando).toBe(false);
+    expect(result.ingresos).toHaveLength(2);
+    expect(result.ingresosPorCiclo.get("next")?.estado).toBe("cancelado");
+  });
+
+  it("hides previous forecast income immediately when the horizon changes", () => {
+    const projection = { ...scope, inicioProyeccion: "2026-10-10", finProyeccion: "2026-10-24" };
+    render(projection); state.effect?.();
+    receiveCollection(0, [document("next")]); receiveCollection(1, []); receiveDocument(2, null);
+    expect(render(projection).ingresos).toHaveLength(1);
+    const result = render({ ...projection, inicioProyeccion: "2026-10-11" });
+    expect(result.ingresos).toEqual([]);
+    expect(result.cargando).toBe(true);
+  });
+
   it("subscribes only to bank receipts and the requested cycle on the dashboard", () => {
     render(); state.effect?.();
     expect(state.listeners.map(listener => listener.reference)).toEqual([

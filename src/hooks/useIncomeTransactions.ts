@@ -19,7 +19,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { ingresosDesdeSaldoInicial } from "@/lib/firestore/financial-queries";
+import { ingresosDesdeSaldoInicial, ingresosProgramadosEntre } from "@/lib/firestore/financial-queries";
 
 import {
   getUserCollection,
@@ -459,6 +459,9 @@ interface IncomeQueryScope {
   fechaSaldoInicial?: string | null;
   cicloActualId?: string | null;
   cicloSeleccionadoId?: string | null;
+  proximoCicloId?: string | null;
+  inicioProyeccion?: string | null;
+  finProyeccion?: string | null;
 }
 
 export function useIncomeTransactions({
@@ -466,6 +469,9 @@ export function useIncomeTransactions({
   fechaSaldoInicial = null,
   cicloActualId = null,
   cicloSeleccionadoId = null,
+  proximoCicloId = null,
+  inicioProyeccion = null,
+  finProyeccion = null,
 }: IncomeQueryScope = {}) {
   const {
     user,
@@ -515,7 +521,7 @@ export function useIncomeTransactions({
       null,
     );
 
-  const claveConsulta = JSON.stringify([uid, modo, fechaSaldoInicial, cicloActualId, cicloSeleccionadoId]);
+  const claveConsulta = JSON.stringify([uid, modo, fechaSaldoInicial, cicloActualId, cicloSeleccionadoId, proximoCicloId, inicioProyeccion, finProyeccion]);
   const [claveDatos, setClaveDatos] = useState<string | null>(null);
   const ingresos = useMemo(
     () => claveDatos === claveConsulta ? ingresosCargados : [],
@@ -568,10 +574,11 @@ export function useIncomeTransactions({
     };
 
     // Register every source before callbacks so partial initial results stay loading.
-    const ciclos = Array.from(new Set([cicloActualId, cicloSeleccionadoId].filter((id): id is string => Boolean(id))));
+    const ciclos = Array.from(new Set([cicloActualId, cicloSeleccionadoId, proximoCicloId].filter((id): id is string => Boolean(id))));
     if (modo === "historial") pendientes.add("historial");
     if (modo === "cuenta" && fechaSaldoInicial) pendientes.add("cuenta");
     if (modo === "cuenta") ciclos.forEach(id => pendientes.add(`ciclo:${id}`));
+    if (modo === "cuenta" && inicioProyeccion && finProyeccion) pendientes.add("proyeccion");
 
     if (modo === "historial") {
       cancelar.push(onSnapshot(
@@ -580,6 +587,13 @@ export function useIncomeTransactions({
         error => fallar("historial", error),
       ));
     } else {
+      if (inicioProyeccion && finProyeccion) {
+        cancelar.push(onSnapshot(
+          ingresosProgramadosEntre(getUserCollection(uid, "ingresos"), inicioProyeccion, finProyeccion),
+          snapshot => recibir("proyeccion", snapshot.docs),
+          error => fallar("proyeccion", error),
+        ));
+      }
       if (fechaSaldoInicial) {
         cancelar.push(onSnapshot(
           ingresosDesdeSaldoInicial(getUserCollection(uid, "ingresos"), fechaSaldoInicial),
@@ -600,7 +614,7 @@ export function useIncomeTransactions({
       activo = false;
       cancelar.forEach(unsubscribe => unsubscribe());
     };
-  }, [uid, modo, fechaSaldoInicial, cicloActualId, cicloSeleccionadoId, claveConsulta]);
+  }, [uid, modo, fechaSaldoInicial, cicloActualId, cicloSeleccionadoId, proximoCicloId, inicioProyeccion, finProyeccion, claveConsulta]);
 
   const ingresosPorCiclo =
     useMemo(

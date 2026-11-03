@@ -9,3 +9,8 @@ export function movimientosDesdeSaldoInicial(reference: CollectionReference<Docu
 export function ingresosDesdeSaldoInicial(reference: CollectionReference<DocumentData>, fecha: string) {
   return query(reference, where("fechaRecibida", ">=", fecha), orderBy("fechaRecibida", "desc"));
 }
+
+/** Only the projection interval is needed, including edited or cancelled paychecks. */
+export function ingresosProgramadosEntre(reference: CollectionReference<DocumentData>, inicio: string, fin: string) {
+  return query(reference, where("fechaProgramada", ">=", inicio), where("fechaProgramada", "<=", fin), orderBy("fechaProgramada", "asc"));
+}
