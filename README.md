@@ -71,6 +71,16 @@ Las reglas de negocio y compatibilidad se detallan en [AGENTS.md](AGENTS.md). Lo
 
 Al registrar o editar un pago a tarjeta se puede elegir la cuenta configurada u **Otra cuenta externa**. El origen externo reduce la deuda al contabilizarse, sin descontar efectivo de la cuenta configurada ni incluirse en su recalibración. No administra un saldo externo. El historial muestra el origen y los pagos anteriores sin `origenFondos` conservan la cuenta configurada como origen. El campo opcional acepta `cuenta_gastos` o `cuenta_externa`; publicar estas reglas de Firestore es necesario antes de guardar pagos desde la nueva versión.
 
+### Exportar a CSV / Excel
+
+**Exportar a CSV / Excel** permite descargar movimientos detallados o un resumen por mes y quincena calendario. El intervalo empieza con el mes seleccionado y puede editarse, con un máximo inclusivo de 366 días por archivo. Se genera CSV UTF-8 con BOM, separador coma y registros CRLF, compatible con Excel; no es un archivo nativo `.xlsx`. Se conservan comillas, comas y saltos de línea de los textos y se neutralizan los textos que una hoja de cálculo podría interpretar como fórmulas.
+
+La exportación incluye gastos, pagos de tarjetas, pagos fijos, movimientos manuales e ingresos, con IDs, categorías, estados, referencias, notas y origen de los pagos. Los ingresos recibidos se seleccionan por su fecha de recepción; los proyectados o cancelados, por la programada. Las fechas de calendario se mantienen literales y los instantes se convierten a la zona horaria del navegador. El historial anterior al saldo base se incluye cuando corresponde al intervalo; la papelera queda fuera.
+
+El resumen separa mes, quincena, tipo, dirección, categorías, estado y origen. Sus totales son importes registrados, no saldos bancarios: las compras y los pagos de tarjetas no se mezclan como un único gasto. Los importes inválidos quedan vacíos en el detalle y se cuentan por separado en el resumen. Un intervalo vacío genera un CSV válido con encabezados.
+
+La API `/api/export/movements` verifica el token y la autorización activa, y obtiene el UID exclusivamente del token. Hace consultas acotadas por fechas, incluyendo tanto texto histórico como marcas de tiempo nativas, paginadas de 500 en 500 sin truncar por cantidad de filas. Una transacción de solo lectura mantiene la misma fotografía durante la exportación. Las lecturas superpuestas se deduplican por colección e ID y solo se consultan los nombres de las tarjetas referenciadas del mismo usuario. El archivo se genera al solicitarlo, sin escrituras financieras ni almacenamiento de copias. No requiere publicar reglas o índices nuevos de Firebase.
+
 ### Deshacer eliminaciones
 
 Los gastos, pagos de tarjetas, pagos fijos, ingresos y movimientos manuales eliminados desde la aplicación se envían a una papelera persistente. El aviso **Deshacer** permite recuperar la última eliminación; **Movimientos eliminados**, en el dashboard, permite consultar y recuperar otras, incluso después de recargar. La lista se carga al abrirla, en páginas de 20, y puede actualizarse manualmente. No se borran automáticamente las copias. No se pueden recuperar eliminaciones anteriores a esta función ni las realizadas directamente fuera de este flujo.
