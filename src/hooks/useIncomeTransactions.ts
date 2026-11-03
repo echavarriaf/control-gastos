@@ -7,7 +7,6 @@ import {
 } from "react";
 
 import {
-  deleteDoc,
   type DocumentData,
   type QueryDocumentSnapshot,
   doc,
@@ -19,6 +18,7 @@ import {
 } from "firebase/firestore";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { enviarAPapelera } from "@/lib/movement-trash/client";
 import { ingresosDesdeSaldoInicial, ingresosProgramadosEntre } from "@/lib/firestore/financial-queries";
 
 import {
@@ -962,13 +962,7 @@ export function useIncomeTransactions({
       );
 
       try {
-        await deleteDoc(
-          getUserDocument(
-            uid,
-            "ingresos",
-            cicloPagoId,
-          ),
-        );
+        await enviarAPapelera(uid, "ingresos", cicloPagoId);
 
         return true;
       } catch (

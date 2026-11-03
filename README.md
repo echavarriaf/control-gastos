@@ -71,6 +71,16 @@ Las reglas de negocio y compatibilidad se detallan en [AGENTS.md](AGENTS.md). Lo
 
 Al registrar o editar un pago a tarjeta se puede elegir la cuenta configurada u **Otra cuenta externa**. El origen externo reduce la deuda al contabilizarse, sin descontar efectivo de la cuenta configurada ni incluirse en su recalibración. No administra un saldo externo. El historial muestra el origen y los pagos anteriores sin `origenFondos` conservan la cuenta configurada como origen. El campo opcional acepta `cuenta_gastos` o `cuenta_externa`; publicar estas reglas de Firestore es necesario antes de guardar pagos desde la nueva versión.
 
+### Deshacer eliminaciones
+
+Los gastos, pagos de tarjetas, pagos fijos, ingresos y movimientos manuales eliminados desde la aplicación se envían a una papelera persistente. El aviso **Deshacer** permite recuperar la última eliminación; **Movimientos eliminados**, en el dashboard, permite consultar y recuperar otras, incluso después de recargar. La lista se carga al abrirla, en páginas de 20, y puede actualizarse manualmente. No se borran automáticamente las copias. No se pueden recuperar eliminaciones anteriores a esta función ni las realizadas directamente fuera de este flujo.
+
+La API `/api/movements/trash` verifica el ID token, comprueba que no esté revocado y exige la autorización activa del propietario. Firebase Admin copia el documento original y lo elimina en una transacción; la recuperación crea el mismo ID con los datos exactos, incluidos origen de fondos, estado pendiente, campos históricos y marcas de tiempo, y elimina su copia en la misma transacción. No acepta datos financieros de reemplazo enviados por el navegador ni sobrescribe un documento que ya exista. Los saldos se recalculan con los listeners habituales, conservando las referencias de las fotografías iniciales.
+
+Si se recalibró la cuenta desde la eliminación de un movimiento bancario, se bloquea su recuperación automática para no alterar una fotografía posterior. Una recalibración de la tarjeta asociada, una tarjeta inexistente o un compromiso fijo eliminado también requieren revisar el registro antes de volver a registrarlo. La copia permanece en la papelera y el error se muestra al intentar recuperar. Los cambios de nombre de cuenta no se consideran recalibración.
+
+Las copias residen en `users/{uid}/papeleraMovimientos` y solo son accesibles desde la API. El SDK cliente no puede leerlas, crearlas, modificarlas ni borrarlas: las reglas actuales ya las deniegan mediante su cierre por defecto. Esta función no necesita publicar reglas o índices nuevos de Firebase.
+
 ### Conciliación bancaria
 
 En la Cuenta operativa, **Conciliar con el banco** compara el saldo contable del banco con los movimientos aplicados hasta la fecha elegida, desde el saldo base vigente. No usa el disponible después de reservas. Permite marcar las partidas que aparecen en el estado de cuenta y muestra el saldo revisado, las entradas y salidas sin revisar y la diferencia pendiente de explicar. Si las partidas sin revisar explican la diferencia por importe, se indica como una posibilidad para investigar, sin asumir que estén pendientes en el banco.

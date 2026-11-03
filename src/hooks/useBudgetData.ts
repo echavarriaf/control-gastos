@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import {
   addDoc,
-  deleteDoc,
   onSnapshot,
   orderBy,
   query,
@@ -14,6 +13,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/lib/firebase";
+import { enviarAPapelera } from "@/lib/movement-trash/client";
 import { normalizarOrigenFondosPago, validarOrigenFondosPago } from "@/lib/budget/payment-origin";
 import {
   getUserCollection,
@@ -1117,13 +1117,7 @@ export function useBudgetData() {
         );
       }
 
-      await deleteDoc(
-        getUserDocument(
-          uid,
-          coleccion,
-          movimiento.id,
-        ),
-      );
+      await enviarAPapelera(uid, coleccion, movimiento.id);
 
       try {
         if (PUSH_EVALUATION_ENABLED) {
@@ -1141,7 +1135,7 @@ export function useBudgetData() {
       }
     } catch (eliminarError) {
       console.error(eliminarError);
-      setError("No se pudo eliminar el movimiento.");
+      setError(eliminarError instanceof Error ? eliminarError.message : "No se pudo eliminar el movimiento.");
     } finally {
       setEliminandoMovimientoId(null);
     }
@@ -1161,18 +1155,12 @@ export function useBudgetData() {
     setError(null);
 
     try {
-      await deleteDoc(
-        getUserDocument(
-          uid,
-          "pagosFijos",
-          pago.id,
-        ),
-      );
+      await enviarAPapelera(uid, "pagosFijos", pago.id);
 
       return true;
     } catch (eliminarError) {
       console.error(eliminarError);
-      setError("No se pudo eliminar el pago fijo.");
+      setError(eliminarError instanceof Error ? eliminarError.message : "No se pudo eliminar el pago fijo.");
       return false;
     } finally {
       setEliminandoPagoFijoId(null);

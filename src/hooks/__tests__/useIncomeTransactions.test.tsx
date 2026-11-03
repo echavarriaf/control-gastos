@@ -28,6 +28,7 @@ vi.mock("react", async importOriginal => {
   };
 });
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: state.uid ? { uid: state.uid } : null, authorized: true }) }));
+vi.mock("@/lib/movement-trash/client", () => ({ enviarAPapelera: vi.fn().mockResolvedValue({}) }));
 vi.mock("@/lib/firestore/user-paths", () => ({
   getUserCollection: (uid: string, collection: string) => ({ path: `${uid}/${collection}` }),
   getUserDocument: (uid: string, collection: string, id: string) => ({ path: `${uid}/${collection}/${id}` }),

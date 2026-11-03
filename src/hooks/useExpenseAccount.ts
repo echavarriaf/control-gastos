@@ -16,7 +16,6 @@ import {
 
 import {
   addDoc,
-  deleteDoc,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -29,6 +28,7 @@ import {
 } from "@/lib/firestore/user-paths";
 
 import { movimientosDesdeSaldoInicial } from "@/lib/firestore/financial-queries";
+import { enviarAPapelera } from "@/lib/movement-trash/client";
 
 import {
   type CuentaGastos,
@@ -778,13 +778,7 @@ export function useExpenseAccount() {
         );
 
         try {
-          await deleteDoc(
-            getUserDocument(
-              uid,
-              "movimientosCuenta",
-              movimientoId,
-            ),
-          );
+          await enviarAPapelera(uid, "movimientosCuenta", movimientoId);
 
           return true;
         } catch (
