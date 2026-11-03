@@ -119,7 +119,7 @@ function QuincenaButton({
           : "text-slate-500 hover:text-slate-800"
       }`}
     >
-      Quincena {quincena}
+      Quincena {quincena} ({quincena === 1 ? "1–15" : "16–fin"})
     </button>
   );
 }

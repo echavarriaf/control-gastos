@@ -57,11 +57,9 @@ import {
 import {
   asignarFechaAPresupuesto,
   obtenerCoberturaPresupuestaria,
-  type ReglaPresupuestaria,
 } from "@/lib/budget/budget-periods";
 
 interface UseBudgetSummaryArgs {
-  reglaPresupuestaria?: ReglaPresupuestaria | null;
   gastos:
     GastoVariable[];
 
@@ -95,7 +93,6 @@ interface UseBudgetSummaryArgs {
  * siguiente puede recibir exceso de Q2 del mes anterior.
  */
 export function useBudgetSummary({
-  reglaPresupuestaria = null,
   gastos,
   pagos,
   pagosFijos,
@@ -107,8 +104,8 @@ export function useBudgetSummary({
 }: UseBudgetSummaryArgs) {
   return useMemo(
     () => {
-      const asignacion = (fecha: string) => asignarFechaAPresupuesto(fecha, reglaPresupuestaria);
-      const coberturaQuincena = obtenerCoberturaPresupuestaria(mesSeleccionado, quincenaSeleccionada, reglaPresupuestaria);
+      const asignacion = (fecha: string) => asignarFechaAPresupuesto(fecha);
+      const coberturaQuincena = obtenerCoberturaPresupuestaria(mesSeleccionado, quincenaSeleccionada);
       const gastosMes =
         gastos.filter(
           (gasto) =>
@@ -612,7 +609,6 @@ export function useBudgetSummary({
       };
     },
     [
-      reglaPresupuestaria,
       gastos,
       pagos,
       pagosFijos,

@@ -23,7 +23,7 @@ function render() {
 }
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date(2026, 9, 29, 23, 59, 30));
+  vi.setSystemTime(new Date(2026, 9, 31, 23, 59, 30));
   state.value = undefined; state.effect = undefined;
   fakeDocument = Object.assign(new EventTarget(), { visibilityState: "visible" });
   vi.stubGlobal("document", fakeDocument);
@@ -31,13 +31,13 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-it("changes to the third paycheck's budget after midnight without a page reload", async () => {
-  expect(render()).toBe("2026-10-29");
+it("refreshes the calendar half after midnight without a page reload", async () => {
+  expect(render()).toBe("2026-10-31");
   const cleanup = state.effect?.();
   await vi.advanceTimersByTimeAsync(60_000);
   const fecha = render();
-  expect(fecha).toBe("2026-10-30");
-  expect(asignarFechaAPresupuesto(fecha, { fechaAncla: "2026-10-02", intervaloDias: 14 }))
+  expect(fecha).toBe("2026-11-01");
+  expect(asignarFechaAPresupuesto(fecha))
     .toEqual({ periodoPresupuestario: "2026-11", quincenaPresupuestaria: 1 });
   cleanup?.();
   expect(vi.getTimerCount()).toBe(0);

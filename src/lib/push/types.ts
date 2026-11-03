@@ -322,7 +322,6 @@ export interface EvaluacionAlertasUsuarioResultado {
  */
 
 export interface PrepararAlertasPresupuestoArgs {
-  usarCarryOver?: boolean;
   uid:
     string;
 

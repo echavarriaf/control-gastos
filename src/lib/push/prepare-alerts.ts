@@ -15,7 +15,6 @@ import { reclamarAlertaTarjeta } from "./card-alert-state";
 
 export async function prepararAlertasPresupuesto({
   uid,
-  usarCarryOver = false,
   periodo,
   quincena,
   limites,
@@ -27,10 +26,10 @@ export async function prepararAlertasPresupuesto({
     AlertaPresupuestoPendiente[] =
       [];
 
-  const carry = usarCarryOver ? calcularCarryOverQuincenal({
+  const carry = calcularCarryOverQuincenal({
     movimientos: datos.gastos.flatMap(movimiento => movimiento.categoria === null ? [] : [{ ...movimiento, categoria: movimiento.categoria }]),
     limites, periodoObjetivo: periodo, quincenaObjetivo: quincena,
-  }) : null;
+  });
 
   for (
     const categoria of
@@ -83,22 +82,7 @@ export async function prepararAlertasPresupuesto({
       );
     }
 
-    const gastosQuincena =
-      gastosCategoria.filter(
-        (
-          movimiento,
-        ) =>
-          movimiento.quincena ===
-          quincena,
-      );
-
-    const saldoQuincenal = carry ? carry[categoria].consumoAjustadoQuincena :
-      Math.max(
-        sumarMontos(
-          gastosQuincena,
-        ),
-        0,
-      );
+    const saldoQuincenal = carry[categoria].consumoAjustadoQuincena;
 
     const alertaQuincenal =
       await reclamarAlertaPresupuesto({

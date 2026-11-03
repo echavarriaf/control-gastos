@@ -71,24 +71,13 @@ Las reglas de negocio y compatibilidad se detallan en [AGENTS.md](AGENTS.md). Lo
 
 Al registrar o editar un pago a tarjeta se puede elegir la cuenta configurada u **Otra cuenta externa**. El origen externo reduce la deuda al contabilizarse, sin descontar efectivo de la cuenta configurada ni incluirse en su recalibración. No administra un saldo externo. El historial muestra el origen y los pagos anteriores sin `origenFondos` conservan la cuenta configurada como origen. El campo opcional acepta `cuenta_gastos` o `cuenta_externa`; publicar estas reglas de Firestore es necesario antes de guardar pagos desde la nueva versión.
 
-### Comida y gas: quincenas iniciadas por el cobro
+### Comida y gas: quincenas calendario
 
-Cuando el ingreso principal está activo, configurado con frecuencia `cada_2_semanas` e intervalo de 14 días, los presupuestos variables usan ciclos de cobro, no los días 1–15 y 16–fin. La fecha ancla determina la secuencia; cada dos ciclos consecutivos financian un mes presupuestario. El gasto pertenece al ciclo abierto en su fecha real.
+Los presupuestos variables se agrupan por la fecha real del gasto: Q1 del día 1 al 15 y Q2 del 16 al último día del mes. Por ejemplo, el 30 de octubre pertenece a octubre Q2 y el 13 de noviembre a noviembre Q1, aunque sean fechas de cobro. Los ingresos mantienen sus ciclos de cobro cada 14 días; un tercer cobro no adelanta la quincena de comida o gas.
 
-Por ejemplo, con fecha ancla `2026-10-02`:
+El consumo mensual, el disponible por quincena, el arrastre y las alertas usan la misma asignación calendario. El selector abre la quincena calendario vigente y muestra su cobertura. No se modifican los movimientos guardados, los saldos bancarios ni las deudas de tarjetas; el historial se reagrupa por sus fechas existentes.
 
-| Cobro | Presupuesto financiado | Cobertura |
-| --- | --- | --- |
-| 2 de octubre | Octubre Q1 | 2–15 de octubre |
-| 16 de octubre | Octubre Q2 | 16–29 de octubre |
-| 30 de octubre | Noviembre Q1 | 30 de octubre–12 de noviembre |
-| 13 de noviembre | Noviembre Q2 | 13–26 de noviembre |
-
-El consumo mensual, el disponible por quincena, el arrastre y las alertas de comida/gas usan esa misma asignación. El selector abre el ciclo vigente y muestra sus fechas; el formulario conserva la fecha real del gasto, aunque el nombre del mes presupuestario sea el siguiente. Una pestaña abierta actualiza el ciclo al cambiar de día o regresar de una suspensión.
-
-La asignación se deriva de las fechas existentes: no modifica movimientos, saldos bancarios ni deudas de tarjetas y no requiere una migración. Cambiar la fecha ancla reinterpreta la asignación presupuestaria del historial. Las cuentas sin esa configuración conservan el comportamiento calendario. Los pagos fijos mantienen su agrupación calendario existente.
-
-Para calcular correctamente las alertas con arrastre, el servidor necesita los gastos históricos hasta el periodo financiado; no se recorta ese historial con un límite arbitrario de documentos. La política de recordatorios de tarjetas conserva su calendario de corte.
+Para calcular las alertas con arrastre, el servidor necesita el historial hasta el mes seleccionado; no se aplica un límite arbitrario de documentos. Los recordatorios de tarjetas conservan su calendario de corte.
 
 ## Organización
 
