@@ -73,6 +73,7 @@ export function BudgetDashboard() {
             cargandoIngresos={incomeTransactions.cargando}
             cargandoPresupuesto={budget.cargando}
             cargandoCompromisos={fixedCommitments.cargando}
+            errorDatos={incomeTransactions.error || budget.error || fixedCommitments.error}
           />
 
           <BudgetOverview dashboard={dashboard} />

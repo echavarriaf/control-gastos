@@ -71,6 +71,12 @@ Las reglas de negocio y compatibilidad se detallan en [AGENTS.md](AGENTS.md). Lo
 
 Al registrar o editar un pago a tarjeta se puede elegir la cuenta configurada u **Otra cuenta externa**. El origen externo reduce la deuda al contabilizarse, sin descontar efectivo de la cuenta configurada ni incluirse en su recalibración. No administra un saldo externo. El historial muestra el origen y los pagos anteriores sin `origenFondos` conservan la cuenta configurada como origen. El campo opcional acepta `cuenta_gastos` o `cuenta_externa`; publicar estas reglas de Firestore es necesario antes de guardar pagos desde la nueva versión.
 
+### Conciliación bancaria
+
+En la Cuenta operativa, **Conciliar con el banco** compara el saldo contable del banco con los movimientos aplicados hasta la fecha elegida, desde el saldo base vigente. No usa el disponible después de reservas. Permite marcar las partidas que aparecen en el estado de cuenta y muestra el saldo revisado, las entradas y salidas sin revisar y la diferencia pendiente de explicar. Si las partidas sin revisar explican la diferencia por importe, se indica como una posibilidad para investigar, sin asumir que estén pendientes en el banco.
+
+La conciliación se completa cuando los saldos coinciden a centavos y todas las partidas están revisadas. La revisión es temporal: se reinicia al salir de la pantalla, recalibrar la cuenta o cambiar de sesión; un importe, fecha o dirección editado requiere revisar nuevamente esa partida. La comparación no modifica ni guarda saldos o movimientos y no requiere publicar recursos de Firebase. Para corregir diferencias, se registran o corrigen los movimientos en sus secciones habituales. No permite comparar fechas anteriores al saldo base vigente.
+
 ### Comida y gas: quincenas calendario
 
 Los presupuestos variables se agrupan por la fecha real del gasto: Q1 del día 1 al 15 y Q2 del 16 al último día del mes. Por ejemplo, el 30 de octubre pertenece a octubre Q2 y el 13 de noviembre a noviembre Q1, aunque sean fechas de cobro. Los ingresos mantienen sus ciclos de cobro cada 14 días; un tercer cobro no adelanta la quincena de comida o gas.

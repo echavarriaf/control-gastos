@@ -42,6 +42,8 @@ import type {
 } from "@/lib/budget/types";
 
 import type { ExpenseAccountController } from "@/hooks/useExpenseAccount";
+import { BankReconciliation } from "./BankReconciliation";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ExpenseAccountCardProps {
   account: ExpenseAccountController;
@@ -62,6 +64,7 @@ interface ExpenseAccountCardProps {
   cargandoPresupuesto: boolean;
 
   cargandoCompromisos: boolean;
+  errorDatos?: string | null;
 }
 
 const formatoMoneda = new Intl.NumberFormat("en-US", {
@@ -363,7 +366,9 @@ export function ExpenseAccountCard({
   cargandoIngresos,
   cargandoPresupuesto,
   cargandoCompromisos,
+  errorDatos,
 }: ExpenseAccountCardProps) {
+  const { user } = useAuth();
   const [editando, setEditando] = useState(false);
 
   const [mostrandoMovimientos, setMostrandoMovimientos] = useState(false);
@@ -1019,6 +1024,13 @@ export function ExpenseAccountCard({
 
             {!editando && account.cuenta && resumen && (
               <div className="mt-5 space-y-3">
+                <BankReconciliation
+                  key={JSON.stringify([user?.uid, account.cuenta])}
+                  movimientos={resumen.movimientos}
+                  fechaSaldoInicial={account.cuenta.fechaSaldoInicial}
+                  cargando={cargandoMovimientos}
+                  errorDatos={errorDatos || account.error}
+                />
                 {/*
                  * =====================================================
                  * 2B — DISPONIBLE REAL
