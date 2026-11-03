@@ -1226,6 +1226,24 @@ function pagoFijoValido(data) {
         allow delete: if false;
       }
 
+      match /historialCambios/{eventoId} {
+        function eventoValido(data) {
+          let ruta = /databases/$(database)/documents/users/$(userId)/$(data.coleccion)/$(data.documentoId);
+          return data.keys().hasOnly(["actorUid", "coleccion", "documentoId", "accion", "antes", "despues", "fecha"])
+            && data.keys().hasAll(["actorUid", "coleccion", "documentoId", "accion", "antes", "despues", "fecha"])
+            && data.actorUid == request.auth.uid && data.actorUid == userId
+            && data.coleccion in ["gastos", "pagosTarjeta", "pagosFijos", "movimientosCuenta", "ingresos", "metasAhorro", "tarjetasCredito", "compromisosFijos", "configuracion", "cuentas"]
+            && data.documentoId is string && data.documentoId.size() > 0 && !data.documentoId.matches(".*/.*")
+            && data.fecha == request.time && data.despues is map
+            && existsAfter(ruta) && data.despues == getAfter(ruta).data
+            && ((data.accion == "creado" && data.antes == null && !exists(ruta))
+              || (data.accion == "editado" && data.antes is map && exists(ruta) && data.antes == get(ruta).data && data.antes != data.despues));
+        }
+        allow read: if usuarioPropietarioAutorizado(userId);
+        allow create: if usuarioPropietarioAutorizado(userId) && eventoValido(request.resource.data);
+        allow update, delete: if false;
+      }
+
       match /gastos/{gastoId} {
         allow read:
           if usuarioPropietarioAutorizado(userId);

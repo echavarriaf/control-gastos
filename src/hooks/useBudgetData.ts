@@ -1,14 +1,13 @@
 "use client";
 
+import { addDocConHistorial as addDoc, setDocConHistorial as setDoc, updateDocConHistorial as updateDoc } from "@/lib/history/client-writes";
+
 import { useEffect, useState } from "react";
 import {
-  addDoc,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
-  setDoc,
-  updateDoc
 } from "firebase/firestore";
 
 import { useAuth } from "@/contexts/AuthContext";

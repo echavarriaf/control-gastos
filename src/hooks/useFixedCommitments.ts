@@ -1,10 +1,10 @@
 "use client";
 
+import { addDocConHistorial as addDoc, setDocConHistorial as setDoc } from "@/lib/history/client-writes";
+
 import {
-  addDoc,
   onSnapshot,
   serverTimestamp,
-  setDoc,
 } from "firebase/firestore";
 
 import {

@@ -106,6 +106,10 @@ describe("Persistent movement trash API", () => {
     expect(result.status).toBe(200);
     expect((await source(coleccion).get()).data()).toEqual(original);
     expect((await archive(item.id).get()).exists).toBe(false);
+    const eventos = await db.collection(`users/${uid}/historialCambios`).orderBy("fecha", "asc").get();
+    expect(eventos.docs.map(documento => documento.data().accion)).toEqual(["eliminado", "recuperado"]);
+    expect(eventos.docs[0].data()).toMatchObject({ actorUid: uid, coleccion, documentoId: "movement", antes: original, despues: null });
+    expect(eventos.docs[1].data()).toMatchObject({ antes: null, despues: original });
   });
   it("does not trust a UID or replacement document supplied by the browser", async () => {
     await source().set(original); await source("gastos", "movement", other).set({ ...original, monto: 999 });

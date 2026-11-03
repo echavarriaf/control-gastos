@@ -9,6 +9,7 @@ import { ExpenseAccountCard } from "@/components/budget/ExpenseAccountCard";
 import { PeriodSelector } from "@/components/budget/PeriodSelector";
 import { MovementTrash } from "@/components/budget/MovementTrash";
 import { ExportMovements } from "@/components/budget/ExportMovements";
+import { ChangeHistory } from "@/components/budget/ChangeHistory";
 
 import { useBudgetDashboard } from "@/hooks/useBudgetDashboard";
 
@@ -60,6 +61,7 @@ export function BudgetDashboard() {
         <div className="space-y-5 p-4 pb-28 sm:p-6 sm:pb-8">
           <MovementTrash />
           <ExportMovements mesSeleccionado={period.mesSeleccionado} />
+          <ChangeHistory tarjetas={dashboard.creditCards.tarjetas} compromisos={fixedCommitments.compromisos} />
           <ExpenseAccountCard
             account={dashboard.account}
             ahorros={dashboard.savingsGoals}

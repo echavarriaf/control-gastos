@@ -596,6 +596,8 @@ Do not automatically assign `Otro` purchases to Food or Gas.
 
 # 22. Firestore rules
 
+Financial writes from the application must preserve the atomic change history in `users/{uid}/historialCambios`. Use the audited write helpers in `src/lib/history/client-writes.ts`; for existing transactions, record the event in the same transaction. Server-side deletion, restoration and bank recalibration use `src/lib/history/server.ts`. Never replace these flows with a financial write followed by a best-effort history write. Keep history append-only and preserve the original record creation timestamp. Do not fabricate past events or claim that external scripts, direct console writes or older clients are covered.
+
 Any new persisted field must be reviewed against `firestore.rules`.
 
 This project intentionally uses explicit schemas with constructs such as:

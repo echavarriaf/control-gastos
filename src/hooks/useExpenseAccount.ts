@@ -1,5 +1,7 @@
 "use client";
 
+import { addDocConHistorial as addDoc, setDocConHistorial as setDoc } from "@/lib/history/client-writes";
+
 import {
   useCallback,
   useEffect,
@@ -15,10 +17,8 @@ import {
 } from "@/lib/firebase";
 
 import {
-  addDoc,
   onSnapshot,
   serverTimestamp,
-  setDoc,
   Timestamp,
 } from "firebase/firestore";
 

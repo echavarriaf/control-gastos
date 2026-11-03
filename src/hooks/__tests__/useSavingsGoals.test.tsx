@@ -19,6 +19,8 @@ vi.mock("react", async importOriginal => ({
 }));
 vi.mock("@/contexts/AuthContext", () => ({ useAuth: () => ({ user: state.uid ? { uid: state.uid } : null, authorized: Boolean(state.uid) }) }));
 vi.mock("@/lib/firebase", () => ({ db: {} }));
+vi.mock("@/lib/history/client-writes", () => ({ addDocConHistorial: state.crear, registrarCambioEnTransaccion: vi.fn(),
+  transaccionConHistorial: (ref: unknown, callback: (transaction: unknown, snapshot: unknown) => unknown) => state.transaction({}, async (transaction: { get: (ref: unknown) => Promise<unknown> }) => callback(transaction, await transaction.get(ref))) }));
 vi.mock("@/lib/firestore/user-paths", () => ({ getUserCollection: (uid: string, collection: string) => ({ uid, collection }),
   getUserDocument: (uid: string, collection: string, id: string) => ({ uid, collection, id }) }));
 vi.mock("firebase/firestore", () => ({ addDoc: state.crear, serverTimestamp: () => "server-time", where: vi.fn(),

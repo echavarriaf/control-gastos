@@ -1,5 +1,7 @@
 "use client";
 
+import { setDocConHistorial as setDoc, updateDocConHistorial as updateDoc } from "@/lib/history/client-writes";
+
 import {
   useEffect,
   useMemo,
@@ -13,8 +15,6 @@ import {
   onSnapshot,
   orderBy,
   query,
-  setDoc,
-  updateDoc,
 } from "firebase/firestore";
 
 import { useAuth } from "@/contexts/AuthContext";

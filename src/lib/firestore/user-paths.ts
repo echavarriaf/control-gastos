@@ -33,7 +33,8 @@ export type UserCollectionName =
   | "ingresos"
   | "notificationDevices"
   | "movimientosCuenta"
-  | "metasAhorro";
+  | "metasAhorro"
+  | "historialCambios";
 
 export type UserConfigDocumentId =
   | "presupuestoFelo"

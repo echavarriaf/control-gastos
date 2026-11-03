@@ -20,6 +20,7 @@ import {
 } from "@/lib/budget/expense-account";
 
 import { pagoTarjetaSaleDeCuenta } from "@/lib/budget/payment-origin";
+import { registrarHistorialServidor } from "@/lib/history/server";
 
 export const runtime =
   "nodejs";
@@ -890,6 +891,9 @@ export async function PUT(
           merge: true,
         },
       );
+
+      registrarHistorialServidor(transaction, getAdminDb(), autorizacion.uid, "cuentas", EXPENSE_ACCOUNT_ID,
+        existente.data() ?? null, { ...existente.data(), ...datosFirestore }, existente.exists ? "recalibrado" : "creado");
 
       return respuestaJson({
         ok: true,

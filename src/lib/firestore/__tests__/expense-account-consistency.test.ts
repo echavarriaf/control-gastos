@@ -6,6 +6,7 @@ import { NextRequest } from "next/server";
 import { EXPENSE_ACCOUNT_ID } from "@/lib/budget/expense-account";
 
 const state = vi.hoisted(() => ({ uid: "", db: null as Firestore | null }));
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/firebase-admin", () => ({
   getAdminDb: () => {
     if (!state.db) throw new Error("Emulator not initialized");
@@ -97,6 +98,10 @@ describe("Expense account atomic baseline", () => {
     const payload = await response.json();
     for (const field of fields) expect(payload.cuenta[field]).toEqual(stored?.[field]);
     expect(stored?.creadoEn).toBeDefined();
+    const history = await db.collection(`users/${state.uid}/historialCambios`).get();
+    expect(history.size).toBe(1);
+    expect(history.docs[0].data()).toMatchObject({ actorUid: state.uid, coleccion: "cuentas", documentoId: EXPENSE_ACCOUNT_ID,
+      accion: "creado", antes: null, despues: stored });
   });
 
   it("backfills legacy snapshots atomically and preserves existing snapshots", async () => {

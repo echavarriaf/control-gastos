@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { FieldValue, type DocumentData, type Firestore } from "firebase-admin/firestore";
 import { esColeccionRecuperable, esIdDocumento, type ColeccionRecuperable, type MovimientoEliminado, type PaginaPapelera } from "./types";
+import { registrarHistorialServidor } from "@/lib/history/server";
 
 export class ErrorPapelera extends Error {
   constructor(message: string, public status: number) { super(message); }
@@ -50,6 +51,7 @@ export async function archivarMovimiento(db: Firestore, uid: string, coleccion: 
       versionTarjeta: versionTarjeta(tarjeta?.data()) };
     transaction.create(copia, archivo);
     transaction.delete(origen);
+    registrarHistorialServidor(transaction, db, uid, coleccion, documentoId, datos, null, "eliminado");
     return resumen(copia.id, archivo);
   });
   return resultado;
@@ -87,6 +89,7 @@ export async function restaurarMovimiento(db: Firestore, uid: string, archivoId:
     }
     transaction.create(origen, archivo.datos);
     transaction.delete(copia);
+    registrarHistorialServidor(transaction, db, uid, archivo.coleccion, archivo.documentoId, null, archivo.datos, "recuperado");
     return resumen(documento.id, archivo);
   });
 }

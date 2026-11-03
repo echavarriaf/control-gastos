@@ -1,10 +1,12 @@
 "use client";
+
+import { addDocConHistorial as addDoc } from "@/lib/history/client-writes";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { addDoc, onSnapshot, query, runTransaction, serverTimestamp, where } from "firebase/firestore";
+import { onSnapshot, query, serverTimestamp, where } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
 import { getUserCollection, getUserDocument } from "@/lib/firestore/user-paths";
 import { cambiarApartado, normalizarMetaAhorro, validarMetaAhorro, type DatosMetaAhorro, type MetaAhorro } from "@/lib/budget/savings-goals";
+import { registrarCambioEnTransaccion, transaccionConHistorial } from "@/lib/history/client-writes";
 
 export function useSavingsGoals() {
   const { user, authorized } = useAuth();
@@ -57,8 +59,7 @@ export function useSavingsGoals() {
   });
   const cambiar = (id: string, accion: "apartar" | "liberar" | "editar" | "archivar", input: number | DatosMetaAhorro = 0) => ejecutar(id, async propietario => {
     const referencia = getUserDocument(propietario, "metasAhorro", id);
-    await runTransaction(db, async transaction => {
-      const snapshot = await transaction.get(referencia);
+    await transaccionConHistorial(referencia, async (transaction, snapshot) => {
       const meta = snapshot.exists() ? normalizarMetaAhorro(snapshot.id, snapshot.data()) : null;
       if (!meta || meta.archivada) throw new Error("La meta ya no está disponible. Actualiza las metas.");
       let cambios: Partial<MetaAhorro>;
@@ -74,7 +75,9 @@ export function useSavingsGoals() {
         if (meta.apartado !== 0) throw new Error("Libera el dinero apartado antes de archivar la meta.");
         cambios = { archivada: true };
       }
-      transaction.update(referencia, { ...cambios, actualizadoEn: serverTimestamp() });
+      const actualizacion = { ...cambios, actualizadoEn: serverTimestamp() };
+      transaction.update(referencia, actualizacion);
+      registrarCambioEnTransaccion(transaction, referencia, snapshot.data()!, { ...snapshot.data(), ...actualizacion });
     });
   });
   const reintentar = useCallback(() => {
